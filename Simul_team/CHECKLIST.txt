@@ -1,0 +1,13 @@
+1. reward 부여 시점
+- 기존에는 환자 이송 시작 시 이동 시간 반영해서 기록
+- 현재는 병원 도착 시점의 생존율로 작성
+
+2. 병원 tier1, tier2 정의 바뀜
+
+TO-DO:
+1. reward 추가
+2. 강화학습용 내용 추가
+3. save_info (시나리오 저장) 기능 추가
+
+* ADG design
+: Neural network로 결과 학습
