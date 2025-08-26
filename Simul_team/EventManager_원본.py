@@ -507,8 +507,8 @@ class EventManager():
             h_tier = self.properties['hospital']['hos_tier'][h_idx]
             # Red, Yellow, Green, Black 순으로 처치
             for p_class in range(4):
-                if self.status['patient']['p_wait'][p_class]:
-                    new_p_idx = self.status['patient']['p_wait'][p_class].pop()
+                if self.status['patient']['p_wait'][p_class][h_idx+1]:
+                    new_p_idx = self.status['patient']['p_wait'][p_class][h_idx+1].pop()
                     break
             service_time = self.sample_service_time(h_tier=h_tier, p_class=p_class)
             # 병원, 환자 상태 업데이트

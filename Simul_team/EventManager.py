@@ -45,7 +45,12 @@ class EventManager():
 
                 h_idle_que_occ = self.status['hospital']['h_states'].copy() if 'hospital' in self.status else None
 
-                print('[EventQueueEmpty] t=', self.time, 'h_states(sample)=', h_idle_que_occ[:5] if h_idle_que_occ is not None else None)
+                if h_idle_que_occ is None:
+                    print(f'[EventQueueEmpty] t={self.time} h_states=None')
+                else:
+                    # numpy가 ... 로 줄이지 않도록 옵션
+                    with np.printoptions(threshold=np.inf, linewidth=200, suppress=True):
+                        print(f'[EventQueueEmpty] t={self.time}  h_states.shape={h_idle_que_occ.shape}\n{h_idle_que_occ}')
 
                 return log, True
 
@@ -372,6 +377,7 @@ class EventManager():
         if n_idle > 0: # 서비스 시작
             h_tier = self.properties['hospital']['hos_tier'][h_idx]
             service_time = self.sample_service_time(h_tier=h_tier, p_class=p_class)
+            log['p_admit'].append((self.time, p_class))
             # 병원, 환자 상태 업데이트
             self.status['hospital']['h_states'][h_idx, 0] -= 1  # n_idle -= 1
             # 이벤트 추가
@@ -419,7 +425,7 @@ class EventManager():
             # 이벤트 추가
             self.add_event(handover_time, 'p_care_ready', (p_idx, h_idx))
             # event log 추가
-            log['p_admit'].append((self.time, p_class))
+            # log['p_admit'].append((self.time, p_class))
         else:
             destination = self.diversion_rule(h_idx, pass_to_tier1=p_info['treat_tier1'][p_class],
                                               pass_to_tier2=p_info['treat_tier2'][p_class],
@@ -476,7 +482,7 @@ class EventManager():
             # 이벤트 추가
             self.add_event(handover_time, 'p_care_ready', (p_idx, h_idx))
             # event log 추가
-            log['p_admit'].append((self.time, p_class))
+            # log['p_admit'].append((self.time, p_class))
         else:
             destination = self.diversion_rule(h_idx, pass_to_tier1=p_info['treat_tier1'][p_class],
                                               pass_to_tier2=p_info['treat_tier2'][p_class],
@@ -515,21 +521,12 @@ class EventManager():
         if n_queue > 0:
             h_tier = self.properties['hospital']['hos_tier'][h_idx]
             # Red, Yellow, Green, Black 순으로 처치
-            # 병원별 대기열에서 Red→Yellow→Green→Black 순으로 처치 시작
-            new_p_idx = None
-            p_class = None
-            for cls in range(4):
-                queue = self.status['patient']['p_wait'][cls][h_idx+1]
-                if queue:
-                    p_class = cls
-                    new_p_idx = queue.pop()
+            for p_class in range(4):
+                if self.status['patient']['p_wait'][p_class][h_idx+1]:
+                    new_p_idx = self.status['patient']['p_wait'][p_class][h_idx+1].pop()
                     break
-            if new_p_idx is None:
-                # 병원 큐 카운트만 있고 실제 환자 큐가 비어있다면 불일치 → 안전 복구 후 종료
-                self.status['hospital']['h_states'][h_idx, 0] += 1  # n_idle += 1
-                self.status['hospital']['h_states'][h_idx, 1] = max(self.status['hospital']['h_states'][h_idx, 1] - 1, 0)  # n_queue -= 1
-                return log, False
             service_time = self.sample_service_time(h_tier=h_tier, p_class=p_class)
+            log['p_admit'].append((self.time, p_class))
             # 병원, 환자 상태 업데이트
             self.status['hospital']['h_states'][h_idx, 1] -= 1  # n_queue -= 1
             # 이벤트 추가
