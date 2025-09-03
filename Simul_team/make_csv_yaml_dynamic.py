@@ -8,9 +8,30 @@ import argparse
 import pandas as pd
 import numpy as np
 import requests
-from datetime import datetime
 from haversine import haversine
 from random_coordinate_generator import CoordinateGenerator
+# [ADD] ──────────────────────────────────────────────────────────────
+import re
+from datetime import timezone, timedelta, datetime
+from typing import Optional
+
+KST = timezone(timedelta(hours=9))
+
+def ensure_dir(path: str):
+    os.makedirs(path, exist_ok=True)
+
+def slugify(name: str, maxlen: int = 60) -> str:
+    s = re.sub(r"[^\w\-\s]", "", str(name))
+    s = re.sub(r"\s+", "_", s).strip("_")
+    return (s[:maxlen] or "noname")
+
+def save_route_json(meta: dict, payload: Optional[dict], out_path: str):
+    ensure_dir(os.path.dirname(out_path))
+    data = {"meta": meta, "payload": {"naver_response": payload} if payload else None}
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+# [ADD END] ─────────────────────────────────────────────────────────
+
 
 def parse_util_map(text: str):
     """
@@ -79,7 +100,7 @@ class ScenarioGenerator:
         }
         
         # 후보군 확장 배수 (AMB road distance 호출 수 완화)
-        self.multiplier = 2
+        self.multiplier = 1.5
 
         # --- ENV 주입(PS에서 전달) ---
         # util_by_tier: 예) "1:0.656,11:0.461,etc:0.461"
@@ -87,7 +108,7 @@ class ScenarioGenerator:
         self.util_by_tier = env_util or {1: 0.656, 11: 0.461, "etc": 0.461}
 
         # queue_policy: "0" | "capa/2" | "0.5" 등
-        self.queue_policy = os.environ.get("MCI_QUEUE_POLICY", "0")
+        # self.queue_policy = os.environ.get("MCI_QUEUE_POLICY", "0")
 
         # buffer_ratio: float
         try:
@@ -100,7 +121,7 @@ class ScenarioGenerator:
         
         print(f"📁 프로젝트 경로: {self.base_path}")
         print(f"🆔 실험 ID: {self.experiment_id}")
-        print(f"🪑 queue_policy={self.queue_policy} | buffer_ratio={self.buffer_ratio}")
+        print(f"buffer_ratio={self.buffer_ratio}")
 
     def _validate_data_files(self):
         """필수 데이터 파일들의 존재성 검증"""
@@ -120,7 +141,7 @@ class ScenarioGenerator:
             raise FileNotFoundError("필수 데이터 파일들을 확인해주세요.")
         print("✅ 모든 필수 데이터 파일 확인 완료")
 
-    def get_road_distance(self, start, end, max_retries=3):
+    def get_road_distance(self, start, end, max_retries=3, save_json_dir=None, route_type=None, source_index=None, name=None, start_label="start", goal_label="goal"):
         """도로 거리 계산 (재시도 로직 포함)"""
         if not self.client_id or not self.client_secret:
             # API 키 없으면 유클리드로 대체
@@ -136,7 +157,8 @@ class ScenarioGenerator:
             "goal": f"{end[1]},{end[0]}",
             "option": "trafast",
             "car_type": 0,
-            "fuel_type": "DIESEL"
+            "fuel_type": "DIESEL",
+            "summary": "true"               # [ADD]
         }
 
         for attempt in range(max_retries):
@@ -144,7 +166,38 @@ class ScenarioGenerator:
                 response = requests.get(url, headers=headers, params=params, timeout=15)
                 if response.status_code == 200:
                     data = response.json()
-                    return data["route"]["trafast"][0]["summary"]["distance"] / 1000  # m → km
+                    # --- 기존 반환용 거리(km)
+                    summary = data["route"]["trafast"][0]["summary"]
+                    distance_km = summary["distance"] / 1000.0
+
+                    # --- [ADD] 저장 메타
+                    if save_json_dir:
+                        now = datetime.now(KST).isoformat()
+                        meta = {
+                            "route_type": route_type,
+                            "source_index": source_index,
+                            "name": name,
+                            # 좌표는 경량/호환 목적상 [lon,lat]로 저장
+                            start_label: [start[1], start[0]],
+                            goal_label:  [end[1],   end[0]],
+                            "option": params.get("option"),
+                            "car_type": params.get("car_type"),
+                            "fuel_type": params.get("fuel_type"),
+                            "saved_at": now,
+                            # 요약 필드
+                            "distance_km": distance_km,
+                            "duration_sec": summary.get("duration"),
+                            "tollFare": summary.get("tollFare"),
+                            "taxiFare": summary.get("taxiFare"),
+                            "fuelPrice": summary.get("fuelPrice"),
+                            # 참고: 현재 방향 (site→hospital 여부)도 명시 가능
+                            "direction_note": f"{start_label}->{goal_label}"
+                        }
+                        fname = f"{(source_index if source_index is not None else 0):03d}_{slugify(name)}.json"
+                        out_path = os.path.join(save_json_dir, fname)
+                        save_route_json(meta, data, out_path)
+                        print(f"  📦 [{route_type}] idx={source_index:03d} {name} → saved: {out_path}")
+                    return distance_km
                 elif response.status_code == 401:
                     time.sleep(1)
                 elif response.status_code == 429:
@@ -218,15 +271,24 @@ class ScenarioGenerator:
         df_sorted_euc = df_sorted_euc[["init_distance", "안전센터/소방서이름"]]
         euc_save_path = os.path.join(save_folder, "amb_info_euc.csv")
         df_sorted_euc.to_csv(euc_save_path, index=True, index_label="Index", encoding="utf-8-sig")
+        
+        # [ADD] center2site 저장 폴더
+        routes_dir = os.path.join(save_folder, "routes", "center2site")
+        ensure_dir(routes_dir)
 
         # 후보군 확장 및 도로 거리 계산
-        df_candidates = df.sort_values("euclidean_distance").head(incident_size * self.multiplier).copy()
+        df_candidates = df.sort_values("euclidean_distance").head(int(incident_size * self.multiplier)).copy()
         road_distances = []
-        for _, row in df_candidates.iterrows():
-            coord = (row["y좌표"], row["x좌표"])
-            dist = self.get_road_distance(coord, (latitude, longitude))
+        for j, (_, row) in enumerate(df_candidates.iterrows()):
+            coord = (row["y좌표"], row["x좌표"])  # (lat,lon) of center
+            dist = self.get_road_distance(
+                start=coord, end=(latitude, longitude),           # center → site
+                save_json_dir=routes_dir, route_type="center2site",
+                source_index=j, name=row.get("기관명", f"center_{j}"),
+                start_label="center", goal_label="site"
+            )
             road_distances.append(dist)
-            time.sleep(0.05)  # API 호출 간격
+            time.sleep(0.05)
         df_candidates["road_distance"] = road_distances
 
         # ROAD 저장
@@ -266,7 +328,7 @@ class ScenarioGenerator:
 
         # ---------- (2) 파라미터 ----------
         util_by_tier = getattr(self, "util_by_tier", {1: 0.656, 11: 0.461, "etc": 0.461})
-        queue_policy = str(getattr(self, "queue_policy", "0")).strip()
+        # queue_policy = str(getattr(self, "queue_policy", "0")).strip()
         try:
             buffer_ratio = float(getattr(self, "buffer_ratio", 1.5))
         except Exception:
@@ -283,30 +345,44 @@ class ScenarioGenerator:
                 return util_by_tier.get(icode, util_by_tier.get("etc", 0.461))
             except Exception:
                 return util_by_tier.get("etc", 0.461)
-
-        def _queue_from_policy(capa):
-            if queue_policy in ("0", "none", "None"):
-                return 0
-            if isinstance(queue_policy, str) and queue_policy.startswith("capa/"):
-                try:
-                    denom = float(queue_policy.split("/", 1)[1])
-                    if denom > 0:
-                        return int(max(0, math.floor(capa / denom)))
-                except Exception:
-                    return 0
-            try:
-                frac = float(queue_policy)
-                if 0 < frac <= 1:
-                    return int(max(0, math.floor(capa * frac)))
-            except Exception:
-                pass
-            return 0
-
-        # capa(now) 계산 = 응급실병상수 × (1-util)
+        # ========== [수정 1] capa 계산 (기존과 동일) ==========    
         df["util"] = df["종별코드"].apply(_get_util)
         df["capa"] = (df["응급실병상수"] * (1 - df["util"])).apply(lambda x: int(max(0, math.floor(x))))
-        df["queue_capa"] = df["capa"].apply(_queue_from_policy)
-        df["eff"] = df["capa"] + df["queue_capa"]
+        
+        # ========== [수정 2] '수술실 수' 계산 (새로운 a 컴포넌트) ==========
+        conditions = [
+            df['종별코드'] == 1,  # 상급종합병원
+            df['종별코드'] == 11  # 종합병원
+        ]
+        values = [4, 3] # 상급종합병원: 4, 종합병원: 3
+        df['operating_rooms'] = np.select(conditions, values, default=2)
+
+        # =========== [수정 3] 새로운 '실효 수용력(eff)' 계산 (기존 queue_capa 계산은 삭제) ==========
+        df["eff"] = df["operating_rooms"] + df["capa"] # a * 수술실수 + b * 병상수 (a=1, b=1로 가정)
+        
+        # def _queue_from_policy(capa):
+        #     if queue_policy in ("0", "none", "None"):
+        #         return 0
+        #     if isinstance(queue_policy, str) and queue_policy.startswith("capa/"):
+        #         try:
+        #             denom = float(queue_policy.split("/", 1)[1])
+        #             if denom > 0:
+        #                 return int(max(0, math.floor(capa / denom)))
+        #         except Exception:
+        #             return 0
+        #     try:
+        #         frac = float(queue_policy)
+        #         if 0 < frac <= 1:
+        #             return int(max(0, math.floor(capa * frac)))
+        #     except Exception:
+        #         pass
+        #     return 0
+
+        # # capa(now) 계산 = 응급실병상수 × (1-util)
+        # df["util"] = df["종별코드"].apply(_get_util)
+        # df["capa"] = (df["응급실병상수"] * (1 - df["util"])).apply(lambda x: int(max(0, math.floor(x))))
+        # df["queue_capa"] = df["capa"].apply(_queue_from_policy)
+        # df["eff"] = df["capa"] + df["queue_capa"]
         df["is_tier1"] = (df["종별코드"].astype(str).astype(float).astype(int) == 1).astype(int)
 
         # ---------- (3) 전역 상급 용량 점검 (불가능 사전 감지) ----------
@@ -348,12 +424,14 @@ class ScenarioGenerator:
             if acc_tier1 >= U:
                 break
 
+
+
         # 5-2) 나머지에서 총 capa를 N까지 채우기 (capa 내림차순)
         rest_cand = df_cand.drop(index=sel_names, errors="ignore").sort_values("capa", ascending=False)
         for _, r in rest_cand.iterrows():
             # 제안: 최종 리스트에도 여유를 남김
-            tier1_keep = float(os.environ.get("MCI_TIER1_KEEP", "1.8"))  # 상급 여유(기본 1.8배)
-            total_keep = float(os.environ.get("MCI_TOTAL_KEEP", "1.2"))  # 전체 여유(기본 1.2배)
+            tier1_keep = float(os.environ.get("MCI_TIER1_KEEP", "5"))  # 상급 여유
+            total_keep = float(os.environ.get("MCI_TOTAL_KEEP", "5"))  # 전체 여유
 
             if (acc_tier1 >= U * tier1_keep) and (acc_capa >= N * total_keep):
                 break
@@ -403,16 +481,27 @@ class ScenarioGenerator:
         dist_euc_path = os.path.join(save_folder, "distance_Hos2Site_euc.csv")
         dist_euc_df.to_csv(dist_euc_path, index=True, index_label="Index", encoding="utf-8-sig")
 
-        euc_info = df_euc[["capa", "queue_capa", "종별코드", "요양기관명"]].copy()
-        euc_info.columns = ["병상수", "queue_capa", "종별코드", "요양기관명"]
+        # euc_info = df_euc[["capa", "queue_capa", "종별코드", "요양기관명"]].copy()
+        # euc_info.columns = ["병상수", "queue_capa", "종별코드", "요양기관명"]
+        euc_info = df_euc[["operating_rooms", "capa", "종별코드", "요양기관명"]].copy()
+        euc_info.columns = ["수술실수", "병상수", "종별코드", "요양기관명"]
         euc_info_path = os.path.join(save_folder, "hospital_info_euc.csv")
         euc_info.to_csv(euc_info_path, index=True, index_label="Index", encoding="utf-8-sig")
 
+        # [ADD] hos2site 저장 폴더
+        routes_dir_hos = os.path.join(save_folder, "routes", "hos2site")
+        ensure_dir(routes_dir_hos)
+
         # ---------- (7) ROAD 거리 계산 & 저장 (선정 병원만) ----------
         road_distances = []
-        for _, row in df_euc.iterrows():
-            end = (row["y좌표"], row["x좌표"])
-            road_km = self.get_road_distance((latitude, longitude), end)
+        for j, (_, row) in enumerate(df_euc.iterrows()):
+            end = (row["y좌표"], row["x좌표"])   # (lat,lon) of hospital
+            road_km = self.get_road_distance(
+                start=(latitude, longitude), end=end,            # 현재: site → hospital
+                save_json_dir=routes_dir_hos, route_type="hos2site",
+                source_index=j, name=row.get("요양기관명", f"hospital_{j}"),
+                start_label="site", goal_label="hospital"
+            )
             road_distances.append(road_km)
             time.sleep(0.05)
         df_euc = df_euc.copy()
@@ -423,8 +512,8 @@ class ScenarioGenerator:
         dist_road_path = os.path.join(save_folder, "distance_Hos2Site_road.csv")
         dist_road_df.to_csv(dist_road_path, index=True, index_label="Index", encoding="utf-8-sig")
 
-        road_info = df_road[["capa", "queue_capa", "종별코드", "요양기관명"]].copy()
-        road_info.columns = ["병상수", "queue_capa", "종별코드", "요양기관명"]
+        road_info = df_road[["operating_rooms", "capa", "종별코드", "요양기관명"]].copy()
+        road_info.columns = ["수술실수", "병상수", "종별코드", "요양기관명"]
         road_info_path = os.path.join(save_folder, "hospital_info_road.csv")
         road_info.to_csv(road_info_path, index=True, index_label="Index", encoding="utf-8-sig")
 
@@ -801,7 +890,7 @@ if __name__ == "__main__":
     parser.add_argument("--coord_mode", choices=["korea_random", "sido"], default="korea_random", help="좌표 생성 모드")
     parser.add_argument("--sido_name", type=str, help="시도명 (coord_mode=sido일 때)")
     # 고급 옵션(ENV 또는 CLI 둘 다 허용)
-    parser.add_argument("--queue_policy", type=str, help='예: "0", "capa/2", "0.5"')
+    # parser.add_argument("--queue_policy", type=str, help='예: "0", "capa/2", "0.5"')
     parser.add_argument("--buffer_ratio", type=float, help="후보군 버퍼 배수 (기본 1.5)")
     parser.add_argument("--util_by_tier", type=str, help='예: "1:0.90,11:0.75,etc:0.60"')
     parser.add_argument("--hospital_max_send_coeff", type=str, default=None, help="전송계수 'a,b' 형식 (예: 1.1,1.0). 미입력시 ENV(MCI_MAX_SEND_COEFF) 또는 기본 1,1")
@@ -820,8 +909,8 @@ if __name__ == "__main__":
         # CLI가 주어지면 ENV 기본값을 덮어씀
         if args.hospital_max_send_coeff:
             generator.max_send_coeff_text = args.hospital_max_send_coeff
-        if args.queue_policy is not None:
-            generator.queue_policy = args.queue_policy
+        # if args.queue_policy is not None:
+        #     generator.queue_policy = args.queue_policy
         if args.buffer_ratio is not None:
             generator.buffer_ratio = float(args.buffer_ratio)
         if args.util_by_tier:
@@ -830,7 +919,7 @@ if __name__ == "__main__":
                 generator.util_by_tier = m
 
         # 현재 적용값 재출력
-        print(f"🪑 queue_policy={generator.queue_policy} | buffer_ratio={generator.buffer_ratio}")
+        print(f"buffer_ratio={generator.buffer_ratio}")
 
         # 좌표 처리
         if args.generate_coord:

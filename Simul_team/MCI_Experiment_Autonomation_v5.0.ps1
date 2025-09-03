@@ -407,8 +407,8 @@ function Save-ExperimentLog {
     
     # 좌표 정보 추출
     $coordText = switch ($Config.Mode) {
-        "korea_random" { "대한민국_전국완전랜덤" }
-        "sido" { $Config.SidoName }
+        "korea_random" { "($($Config.Latitude),$($Config.Longitude))"  }
+        "sido" { "($($Config.Latitude),$($Config.Longitude))"  }
         "manual" { "($($Config.Latitude),$($Config.Longitude))" }
     }
     
@@ -1279,7 +1279,7 @@ function Get-AdvancedOptions {
     Write-StyledHeader "⚙️ 고급 옵션(병원선정/AMB/Patient)" $Colors.Header
 
     # 기본값
-    $QueuePolicyDefault = "0"
+    $QueuePolicy= "0"
     $UtilByTierDefault  = "1:0.656,11:0.461,etc:0.461"
     $BufferRatioDefault = 1.5
 
@@ -1601,46 +1601,7 @@ function Show-ExperimentReview {
         Write-Host "    반복: ${totalSamples}회, 시드: $randomSeed" -ForegroundColor $Colors.Info
     }
     
-    # API 사용량 정확 계산
-    $totalDirectionsCalls = 0
-    $totalGeocodingCalls = 0
-    
-    foreach ($config in $SimConfigs) {
-        # 파라미터 안전하게 추출
-        $configParams = if ($config -is [PSCustomObject]) { 
-            $config.Parameters 
-        } else { 
-            $config["Parameters"] 
-        }
-        
-        $incidentSize = if ($configParams -is [PSCustomObject]) {
-            $configParams.incident_size
-        } else {
-            $configParams["incident_size"]
-        }
-        
-        # Directions API 호출량 계산
-        $directionsPerSim = $incidentSize + $incidentSize + ($incidentSize * ($incidentSize - 1) / 2)
-        $totalDirectionsCalls += $directionsPerSim
-        
-        # Geocoding API: 좌표 생성 성공시 1회 (재시도 포함 최대 5회)
-        $geocodingPerSim = if ($config.Mode -ne "manual") { 5 } else { 0 }  # 수동입력은 geocoding 불필요
-        $totalGeocodingCalls += $geocodingPerSim
-    }
 
-    $totalAPICalls = $totalDirectionsCalls + $totalGeocodingCalls
-    
-    Write-Host ""
-    Write-Host "  ⚠️ 예상 Naver API 호출량" -ForegroundColor $Colors.Warning
-    Write-Host "  ─────────────────────────" -ForegroundColor $Colors.Warning
-    Write-Host "    • Directions 5: $($totalDirectionsCalls.ToString('N0'))회 (거리 계산)" -ForegroundColor $Colors.Debug
-    Write-Host "    • Reverse Geocoding: $($totalGeocodingCalls.ToString('N0'))회 (좌표 검증)" -ForegroundColor $Colors.Debug
-    Write-Host "    • 이 예상 호출: $($totalAPICalls.ToString('N0'))회" -ForegroundColor $Colors.Warning
-    
-    if ($totalAPICalls -gt 1000) {
-        Write-Host "    💰 참고: Naver API 무료 한도 확인 필요" -ForegroundColor $Colors.Warning
-    }
-    Write-Host ""
 }
 
 # ==================== 시뮬레이션 실행 함수들 ====================
@@ -1857,8 +1818,7 @@ function Invoke-ScenarioGeneration {
         Write-Host "     Python 출력에서 COORDINATE_INFO를 찾을 수 없습니다" -ForegroundColor $Colors.Error
     }
 
-    $dataOrigin = $null
-    if ($outputStr -match "DATA_ORIGIN\s*:\s*(.+)") { $dataOrigin = $matches[1].Trim() }
+    
 
     # Config 경로 추출
     $configPath = $null

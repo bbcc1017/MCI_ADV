@@ -363,6 +363,7 @@ class EventManager():
         if n_idle > 0: # 서비스 시작
             h_tier = self.properties['hospital']['hos_tier'][h_idx]
             service_time = self.sample_service_time(h_tier=h_tier, p_class=p_class)
+            log['p_admit'].append((self.time, p_class))
             # 병원, 환자 상태 업데이트
             self.status['hospital']['h_states'][h_idx, 0] -= 1  # n_idle -= 1
             # 이벤트 추가
@@ -410,7 +411,7 @@ class EventManager():
             # 이벤트 추가
             self.add_event(handover_time, 'p_care_ready', (p_idx, h_idx))
             # event log 추가
-            log['p_admit'].append((self.time, p_class))
+            # log['p_admit'].append((self.time, p_class))
         else:
             destination = self.diversion_rule(h_idx, pass_to_tier1=p_info['treat_tier1'][p_class],
                                               pass_to_tier2=p_info['treat_tier2'][p_class],
@@ -467,7 +468,7 @@ class EventManager():
             # 이벤트 추가
             self.add_event(handover_time, 'p_care_ready', (p_idx, h_idx))
             # event log 추가
-            log['p_admit'].append((self.time, p_class))
+            # log['p_admit'].append((self.time, p_class))
         else:
             destination = self.diversion_rule(h_idx, pass_to_tier1=p_info['treat_tier1'][p_class],
                                               pass_to_tier2=p_info['treat_tier2'][p_class],
@@ -511,6 +512,7 @@ class EventManager():
                     new_p_idx = self.status['patient']['p_wait'][p_class][h_idx+1].pop()
                     break
             service_time = self.sample_service_time(h_tier=h_tier, p_class=p_class)
+            log['p_admit'].append((self.time, p_class))
             # 병원, 환자 상태 업데이트
             self.status['hospital']['h_states'][h_idx, 1] -= 1  # n_queue -= 1
             # 이벤트 추가
