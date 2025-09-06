@@ -430,7 +430,7 @@ class ScenarioGenerator:
         rest_cand = df_cand.drop(index=sel_names, errors="ignore").sort_values("capa", ascending=False)
         for _, r in rest_cand.iterrows():
             # 제안: 최종 리스트에도 여유를 남김
-            tier1_keep = float(os.environ.get("MCI_TIER1_KEEP", "5"))  # 상급 여유
+            tier1_keep = float(os.environ.get("MCI_TIER1_KEEP", "20"))  # 상급 여유
             total_keep = float(os.environ.get("MCI_TOTAL_KEEP", "5"))  # 전체 여유
 
             if (acc_tier1 >= U * tier1_keep) and (acc_capa >= N * total_keep):
