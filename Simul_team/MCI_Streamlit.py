@@ -923,7 +923,6 @@ with tabs[0]:
     exp  = st.session_state.selected_exp
     coord= st.session_state.selected_coord
 
-
     # ── 지도는 '최상단' 컨테이너에 그렸다가, 옵션을 아래에 배치 ─────────────
     map_holder = st.container()
     st.divider()
@@ -936,25 +935,43 @@ with tabs[0]:
     # 경로/데이터 로드
     rdirs = get_routes_dirs(bp, exp, coord)
     patient_cnt = get_patient_count(bp, exp, coord)
+
+    # JSON 경로(전체 로드; patient_cnt로 자르지 않음)
     c2s_all = load_json_files(rdirs["center2site"])  # Center→Site
     h2s_all = load_json_files(rdirs["hos2site"])     # Site→Hospitals
-    c2s = c2s_all[:patient_cnt] if patient_cnt is not None else c2s_all
-    h2s = h2s_all[:patient_cnt] if patient_cnt is not None else h2s_all
 
     # 병원/센터 메타
     hosp_xl   = read_excel_hospital(bp)   # 엑셀(요양기관명, 종별코드, x/y좌표, 전화/주소 등)
-    hinfo_csv = Path(bp) / "scenarios" / exp / coord / "hospital_info_road.csv"
-    hinfo_df  = pd.read_csv(hinfo_csv) if hinfo_csv.is_file() else pd.DataFrame()
-    center_csv= Path(bp) / "scenarios" / "안전센터와 소방서.csv"
-    center_df = pd.read_csv(center_csv, encoding="cp949") if center_csv.is_file() else pd.DataFrame()
+
+    # road/euc CSV (표/거리 참조용)
+    hinfo_csv  = Path(bp) / "scenarios" / exp / coord / "hospital_info_road.csv"
+    hinfo_df   = pd.read_csv(hinfo_csv) if hinfo_csv.is_file() else pd.DataFrame()
+
+    center_csv = Path(bp) / "scenarios" / "안전센터와 소방서.csv"
+    center_df  = pd.read_csv(center_csv, encoding="cp949") if center_csv.is_file() else pd.DataFrame()
+
+    ambinfo_csv   = Path(bp) / "scenarios" / exp / coord / "amb_info_road.csv"
+    ambinfo_df    = pd.read_csv(ambinfo_csv) if ambinfo_csv.is_file() else pd.DataFrame()
+
+    dist_road_csv = Path(bp) / "scenarios" / exp / coord / "distance_Hos2Site_road.csv"
+    dist_road_df  = pd.read_csv(dist_road_csv) if dist_road_csv.is_file() else pd.DataFrame()
+    dist_road_map = dict(zip(dist_road_df["Index"], dist_road_df["distance"])) if not dist_road_df.empty else {}
+
+    hinfo_euc_csv = Path(bp) / "scenarios" / exp / coord / "hospital_info_euc.csv"
+    hinfo_euc_df  = pd.read_csv(hinfo_euc_csv) if hinfo_euc_csv.is_file() else pd.DataFrame()
+
+    dist_euc_csv  = Path(bp) / "scenarios" / exp / coord / "distance_Hos2Site_euc.csv"
+    dist_euc_df   = pd.read_csv(dist_euc_csv) if dist_euc_csv.is_file() else pd.DataFrame()
+    dist_euc_map  = dict(zip(dist_euc_df["Index"], dist_euc_df["distance"])) if not dist_euc_df.empty else {}
 
     # 엑셀 이름→좌표 매핑
     xl_coord = {}
     if hosp_xl is not None and "요양기관명" in hosp_xl.columns:
-        for _, r in hosp_xl.iterrows():
-            nm = str(r.get("요양기관명","")).strip()
-            y  = r.get("y좌표", r.get("y", None)); x = r.get("x좌표", r.get("x", None))
-            if pd.notna(y) and pd.notna(x) and nm:
+        for _, rr in hosp_xl.iterrows():
+            nm = str(rr.get("요양기관명","")).strip()
+            y  = rr.get("y좌표", rr.get("y", None))
+            x  = rr.get("x좌표", rr.get("x", None))
+            if nm and pd.notna(y) and pd.notna(x):
                 xl_coord[nm] = (float(y), float(x))
 
     # 종별코드 라벨링(요청: 1=상급종합병원, 11=종합병원, 그 외=일반병원)
@@ -977,6 +994,7 @@ with tabs[0]:
     if not (bp and exp and coord):
         st.info("좌측 사이드바에서 base_path / Experiment / Coord를 선택하세요.")
         st.stop()
+
     # ─────────────────────────────────────────────────────────────────────
     # ① AMB 경로 (C→S 표 / S→H 표)
     # ─────────────────────────────────────────────────────────────────────
@@ -987,23 +1005,18 @@ with tabs[0]:
     with col_amb_c2s:
         st.markdown("**안전센터/소방서→사고지점 (출동)**")
 
-        c2s_rows = []
-        for i, obj in enumerate(c2s):
-            meta = obj.get("meta", {})
-            cname = meta.get("name", "센터")
-            c = meta.get("center") or meta.get("start")  # [lon, lat]
-            dist, mins, _ = _extract_summary_meta(obj)
-            if dist is None and isinstance(c, list) and len(c)==2:
-                clatlon = (c[1], c[0])
-                dist = _haversine_km(clatlon[0], clatlon[1], lat, lon)
-            c2s_rows.append({
-                "인덱스": i,
-                "안전센터/소방서": cname,
-                "거리(km)": round(float(dist),2) if dist is not None else None
-            })
+        # ✔ amb_info_road.csv 기준 표 구성 (인덱스/이름/거리=init_distance)
+        if not ambinfo_df.empty:
+            c2s_df = ambinfo_df.rename(columns={
+                "Index":"인덱스",
+                "안전센터/소방서이름":"안전센터/소방서",
+                "init_distance":"거리(km)",
+            })[["인덱스","안전센터/소방서","거리(km)"]].copy()
+            c2s_df["거리(km)"] = pd.to_numeric(c2s_df["거리(km)"], errors="coerce").round(2)
+        else:
+            c2s_df = pd.DataFrame(columns=["인덱스","안전센터/소방서","거리(km)"])
 
-        c2s_df = pd.DataFrame(c2s_rows)
-
+        # 기본 선택 상태
         if "amb_c2s_sel_idx" not in st.session_state:
             st.session_state.amb_c2s_sel_idx = set(c2s_df["인덱스"].tolist())
 
@@ -1037,57 +1050,31 @@ with tabs[0]:
     with col_amb_s2h:
         st.markdown("**사고지점→병원 (이송)**")
 
-        # 이름→종별코드 매핑(road 우선, 없으면 엑셀)
-        code_map = {}
-        if not hinfo_df.empty and {"요양기관명","종별코드"}.issubset(hinfo_df.columns):
-            for _, r in hinfo_df[["요양기관명","종별코드"]].dropna().iterrows():
-                code_map[str(r["요양기관명"]).strip()] = r["종별코드"]
-        if hosp_xl is not None and {"요양기관명","종별코드"}.issubset(hosp_xl.columns):
-            for _, r in hosp_xl[["요양기관명","종별코드"]].dropna().iterrows():
-                code_map.setdefault(str(r["요양기관명"]).strip(), r["종별코드"])
-
-        # 거리 로드: distance_Hos2Site_road.csv (Index, distance)
-        dist_csv = Path(bp) / "scenarios" / exp / coord / "distance_Hos2Site_road.csv"
-        dist_map = {}
-        if dist_csv.is_file():
-            _dfd = pd.read_csv(dist_csv)
-            if {"Index","distance"}.issubset(_dfd.columns):
-                _dfd = _dfd.copy()
-                _dfd["Index"] = pd.to_numeric(_dfd["Index"], errors="coerce").astype("Int64")
-                _dfd["distance"] = pd.to_numeric(_dfd["distance"], errors="coerce")
-                dist_map = {int(i): float(d) for i, d in _dfd.dropna(subset=["Index","distance"]).itertuples(index=False, name=None)}
-
-        s2h_rows = []
-        for i, obj in enumerate(h2s):
-            nm = obj.get("meta", {}).get("name", "병원")
-            code = code_map.get(nm, "")
-            s2h_rows.append({
-                "인덱스": i,
-                "병원": nm,
-                "종별코드": code,
-                "병원등급": code_to_grade(code),
-            })
-
-        s2h_df = pd.DataFrame(s2h_rows)
-        if s2h_df.shape[0] > 0:
-            s2h_df["거리(km)"] = pd.to_numeric(s2h_df["인덱스"].map(dist_map), errors="coerce").round(2)
+        # ✔ hospital_info_road + distance_Hos2Site_road 기준
+        if not hinfo_df.empty:
+            s2h_df = hinfo_df.rename(columns={
+                "Index":"인덱스",
+                "요양기관명":"병원"
+            })[["인덱스","병원","종별코드"]].copy()
+            s2h_df["병원등급"] = s2h_df["종별코드"].apply(code_to_grade)
+            if dist_road_map:
+                s2h_df["거리(km)"] = s2h_df["인덱스"].map(dist_road_map).round(2)
+        else:
+            s2h_df = pd.DataFrame(columns=["인덱스","병원","종별코드","병원등급","거리(km)"])
 
         if "amb_s2h_sel_idx" not in st.session_state:
             st.session_state.amb_s2h_sel_idx = set(s2h_df["인덱스"].tolist())
 
-        e1, e2 = st.columns(2)
-        if e1.button("전체선택(S→H)"):
+        c, d = st.columns(2)
+        if c.button("전체선택(S→H)"):
             st.session_state.amb_s2h_sel_idx = set(s2h_df["인덱스"].tolist())
-        if e2.button("전체해제(S→H)"):
+        if d.button("전체해제(S→H)"):
             st.session_state.amb_s2h_sel_idx = set()
 
         s2h_df_show = s2h_df.copy()
         s2h_df_show["표시"] = s2h_df_show["인덱스"].apply(lambda i: i in st.session_state.amb_s2h_sel_idx)
         # ▶ 표시를 맨 앞으로
-        cols_order = ["표시","인덱스","병원","종별코드","병원등급"]
-        if "거리(km)" in s2h_df_show.columns:
-            cols_order += ["거리(km)"]
-        s2h_df_show = s2h_df_show[cols_order]
+        s2h_df_show = s2h_df_show[["표시","인덱스","병원","종별코드","병원등급","거리(km)"]]
 
         edited_s2h = st.data_editor(
             s2h_df_show,
@@ -1100,14 +1087,14 @@ with tabs[0]:
                 "병원":     st.column_config.TextColumn("병원", disabled=True),
                 "종별코드": st.column_config.NumberColumn("종별코드", disabled=True),
                 "병원등급": st.column_config.TextColumn("병원등급", disabled=True),
-                **({"거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f")} if "거리(km)" in s2h_df_show.columns else {})
+                "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
             },
             key="tbl_s2h"
         )
         st.session_state.amb_s2h_sel_idx = set(edited_s2h.loc[edited_s2h["표시"]==True, "인덱스"].tolist())
 
     # ─────────────────────────────────────────────────────────────────────
-    # ② UAV 경로 (출동/이송 — AMB 이송과 동일 형식 + 직선거리 마지막 열 추가)
+    # ② UAV 경로 (출동/이송 — 직선거리 표출)
     # ─────────────────────────────────────────────────────────────────────
     st.markdown("### UAV 경로")
     col_uav_out, col_uav_back = st.columns(2)
@@ -1169,29 +1156,27 @@ with tabs[0]:
         )
         st.session_state.uav_c2s_sel_idx = set(edited_uav_out.loc[edited_uav_out["표시"]==True, "인덱스"].tolist())
 
-    # 이송(사고→병원): 전체 병원 대상
+    # 이송(사고→병원): hospital_info_euc + distance_Hos2Site_euc 기준
     with col_uav_back:
         st.markdown("**사고지점→병원 (이송)**")
 
-        all_hosp_latlons = []
-        if not hinfo_df.empty and "요양기관명" in hinfo_df.columns:
-            for _, rr in hinfo_df.iterrows():
-                name = str(rr.get("요양기관명","")).strip()
-                if name and name in xl_coord:
-                    y, x = xl_coord[name]       # (lat, lon)
-                    code = rr.get("종별코드", "")
-                    all_hosp_latlons.append((y, x, name, code))
-
+        # ✔ hospital_info_euc + distance_Hos2Site_euc 기준 표 구성
         uav_back_rows = []
-        for i, (y, x, nm, code) in enumerate(all_hosp_latlons):
-            dkm = _haversine_km(lat, lon, y, x)  # 직선거리
-            uav_back_rows.append({
-                "인덱스": i,
-                "병원": nm,
-                "종별코드": code,
-                "병원등급": code_to_grade(code),
-                "거리(km)": round(dkm, 2)
-            })
+        name_to_idx_euc = {}
+        if not hinfo_euc_df.empty:
+            for _, rr in hinfo_euc_df.iterrows():
+                idx  = int(rr.get("Index"))
+                nm   = str(rr.get("요양기관명","")).strip()
+                code = rr.get("종별코드", "")
+                dkm  = dist_euc_map.get(idx, None)
+                uav_back_rows.append({
+                    "인덱스": idx,
+                    "병원": nm,
+                    "종별코드": code,
+                    "병원등급": code_to_grade(code),
+                    "거리(km)": round(float(dkm), 2) if dkm is not None else None
+                })
+                name_to_idx_euc[nm] = idx
         uav_back_df = pd.DataFrame(uav_back_rows)
 
         if "uav_s2h_sel_idx" not in st.session_state:
@@ -1240,87 +1225,97 @@ with tabs[0]:
     ).add_to(m)
 
     # ─ AMB C→S 라인/마커 ─
-    for i, obj in enumerate(c2s):
+    # 이름 → JSON route 매핑 (센터명으로 연결)
+    c2s_map = {}
+    for obj in c2s_all:  # 전체 탐색
+        meta = obj.get("meta", {})
+        nm = str(meta.get("name","")).strip()
+        if nm:
+            c2s_map[nm] = obj
+
+    # ✔ amb_info_road 순서/선택 기준으로 그림
+    for _, row in c2s_df.iterrows():
+        i = int(row["인덱스"])
         if i not in st.session_state.amb_c2s_sel_idx:
             continue
+        cname = str(row["안전센터/소방서"]).strip()
+        obj   = c2s_map.get(cname)
+        if obj is None:
+            continue
+
         meta = obj.get("meta", {})
-        c = meta.get("center") or meta.get("start")  # [lon,lat]
-        cname = meta.get("name", "센터")
-        clatlon = (c[1], c[0]) if (isinstance(c,list) and len(c)==2) else None
+        c    = meta.get("center") or meta.get("start")  # [lon, lat]
+        clatlon = (c[1], c[0]) if (isinstance(c, list) and len(c)==2) else None
 
         addr = tel = ""
         if not center_df.empty and "기관명" in center_df.columns:
-            msk = (center_df["기관명"].astype(str) == str(cname))
+            msk = (center_df["기관명"].astype(str) == cname)
             if msk.any():
-                row = center_df[msk].iloc[0]
-                addr = str(row.get("주소","")); tel = str(row.get("전화번호",""))
+                rowc = center_df[msk].iloc[0]
+                addr = str(rowc.get("주소","")); tel = str(rowc.get("전화번호",""))
 
-        dist, mins, guide = _extract_summary_meta(obj)
+        # 거리는 ✔ amb_info_road의 init_distance 사용
+        dist = row["거리(km)"]
         extra = []
-        if clatlon and dist is None:
-            d_lin = _haversine_km(clatlon[0], clatlon[1], lat, lon)
-            extra.append(f"직선거리: {d_lin:.2f} km")
-        if dist is not None and mins is not None:
-            extra.append(f"🚑 Center→Site: {float(dist):.2f} km · {mins:.1f}분")
-        elif dist is not None:
+        if pd.notna(dist):
             extra.append(f"🚑 Center→Site: {float(dist):.2f} km")
         if addr: extra.append(f"주소: {addr}")
         if tel:  extra.append(f"전화: {tel}")
-        extra.append(_guide_html(guide))
+
         if clatlon: add_center_marker(m, cname, clatlon, extra)
+
+        # 실제 라인은 JSON 경로
         draw_route_from_json(m, obj, highlight=False)
 
     # ─ AMB S→H 라인/마커 ─
-    for i, obj in enumerate(h2s):
+    # 이름 → JSON route 매핑 (병원명으로 연결)
+    h2s_map = {}
+    for obj in h2s_all:  # 전체 탐색
+        meta = obj.get("meta", {})
+        nm = str(meta.get("name","")).strip()
+        if nm:
+            h2s_map[nm] = obj
+
+    # ✔ hospital_info_road 순서/선택 + distance_Hos2Site_road 거리 표출
+    for _, row in s2h_df.iterrows():
+        i = int(row["인덱스"])
         if i not in st.session_state.amb_s2h_sel_idx:
             continue
-        meta = obj.get("meta", {})
-        h = meta.get("hospital") or meta.get("goal")  # [lon,lat]
-        name = meta.get("name", "병원")
-        latlon = (h[1], h[0]) if (isinstance(h,list) and len(h)==2) else None
+        name = str(row["병원"]).strip()
+        obj  = h2s_map.get(name)
+        if obj is None:
+            continue
 
-        beds=qcap=code=phone=addr=None
-        if not hinfo_df.empty and "요양기관명" in hinfo_df.columns:
-            r = hinfo_df[hinfo_df["요양기관명"]==name]
-            if not r.empty:
-                beds = r.iloc[0].get("병상수", None)
-                qcap = r.iloc[0].get("queue_capa", None)
-                code = r.iloc[0].get("종별코드", None)
-                if latlon is None:
-                    y = r.iloc[0].get("y좌표", r.iloc[0].get("y", None))
-                    x = r.iloc[0].get("x좌표", r.iloc[0].get("x", None))
-                    if pd.notna(y) and pd.notna(x):
-                        latlon = (float(y), float(x))
+        # 좌표/메타는 엑셀에서 보강
+        latlon = None; phone = addr = None
+        code   = row.get("종별코드", None)
         if hosp_xl is not None and "요양기관명" in hosp_xl.columns:
-            rx = hosp_xl[hosp_xl["요양기관명"]==name]
+            rx = hosp_xl[hosp_xl["요양기관명"] == name]
             if not rx.empty:
-                phone = rx.iloc[0].get("전화번호", phone)
-                addr  = rx.iloc[0].get("주소", addr)
-                code  = rx.iloc[0].get("종별코드", code)
-                if latlon is None:
-                    y = rx.iloc[0].get("y좌표", rx.iloc[0].get("y", None))
-                    x = rx.iloc[0].get("x좌표", rx.iloc[0].get("x", None))
-                    if pd.notna(y) and pd.notna(x):
-                        latlon = (float(y), float(x))
+                phone = rx.iloc[0].get("전화번호", None)
+                addr  = rx.iloc[0].get("주소", None)
+                y = rx.iloc[0].get("y좌표", rx.iloc[0].get("y", None))
+                x = rx.iloc[0].get("x좌표", rx.iloc[0].get("x", None))
+                if pd.notna(y) and pd.notna(x):
+                    latlon = (float(y), float(x))
+
+        extra = []
+        dkm = row.get("거리(km)", None)
+        if pd.notna(dkm):
+            extra.append(f"🏥 Site→Hospital: {float(dkm):.2f} km")
+        grade_label = code_to_grade(code)
 
         if latlon:
-            dist, mins, guide = _extract_summary_meta(obj)
-            extra = []
-            if dist is not None and mins is not None:
-                extra.append(f"🏥 Site→Hospital: {float(dist):.2f} km · {mins:.1f}분")
-            elif dist is not None:
-                extra.append(f"🏥 Site→Hospital: {float(dist):.2f} km")
-            grade_label = code_to_grade(code)
             add_hospital_marker(
                 m, name, code, phone, addr, latlon,
-                beds=beds, qcap=qcap,
-                extra_lines=[f"병원등급: {grade_label}"] + extra + [ _guide_html(guide) ]
+                extra_lines=[f"병원등급: {grade_label}"] + extra
             )
+        # 라인은 JSON 경로
         draw_route_from_json(m, obj, highlight=False)
 
     # ─ UAV 출동(병원→사고) ─
     for i, (y, x, name, code) in enumerate(tier1_latlons):
-        if i not in st.session_state.uav_c2s_sel_idx: 
+        if i not in st.session_state.uav_c2s_sel_idx:
             continue
         dkm = _haversine_km(y, x, lat, lon)
         draw_uav_dash(
@@ -1330,17 +1325,23 @@ with tabs[0]:
         )
 
     # ─ UAV 이송(사고→병원) ─
-    t1_set = {(y,x) for (y,x,_,_) in tier1_latlons}
-    for i, (y, x, name, code) in enumerate(all_hosp_latlons):
-        if i not in st.session_state.uav_s2h_sel_idx:
+    # ✔ 표 선택은 euc 인덱스 기준(uav_s2h_sel_idx). 그려줄 좌표는 엑셀(xl_coord)에서 획득.
+    for _, r in uav_back_df.iterrows():
+        idx = int(r["인덱스"])
+        if idx not in st.session_state.uav_s2h_sel_idx:
             continue
-        dkm = _haversine_km(lat, lon, y, x)
-        is_tier1 = (y, x) in t1_set
+        nm   = str(r["병원"]).strip()
+        code = r.get("종별코드", "")
+        if nm not in xl_coord:
+            continue
+        y, x = xl_coord[nm]
+        is_tier1 = (str(code).isdigit() and int(code) == 1)
         off = 30.0 if is_tier1 else 0.0
+        dkm = _haversine_km(lat, lon, y, x)
         draw_uav_dash(
             m, (lat,lon), (y,x),
             UAV_BACK_COLOR,
-            f"🛩️ 이송 Site→{name} · {dkm:.2f} km",
+            f"🛩️ 이송 Site→{nm} · {dkm:.2f} km",
             offset_m=off
         )
 
@@ -1364,7 +1365,7 @@ with tabs[0]:
     legend_html.append('<span style="opacity:.8;">* 경로 상세 안내는 마커 팝업 ▶ 클릭</span>')
     legend_html.append('</div>')
     m.get_root().html.add_child(folium.Element("".join(legend_html)))
-    
+
     # 저작권 표기 축소(옵션)
     from folium import Element
     m.get_root().html.add_child(Element("""
@@ -1384,6 +1385,7 @@ with tabs[0]:
     # 지도는 '최상단' 컨테이너에 출력
     with map_holder:
         st_folium(m, width=None, height=690)
+
 
 # ------------------------------
 # Analytics 탭 (정렬 테이블 + ANOVA 스위트)

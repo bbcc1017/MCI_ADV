@@ -99,6 +99,18 @@ SUMMARY_COLS = [
     "시뮬레이션_시작","시뮬레이션_소요(초)","실험_완료시간","좌표별_총소요(초)","성공여부","로그파일",
     "환자수","max_send_coeff","구급차수","UAV수","구급차속도","UAV속도","시뮬레이션반복","랜덤시드",
 ]
+# (추가) 안정적인 dtype 스키마
+SUMMARY_DTYPES = {
+    "실험ID":"object","좌표":"object","시도번호":"Int64","비고":"object",
+    "위도":"float64","경도":"float64","주소":"object","도로명주소":"object",
+    "시나리오생성_시작":"object","시나리오생성_소요(초)":"float64",
+    "시뮬레이션_시작":"object","시뮬레이션_소요(초)":"float64",
+    "실험_완료시간":"object","좌표별_총소요(초)":"float64",
+    "성공여부":"object","로그파일":"object",
+    "환자수":"Int64","max_send_coeff":"object","구급차수":"Int64","UAV수":"Int64",
+    "구급차속도":"float64","UAV속도":"float64","시뮬레이션반복":"Int64","랜덤시드":"Int64",
+}
+
 
 def _summary_paths(base_path: str, exp_id: str):
     """(NOTE) Some older copies might have returned a single string or 3 items.
@@ -142,14 +154,28 @@ def _load_summary_df(path_main: str, path_legacy: str):
             for enc in ("utf-8-sig","cp949","utf-8"):
                 try:
                     df = pd.read_csv(pth, encoding=enc)
+                    # 누락 컬럼 보충 + 순서 정렬
                     for c in SUMMARY_COLS:
                         if c not in df.columns:
-                            df[c] = None
-                    return df[SUMMARY_COLS]
+                            df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
+                    df = df.reindex(columns=SUMMARY_COLS)
+                    # dtype 강제(일괄 → 실패시 컬럼 단위 보정)
+                    try:
+                        df = df.astype(SUMMARY_DTYPES)
+                    except Exception:
+                        for col, dt in SUMMARY_DTYPES.items():
+                            try:
+                                df[col] = df[col].astype(dt)
+                            except Exception:
+                                df[col] = df[col].astype("object")
+                    return df
                 except Exception:
                     continue
     import pandas as _pd
-    return _pd.DataFrame(columns=SUMMARY_COLS)
+    # 빈 DF도 dtype 보장
+    empty = {c: _pd.Series(dtype=SUMMARY_DTYPES.get(c, "object")) for c in SUMMARY_COLS}
+    return _pd.DataFrame(empty)
+
 
 def _save_summary(path_main: str, df):
     ensure_dir(os.path.dirname(path_main))
@@ -177,8 +203,16 @@ def upsert_summary_row_dual(base_path: str, row: Dict[str,Any]):
         for k, v in row.items():
             df.loc[mask, k] = v
     else:
-        import pandas as _pd
-        df = _pd.concat([df, _pd.DataFrame([row], columns=SUMMARY_COLS)], ignore_index=True)
+        # concat 없이 행 단위 추가 (향후 pandas 동작 변경 대비)
+        for c in SUMMARY_COLS:
+            if c not in df.columns:
+                df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
+        df = df.reindex(columns=SUMMARY_COLS)
+
+        next_idx = len(df)
+        for k, v in row.items():
+            df.loc[next_idx, k] = v
+
     _save_summary(path_main, df)
 
 # ------------------------------------------------------------------
@@ -535,7 +569,16 @@ class Orchestrator:
                     except Exception:
                         prev = 0.0
                     newrow["좌표별_총소요(초)"] = round(prev + float(elapsed), 3)
-                    df = _pd.concat([df, _pd.DataFrame([newrow], columns=SUMMARY_COLS)], ignore_index=True)
+                    # concat 없이 행 단위 추가
+                    for c in SUMMARY_COLS:
+                        if c not in df.columns:
+                            df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
+                    df = df.reindex(columns=SUMMARY_COLS)
+
+                    next_idx = len(df)
+                    for k, v in newrow.items():
+                        df.loc[next_idx, k] = v
+
 
             _save_summary(summary_main, df)
 
