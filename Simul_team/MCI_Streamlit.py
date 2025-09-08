@@ -557,33 +557,39 @@ def add_center_marker(m: folium.Map, name: str, latlon: Tuple[float,float], extr
     ).add_to(m)
 
 
-def add_hospital_marker(m: folium.Map, name: str, grade_code: Union[int, str], phone: Optional[str], addr: Optional[str],
-                        latlon: Tuple[float,float], beds: Optional[Union[int,float]]=None, qcap: Optional[Union[int,float]]=None,
-                        extra_lines: Optional[List[str]]=None):
+# 기존 add_hospital_marker(...)를 아래처럼 정리
+def add_hospital_marker(
+    m: folium.Map,
+    name: str,
+    grade_code: Union[int, str],
+    latlon: Tuple[float, float],
+    op_rooms: Optional[Union[int, float]] = None,  # 수술실수
+    beds: Optional[Union[int, float]] = None,      # 병상수
+    extra_lines: Optional[List[str]] = None,
+):
     try:
         g = int(float(str(grade_code)))
     except:
         g = -1
     color = "red" if g == 1 else ("orange" if g == 11 else "green")
-    body = [f"<b>{name}</b>"]
-    body.append(f"등급코드={grade_code}")
+
+    body = [f"<b>{name}</b>"]                    # 제목
+    body.append(f"lat,lon={latlon[0]:.6f},{latlon[1]:.6f}")  # ① 좌표
+    if op_rooms is not None and not (isinstance(op_rooms, float) and math.isnan(op_rooms)):
+        body.append(f"수술실수={int(op_rooms)}")              # ② 수술실수
     if beds is not None and not (isinstance(beds, float) and math.isnan(beds)):
-        body.append(f"병상수={int(beds)}")
-    if qcap is not None and not (isinstance(qcap, float) and math.isnan(qcap)):
-        body.append(f"queue_capa={int(qcap)}")
-    if phone:
-        body.append(f"전화={phone}")
-    if addr:
-        body.append(f"주소={addr}")
-    body.append(f"lat,lon={latlon[0]:.6f},{latlon[1]:.6f}")
-    if extra_lines:
+        body.append(f"병상수={int(beds)}")                    # ③ 병상수
+    body.append(f"등급코드={grade_code}")                    # ④ 등급코드
+    if extra_lines:                                           # ⑤ 병원등급, 거리, 소요시간 등
         body += [x for x in extra_lines if x]
+
     folium.Marker(
         location=[latlon[0], latlon[1]],
         icon=folium.Icon(color=color, icon="plus", prefix="fa"),
         tooltip=name,
         popup="<br>".join(body)
     ).add_to(m)
+
 
 
 def draw_route_from_json(m: folium.Map, route_obj: dict, highlight: bool=False):
@@ -1255,14 +1261,24 @@ with tabs[0]:
                 addr = str(rowc.get("주소","")); tel = str(rowc.get("전화번호",""))
 
         # 거리는 ✔ amb_info_road의 init_distance 사용
-        dist = row["거리(km)"]
-        extra = []
-        if pd.notna(dist):
-            extra.append(f"🚑 Center→Site: {float(dist):.2f} km")
-        if addr: extra.append(f"주소: {addr}")
-        if tel:  extra.append(f"전화: {tel}")
+        # (기존) extra 구성부를 아래처럼 교체
+        dist_csv = row["거리(km)"] if "거리(km)" in row and pd.notna(row["거리(km)"]) else None
+        dist_json, dur_min, _ = _extract_summary_meta(obj)  # JSON 경로 요약
 
-        if clatlon: add_center_marker(m, cname, clatlon, extra)
+        extra = []
+        if addr: extra.append(f"주소: {addr}")       # ① 주소
+        if tel:  extra.append(f"전화: {tel}")        # ② 전화
+        # ③ 거리 (우선 CSV, 없으면 JSON)
+        dk = float(dist_csv) if dist_csv is not None else (float(dist_json) if dist_json is not None else None)
+        if dk is not None:
+            extra.append(f"🚑 Center→Site: {dk:.2f} km")
+        # ④ 소요시간
+        if dur_min is not None and dur_min > 0:
+            extra.append(f"소요시간: {dur_min:.1f} 분")
+
+        if clatlon:
+            add_center_marker(m, cname, clatlon, extra)
+
 
         # 실제 라인은 JSON 경로
         draw_route_from_json(m, obj, highlight=False)
@@ -1299,17 +1315,35 @@ with tabs[0]:
                 if pd.notna(y) and pd.notna(x):
                     latlon = (float(y), float(x))
 
-        extra = []
-        dkm = row.get("거리(km)", None)
-        if pd.notna(dkm):
-            extra.append(f"🏥 Site→Hospital: {float(dkm):.2f} km")
-        grade_label = code_to_grade(code)
+            # (기존) 좌표/메타 얻는 부분은 그대로 두고,
+            #       추가로 hinfo_df에서 병상수/수술실수, JSON에서 소요시간을 읽어 붙임
 
-        if latlon:
-            add_hospital_marker(
-                m, name, code, phone, addr, latlon,
-                extra_lines=[f"병원등급: {grade_label}"] + extra
-            )
+            # 거리: 표의 (거리(km)) 우선, 없으면 JSON 요약 거리
+            dkm_csv = row.get("거리(km)", None)
+            dkm_json, dur_min, _ = _extract_summary_meta(obj)
+
+            dk = float(dkm_csv) if pd.notna(dkm_csv) else (float(dkm_json) if dkm_json is not None else None)
+
+            # 병상/수술실: hospital_info_road.csv 원본에서 인덱스 i로 조회
+            beds_val = None
+            ops_val  = None
+            orig = hinfo_df[hinfo_df["Index"] == i]
+            if not orig.empty:
+                beds_val = orig.iloc[0].get("병상수", None)
+                ops_val  = orig.iloc[0].get("수술실수", None)  # ← 새로 추가된 열 사용
+
+            grade_label = code_to_grade(code)
+            extras = [f"병원등급: {grade_label}"]                 # ⑤-1 병원등급
+            if dk is not None:
+                extras.append(f"🏥 Site→Hospital: {dk:.2f} km")   # ⑤-2 거리 (이모지 유지)
+            if dur_min is not None and dur_min > 0:
+                extras.append(f"소요시간: {dur_min:.1f} 분")      # ⑤-3 소요시간
+
+            if latlon:
+                add_hospital_marker(
+                    m, name, code, latlon, ops_val, beds_val, extras
+                )
+
         # 라인은 JSON 경로
         draw_route_from_json(m, obj, highlight=False)
 
