@@ -305,9 +305,9 @@ class ScenarioGenerator:
         print(f"  ✅ 구급차 정보 생성 완료")
 
     def make_hospital_info(self, latitude, longitude, incident_size, save_folder):
-        """병원 정보 생성 (capa/큐 정책 + 상급 보장 강화 + 최소 집합)"""
+        """병원 정보 생성 (기존 로직 유지 + 최소 조건 추가 보장)"""
         print(f"  🏥 병원 정보 생성 중...")
-
+        
         # ---------- (0) 데이터 로드 ----------
         try:
             df_full = pd.read_excel(self.hospital_data_path, engine='openpyxl')
@@ -335,9 +335,9 @@ class ScenarioGenerator:
             buffer_ratio = 1.5
 
         ratio = self.patient_config.get("ratio", {"Red":0.1,"Yellow":0.3,"Green":0.5,"Black":0.1})
-        U = int(round(incident_size * float(ratio.get("Red", 0))))   # Red(긴급) 수
+        U = int(round(incident_size * float(ratio.get("Red", 0))))
         N = int(incident_size)
-
+        
         import math
         def _get_util(code):
             try:
@@ -345,159 +345,89 @@ class ScenarioGenerator:
                 return util_by_tier.get(icode, util_by_tier.get("etc", 0.461))
             except Exception:
                 return util_by_tier.get("etc", 0.461)
-        # ========== [수정 1] capa 계산 (기존과 동일) ==========    
+            
         df["util"] = df["종별코드"].apply(_get_util)
         df["capa"] = (df["응급실병상수"] * (1 - df["util"])).apply(lambda x: int(max(0, math.floor(x))))
-        
-        # ========== [수정 2] '수술실 수' 계산 (새로운 a 컴포넌트) ==========
-        conditions = [
-            df['종별코드'] == 1,  # 상급종합병원
-            df['종별코드'] == 11  # 종합병원
-        ]
-        values = [4, 3] # 상급종합병원: 4, 종합병원: 3
+        # 수술실 수 종별코드별 고정
+        conditions = [df['종별코드'] == 1, df['종별코드'] == 11]; values = [4, 3]
         df['operating_rooms'] = np.select(conditions, values, default=2)
-
-        # =========== [수정 3] 새로운 '실효 수용력(eff)' 계산 (기존 queue_capa 계산은 삭제) ==========
-        df["eff"] = df["operating_rooms"] + df["capa"] # a * 수술실수 + b * 병상수 (a=1, b=1로 가정)
-        
-        # def _queue_from_policy(capa):
-        #     if queue_policy in ("0", "none", "None"):
-        #         return 0
-        #     if isinstance(queue_policy, str) and queue_policy.startswith("capa/"):
-        #         try:
-        #             denom = float(queue_policy.split("/", 1)[1])
-        #             if denom > 0:
-        #                 return int(max(0, math.floor(capa / denom)))
-        #         except Exception:
-        #             return 0
-        #     try:
-        #         frac = float(queue_policy)
-        #         if 0 < frac <= 1:
-        #             return int(max(0, math.floor(capa * frac)))
-        #     except Exception:
-        #         pass
-        #     return 0
-
-        # # capa(now) 계산 = 응급실병상수 × (1-util)
-        # df["util"] = df["종별코드"].apply(_get_util)
-        # df["capa"] = (df["응급실병상수"] * (1 - df["util"])).apply(lambda x: int(max(0, math.floor(x))))
-        # df["queue_capa"] = df["capa"].apply(_queue_from_policy)
-        # df["eff"] = df["capa"] + df["queue_capa"]
+        df["eff"] = df["operating_rooms"] + df["capa"]
         df["is_tier1"] = (df["종별코드"].astype(str).astype(float).astype(int) == 1).astype(int)
-
+        
         # ---------- (3) 전역 상급 용량 점검 (불가능 사전 감지) ----------
         total_tier1_capa_all = int(df.loc[df["is_tier1"]==1, "capa"].sum())
         total_capa_all = int(df["capa"].sum())
         if total_tier1_capa_all < U:
             print(f"  ⚠️ 전역 상급 용량 부족: Tier1_capa_all={total_tier1_capa_all} < U={U}. 최선 선택으로 진행(전원 실패 가능).")
-
-        # ---------- (4) 후보군 확장(거리순) — 버퍼는 capa 기준, 상급 보장 조건 포함 ----------
+        
+        # --- (4) 후보군 확장: 기존 코드와 동일 ---
+        # 가까운 병원들을 포함한 넉넉한 후보군(df_cand)
         df_sorted = df.sort_values("euclidean_distance").reset_index(drop=True)
-        sum_capa = 0
-        sum_capa_tier1 = 0
-        cand_idx = []
+        sum_capa = 0; sum_capa_tier1 = 0; cand_idx = []; 
         for i, row in df_sorted.iterrows():
             cand_idx.append(i)
-            c = int(row["eff"])
-            sum_capa += c
-            if row["is_tier1"] == 1:
-                sum_capa_tier1 += c
-            # 버퍼(총 capa) AND 상급 보장(긴급 커버) 동시 만족해야 stop
-            if (sum_capa >= N * buffer_ratio) and (sum_capa_tier1 >= U):
-                break
-
+            sum_capa += int(row["eff"])
+            if row["is_tier1"] == 1: sum_capa_tier1 += int(row["eff"]); 
+            if (sum_capa >= N * buffer_ratio): break
         if not cand_idx:
             cand_idx = list(range(len(df_sorted)))
         df_cand = df_sorted.loc[cand_idx].copy()
-
-        # ---------- (5) 최소 집합 선택 — 상급 먼저 채우고, 이후 총 capa 채우기 ----------
-        # 5-1) 상급(Tier1) 우선 선택 (capa 내림차순)
-        sel_names = []
-        acc_capa = 0
-        acc_tier1 = 0
-
-        tier1_cand = df_cand[df_cand["is_tier1"] == 1].sort_values("capa", ascending=False)
-        for _, r in tier1_cand.iterrows():
-            sel_names.append(r.name)
-            acc_capa += int(r["capa"])
-            acc_tier1 += int(r["capa"])
-            if acc_tier1 >= U:
-                break
+        
+        df_selected = df_cand.copy()
 
 
+        # ================================================================= #
+        # 위에서 선택된 목록에 최소 조건을 만족하는지 확인하고 부족할 시 추가
+        # 규칙 1: 상급종합병원(Tier 1) 최소 2개 보장
+        final_tier1 = df_selected[df_selected["is_tier1"] == 1]
+        num_to_ensure_tier1 = 2 - len(final_tier1)
+        if num_to_ensure_tier1 > 0:
+            print(f"  INFO: 최종 목록의 상급병원이 {len(final_tier1)}개. 최소 2개를 위해 '추가'합니다.")
+            # 전체 병원 목록에서 아직 선택되지 않은 가장 가까운 상급병원을 찾아서 최소 2개가 될때까지 추가
+            candidates = df_sorted[(df_sorted["is_tier1"] == 1) & (~df_sorted.index.isin(df_selected.index))]
+            if not candidates.empty:
+                hospitals_to_add = candidates.head(num_to_ensure_tier1)
+                df_selected = pd.concat([df_selected, hospitals_to_add])
 
-        # 5-2) 나머지에서 총 capa를 N까지 채우기 (capa 내림차순)
-        rest_cand = df_cand.drop(index=sel_names, errors="ignore").sort_values("capa", ascending=False)
-        for _, r in rest_cand.iterrows():
-            # 제안: 최종 리스트에도 여유를 남김
-            tier1_keep = float(os.environ.get("MCI_TIER1_KEEP", "20"))  # 상급 여유
-            total_keep = float(os.environ.get("MCI_TOTAL_KEEP", "5"))  # 전체 여유
+        # 규칙 2: 상급종합병원이 환자 40% 수용 용량 보장 (Tier 1 기준, 환자수가 많을때 최소 red환자 10% 이상 + 확률분포 고려한 비율)
+        target_capa = N * 0.4
+        current_capa = df_selected[df_selected["is_tier1"] == 1]["eff"].sum()
+        while current_capa < target_capa:
+            print(f"  INFO: 상급병원 용량이 {current_capa}/{target_capa}. 용량을 위해 '추가'합니다.")
+            candidates = df_sorted[(df_sorted["is_tier1"] == 1) & (~df_sorted.index.isin(df_selected.index))]
+            if candidates.empty: print("  WARNING: 추가할 상급병원이 더 이상 없습니다."); break
+            hospital_to_add = candidates.head(1)
+            df_selected = pd.concat([df_selected, hospital_to_add])
+            current_capa = df_selected[df_selected["is_tier1"] == 1]["eff"].sum()
 
-            if (acc_tier1 >= U * tier1_keep) and (acc_capa >= N * total_keep):
-                break
-
-            sel_names.append(r.name)
-            acc_capa += int(r["capa"])
-            # (상급이면 함께 증가)
-            if int(r["is_tier1"]) == 1:
-                acc_tier1 += int(r["capa"])
-
-        # 5-3) 여전히 조건 미충족이면 후보군을 전체로 확대해 한 번 더 시도
-        if (acc_capa < N) or (acc_tier1 < U):
-            # 전체 데이터에서 재시도 (최대한 충족)
-            df_cand2 = df_sorted  # 전체
-            sel_names = []
-            acc_capa = 0
-            acc_tier1 = 0
-            tier1_all = df_cand2[df_cand2["is_tier1"] == 1].sort_values("capa", ascending=False)
-            for _, r in tier1_all.iterrows():
-                sel_names.append(r.name)
-                acc_capa += int(r["capa"])
-                acc_tier1 += int(r["capa"])
-                if acc_tier1 >= U:
-                    break
-            rest_all = df_cand2.drop(index=sel_names, errors="ignore").sort_values("capa", ascending=False)
-            for _, r in rest_all.iterrows():
-                if (acc_capa >= N) and (acc_tier1 >= U):
-                    break
-                sel_names.append(r.name)
-                acc_capa += int(r["capa"])
-                if int(r["is_tier1"]) == 1:
-                    acc_tier1 += int(r["capa"])
-
-            if (acc_capa < N) or (acc_tier1 < U):
-                print("  ⚠️ 상급 보장/총 용량 조건을 전역에서도 충족하지 못했습니다. 가능한 최대 집합 사용.")
-                df_selected = df_sorted.copy()
-            else:
-                df_selected = df_cand2.loc[sel_names].copy()
-        else:
-            df_selected = df_cand.loc[sel_names].copy()
-
-        # 결과는 euc 기준 가까운 순으로 다시 정렬(다운스트림 일관성)
+        # 규칙 3: 그 외 병원(Tier 2 등) 최소 1개 보장 (우연히 가장 가까이 있는 병원이 상급종합병원뿐일때 64개의 룰 중 실패하는 룰이 존재하므로)
+        if len(df_selected[df_selected["is_tier1"] == 0]) == 0:
+            print("  INFO: 최종 목록에 Tier 2 병원이 없음. 시뮬레이션 오류 방지를 위해 '추가'합니다.")
+            candidates = df_sorted[(df_sorted["is_tier1"] == 0) & (~df_sorted.index.isin(df_selected.index))]
+            if not candidates.empty:
+                df_selected = pd.concat([df_selected, candidates.head(1)])
+        
         df_euc = df_selected.sort_values("euclidean_distance").reset_index(drop=True).copy()
+        print(f" 최종 생성된 병원: {len(df_euc)}곳 (상급: {df_euc['is_tier1'].sum()}곳, 종합 등: {len(df_euc) - df_euc['is_tier1'].sum()}곳)")
 
         # ---------- (6) EUC 파일 저장 ----------
         dist_euc_df = pd.DataFrame({"distance": df_euc["euclidean_distance"]})
         dist_euc_path = os.path.join(save_folder, "distance_Hos2Site_euc.csv")
         dist_euc_df.to_csv(dist_euc_path, index=True, index_label="Index", encoding="utf-8-sig")
-
-        # euc_info = df_euc[["capa", "queue_capa", "종별코드", "요양기관명"]].copy()
-        # euc_info.columns = ["병상수", "queue_capa", "종별코드", "요양기관명"]
+        
         euc_info = df_euc[["operating_rooms", "capa", "종별코드", "요양기관명"]].copy()
         euc_info.columns = ["수술실수", "병상수", "종별코드", "요양기관명"]
         euc_info_path = os.path.join(save_folder, "hospital_info_euc.csv")
         euc_info.to_csv(euc_info_path, index=True, index_label="Index", encoding="utf-8-sig")
-
-        # [ADD] hos2site 저장 폴더
+        
         routes_dir_hos = os.path.join(save_folder, "routes", "hos2site")
         ensure_dir(routes_dir_hos)
-
         # ---------- (7) ROAD 거리 계산 & 저장 (선정 병원만) ----------
         road_distances = []
         for j, (_, row) in enumerate(df_euc.iterrows()):
-            end = (row["y좌표"], row["x좌표"])   # (lat,lon) of hospital
+            end = (row["y좌표"], row["x좌표"])
             road_km = self.get_road_distance(
-                start=(latitude, longitude), end=end,            # 현재: site → hospital
+                start=(latitude, longitude), end=end,
                 save_json_dir=routes_dir_hos, route_type="hos2site",
                 source_index=j, name=row.get("요양기관명", f"hospital_{j}"),
                 start_label="site", goal_label="hospital"
@@ -507,11 +437,11 @@ class ScenarioGenerator:
         df_euc = df_euc.copy()
         df_euc["road_distance"] = road_distances
         df_road = df_euc.sort_values("road_distance").reset_index(drop=True).copy()
-
+        
         dist_road_df = pd.DataFrame({"distance": df_road["road_distance"]})
         dist_road_path = os.path.join(save_folder, "distance_Hos2Site_road.csv")
         dist_road_df.to_csv(dist_road_path, index=True, index_label="Index", encoding="utf-8-sig")
-
+        
         road_info = df_road[["operating_rooms", "capa", "종별코드", "요양기관명"]].copy()
         road_info.columns = ["수술실수", "병상수", "종별코드", "요양기관명"]
         road_info_path = os.path.join(save_folder, "hospital_info_road.csv")
