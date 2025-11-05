@@ -20,7 +20,6 @@
 #      · statsmodels 있으면 OLS+Type-II ANOVA, 잔차 정규성(Shapiro)·QQ 스캐터·잔차 히스토그램 제공
 # 5) Data Tables: 편집 대상 셀렉터에 파일명만 노출(경로 숨김), "안전센터와 소방서.csv"는 편집 목록에서 제외
 # -------------------------------------------------------------------------------------------------
-
 import os, re, json, shutil, subprocess, math
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -2220,31 +2219,52 @@ with tabs[2]:
                                     import statsmodels.formula.api as smf
                                     from scipy import stats as sps
 
-                                    # --- RCBD 적합 & 정규성
+                                    # ✅ 항상 초기화 (UnboundLocal 방지)
+                                    posthoc = pd.DataFrame()
+                                    explain = ""
+
+                                    # --- RCBD 적합 & 잔차 정규성
                                     model = smf.ols(f"{yvar} ~ C(rule) + C(run)", data=d).fit()
                                     resid = model.resid
-                                    if len(resid) >= 3:
-                                        try:
-                                            W, p_shap = (sps.shapiro(resid.sample(min(len(resid), 500), random_state=0))
-                                                        if len(resid) > 500 else sps.shapiro(resid))
-                                        except Exception:
-                                            p_shap = 1.0
-                                    else:
+                                    try:
+                                        if len(resid) > 500:
+                                            _, p_shap = sps.shapiro(resid.sample(500, random_state=0))
+                                        else:
+                                            _, p_shap = sps.shapiro(resid)
+                                    except Exception:
                                         p_shap = 1.0
+                                    # 스칼라화
+                                    p_shap = float(np.asarray(p_shap).ravel()[0])
 
-                                    # --- 블록-잔차화로 등분산 검사 + 사후 대상
+                                    # --- 블록-잔차화한 y*로 사후검정 입력 만들기(1D 보장)
                                     dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
-                                    dd_work = _make_dd_work(dd, yvar)                         # ▶ '__y__' 1D 보장
+                                    dd_work = _make_dd_work(dd, yvar)                # ▶ '__y__' 1D 보장
                                     y_post, grp_post = dd_work["__y__"], dd_work["rule"]
                                     means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
                                         ascending=prefer_small_is_A
                                     )
 
-                                    # --- 사후검정
+                                    # --- 등분산(Levene) — dd_work 기준으로 재계산
+                                    try:
+                                        lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
+                                        if len(lev_groups) >= 2 and all(len(x) > 1 for x in lev_groups):
+                                            p_lev = sps.levene(*lev_groups, center="median").pvalue
+                                        else:
+                                            p_lev = np.nan
+                                    except Exception:
+                                        p_lev = np.nan
+
+                                    # --- 사후검정 분기
                                     if (p_shap >= alpha) and (np.isnan(p_lev) or p_lev >= alpha):
-                                        posthoc = tukey_table(y_post, grp_post, alpha=alpha)
-                                        explain = "Tukey HSD (RCBD, y*)"
+                                        # 정규 + 등분산 → Tukey
+                                        try:
+                                            posthoc = tukey_table(y_post, grp_post, alpha=alpha)
+                                            explain = "Tukey HSD (RCBD, y*)"
+                                        except Exception as e:
+                                            explain = f"Tukey 실패: {e}"
+
                                     elif (p_shap >= alpha) and (not np.isnan(p_lev) and p_lev < alpha):
+                                        # 정규 + 이분산 → Games–Howell (없으면 Welch+Holm)
                                         try:
                                             import pingouin as pg
                                             gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
@@ -2253,32 +2273,33 @@ with tabs[2]:
                                             explain = "Games–Howell (RCBD, y*)"
                                         except Exception:
                                             posthoc = games_howell_fallback(
-                                                pd.DataFrame({"rule": grp_post.values, "y": y_post.values}), "rule", "y", alpha=alpha
+                                                pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
+                                                "rule", "y", alpha=alpha
                                             )
                                             explain = "Welch t-tests + Holm (fallback, RCBD, y*)"
+
                                     else:
                                         # 비정규 → Friedman(+Conover/Nemenyi)
                                         try:
                                             piv = d.pivot_table(index="run", columns="rule", values=yvar, aggfunc="mean")
                                             stat, p_f = sps.friedmanchisquare(*[piv[c].dropna().values for c in piv.columns])
-                                            st.caption(f"Friedman χ²={stat:.3g}, p={p_f:.3g}")
                                             if p_f < alpha:
                                                 ph_long, err = conover_friedman(piv, alpha=alpha)
-                                                if ph_long.empty:
-                                                    st.caption(f"사후검정 실패: {err}")
+                                                if not ph_long.empty:
+                                                    posthoc = ph_long
+                                                    explain = "Conover (Holm) after Friedman" + (f" · {err}" if err else "")
                                                 else:
-                                                    posthoc = ph_long; explain = "Conover (Holm) after Friedman"
-                                                    if err: st.caption(err)  # Nemenyi fallback 메시지
+                                                    explain = f"사후검정 실패: {err}"
                                             else:
                                                 explain = "Friedman 비유의 → 사후검정 생략"
                                         except Exception as e:
-                                            st.caption(f"Friedman/사후검정 실패: {e}")
+                                            explain = f"Friedman/사후검정 실패: {e}"
 
-                                    # --- CLD
+                                    # --- CLD 산출
                                     if posthoc.empty or (("p-adj" not in posthoc.columns) and ("reject" not in posthoc.columns)):
                                         return means_for_cld, pd.DataFrame(), explain
 
-                                    cld = cld_from_pairs(means_for_cld, posthoc, alpha=alpha)  # 함수명 유지
+                                    cld = cld_from_pairs(means_for_cld, posthoc, alpha=alpha)
                                     return means_for_cld, cld, explain
 
                                 with st.expander("🔍 A그룹 교집합 보기 (Reward↑, Time↓, PDR↓)", expanded=True):
