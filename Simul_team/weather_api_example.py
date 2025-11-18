@@ -15,8 +15,9 @@ import json
 API_KEY = "0429783e8e9380df65e53818f88e17505dd95235dab97f0694382332d2eccebf"
 
 # 테스트 좌표
-TEST_LAT = 37.458819
-TEST_LON = 126.634031
+
+TEST_LAT = 37.654077
+TEST_LON = 126.768665
 
 # 격자 변환 상수 (Lambert Conformal Conic Projection)
 RE = 6371.00877        # 지구 반경(km)
