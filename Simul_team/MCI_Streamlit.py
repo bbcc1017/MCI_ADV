@@ -219,6 +219,7 @@ def _split_factors(rule_label: str):
     yellow_action = pick_mode(parts[3] if len(parts)>3 else "", "Yellow")
     return phase, red_policy, red_action, yellow_action
 
+@st.cache_data(ttl=600)
 def parse_raw_results(raw_path: str) -> pd.DataFrame:
     """
     results_(lat,lon).txt → long DF
@@ -318,6 +319,7 @@ def base_ok(base_path: str) -> bool:
     return s.is_dir() and (s / "scenarios").is_dir()
 
 # --- NEW: scenarios + results 통합 실험 목록 (scenarios 우선) ---
+@st.cache_data(ttl=60)
 def list_experiments_any(base_path: str) -> List[str]:
     res_root = Path(base_path) / "results"
     scn_root = Path(base_path) / "scenarios"
@@ -338,6 +340,7 @@ def list_experiments_any(base_path: str) -> List[str]:
     return items
 
 # --- NEW: 특정 실험의 좌표 목록 (scenarios 기준) ---
+@st.cache_data(ttl=60)
 def list_coords_from_scenarios(base_path: str, exp_id: str) -> List[str]:
     root = Path(base_path) / "scenarios" / exp_id
     if not root.is_dir():
@@ -399,6 +402,7 @@ def get_routes_dirs(base_path: str, exp_id: str, coord: str) -> Dict[str, Path]:
     }
 
 
+@st.cache_data(ttl=300)
 def load_json_files(folder: Path, limit: Optional[int]=None) -> List[dict]:
     if not folder.is_dir():
         return []
@@ -436,6 +440,7 @@ def write_csv_smart(df: pd.DataFrame, path: str):
 
 # 병원 엑셀: 우선순위 1) base_path/엑셀 결합 데이터.xlsx  2) base_path/scenarios/엑셀 결합 데이터.xlsx
 
+@st.cache_data(ttl=600)
 def read_excel_hospital(base_path: str) -> Optional[pd.DataFrame]:
     cands = [
         Path(base_path) / "엑셀 결합 데이터.xlsx",
@@ -450,6 +455,7 @@ def read_excel_hospital(base_path: str) -> Optional[pd.DataFrame]:
                 st.warning(f"엑셀 로드 실패: {excel_path} ({e})")
     return None
 
+@st.cache_data(ttl=300)
 def read_experiment_summary_csv(base_path: str, exp_id: str) -> Optional[pd.DataFrame]:
     folder = Path(base_path) / "scenarios" / exp_id
     if not folder.is_dir():
@@ -528,6 +534,7 @@ def results_raw_path(base_path: str, exp_id: str, coord: str) -> Optional[str]:
     return str(s) if s.is_file() else None
 
 
+@st.cache_data(ttl=300)
 def get_patient_count(base_path: str, exp_id: str, coord: str) -> Optional[int]:
     folder = Path(base_path) / "scenarios" / exp_id / coord
     for cand in ["amb_info.csv", "amb_info_road.csv", "patient_info.csv"]:
@@ -701,10 +708,11 @@ def experiment_log_candidates(base_path: str, exp_id: str, coord: str) -> List[s
 
 
 # ------------------------------
-# 지도 보조 (혼잡도/범례/UAV/요약)
+# 지도 보조 (혼잡도/범례/UAV/요약) - 카카오 API 기준
 # ------------------------------
-CONG_COLORS = {0:"#888888", 1:"#7CFC00", 2:"#FFD700", 3:"#FF0000"}
-CONG_LABELS = {0:"값없음", 1:"원활", 2:"서행", 3:"혼잡"}
+# Kakao traffic_state: 0=정보없음, 1=정체, 2=지체, 3=서행, 4=원활, 6=교통사고
+CONG_COLORS = {0:"#888888", 1:"#FF0000", 2:"#FF6347", 3:"#FFD700", 4:"#7CFC00", 6:"#000000"}
+CONG_LABELS = {0:"정보없음", 1:"정체", 2:"지체", 3:"서행", 4:"원활", 6:"교통사고"}
 UAV_OUT_COLOR = "#8A2BE2"   # 출동(병원→사고)
 UAV_BACK_COLOR = "#00CED1"  # 이송(사고→병원)
 
@@ -741,16 +749,27 @@ def _haversine_km(lat1, lon1, lat2, lon2):
 
 
 def _extract_summary_meta(obj: dict) -> Tuple[Optional[float], Optional[float], list]:
-    payload = (obj.get("payload") or {}).get("naver_response", {})
-    route_list = payload.get("route", {}).get("trafast", [])
-    if not route_list:
-        return None, None, []
-    r0 = route_list[0]
-    summ = r0.get("summary", {})
-    dist_km = (float(summ.get("distance", 0)) / 1000.0) if summ else None
-    dur_min = (float(summ.get("duration", 0)) / 60000.0) if summ else None
-    guide = r0.get("guide", []) or []
-    return dist_km, dur_min, guide
+    meta = obj.get("meta", {})
+    api_provider = meta.get("api_provider", "naver")
+
+    if api_provider == "kakao":
+        # Kakao API: Use meta fields directly (already extracted)
+        dist_km = meta.get("distance_km")
+        dur_min = meta.get("duration_min")
+        # Kakao doesn't have guide in the same format as Naver
+        return dist_km, dur_min, []
+    else:
+        # Naver API: Extract from payload
+        payload = (obj.get("payload") or {}).get("naver_response", {})
+        route_list = payload.get("route", {}).get("trafast", [])
+        if not route_list:
+            return None, None, []
+        r0 = route_list[0]
+        summ = r0.get("summary", {})
+        dist_km = (float(summ.get("distance", 0)) / 1000.0) if summ else None
+        dur_min = (float(summ.get("duration", 0)) / 60000.0) if summ else None
+        guide = r0.get("guide", []) or []
+        return dist_km, dur_min, guide
 
 
 def _guide_html(guide: list) -> str:
@@ -758,9 +777,21 @@ def _guide_html(guide: list) -> str:
         return ""
     rows = ["<details><summary>🧭 경로 안내(클릭)</summary><ol style='padding-left:16px;'>"]
     for g in guide[:200]:
-        inst = str(g.get("instructions", "")).replace("<", "&lt;").replace(">", "&gt;")
+        # Handle both Naver "instructions" and Kakao "guidance" fields
+        inst = str(g.get("instructions") or g.get("guidance", "")).replace("<", "&lt;").replace(">", "&gt;")
         gd = float(g.get("distance", 0))/1000.0 if g.get("distance") is not None else None
-        gm = float(g.get("duration", 0))/60000.0 if g.get("duration") is not None else None
+
+        # Handle different duration formats
+        # Naver API: duration in milliseconds
+        # Kakao API: duration in seconds
+        dur_val = g.get("duration", 0)
+        if dur_val and dur_val > 1000:
+            # Likely Naver (milliseconds)
+            gm = float(dur_val) / 60000.0
+        else:
+            # Likely Kakao (seconds) or zero
+            gm = float(dur_val or 0) / 60.0
+
         tail = []
         if gd is not None and gd>0: tail.append(f"{gd:.2f} km")
         if gm is not None and gm>0: tail.append(f"{gm:.1f} 분")
@@ -826,40 +857,96 @@ def add_hospital_marker(
 
 
 def draw_route_from_json(m: folium.Map, route_obj: dict, highlight: bool=False):
-    payload = (route_obj.get("payload") or {}).get("naver_response", {})
-    route_list = payload.get("route", {}).get("trafast", [])
-    if not route_list:
-        return
-    r0 = route_list[0]
-    path = r0.get("path", [])
-    latlngs = [[p[1], p[0]] for p in path if isinstance(p, (list,tuple)) and len(p) >= 2]
-    if not latlngs:
-        return
-    sections = r0.get("section", [])
-    if sections:
-        try:
-            idx = 0
-            for sec in sections:
-                road_kind = ROADTYPE_TO_KIND.get(int(sec.get("roadType", -1)), "일반도로") if isinstance(sec.get("roadType"), (int,float)) else "일반도로"
-                spd = float(sec.get("speed", np.nan)) if sec.get("speed") is not None else np.nan
-                cong_by_speed = _classify_cong_by_speed(road_kind, (None if np.isnan(spd) else spd))
-                cong = cong_by_speed if cong_by_speed is not None else int(sec.get("congestion", 0))
-                cnt = int(sec.get("pointCount", 0))
-                if cnt > 0 and idx + cnt <= len(latlngs):
-                    seg = latlngs[idx:idx+cnt]
-                    idx += cnt
-                else:
-                    seg = latlngs
-                folium.PolyLine(
-                    locations=seg,
-                    color=CONG_COLORS.get(cong, "#888888"),
-                    weight=8 if highlight else 5,
-                    opacity=0.9 if highlight else 0.7,
-                ).add_to(m)
-        except Exception:
-            folium.PolyLine(locations=latlngs, color="#3388ff", weight=8 if highlight else 5, opacity=0.7).add_to(m)
+    meta = route_obj.get("meta", {})
+    api_provider = meta.get("api_provider", "naver")
+
+    if api_provider == "kakao":
+        # Kakao API: Parse kakao_response structure
+        payload = (route_obj.get("payload") or {}).get("kakao_response", {})
+        routes = payload.get("routes", [])
+        if not routes:
+            return
+
+        route = routes[0]
+        sections = route.get("sections", [])
+        if not sections:
+            return
+
+        # Kakao API structure: sections[0].roads[]
+        roads = sections[0].get("roads", [])
+
+        for road in roads:
+            traffic_state = road.get("traffic_state", 0)
+            traffic_speed = road.get("traffic_speed")
+            road_name = road.get("name", "")
+            vertexes = road.get("vertexes", [])
+
+            # Convert vertexes from [lon, lat, lon, lat, ...] to [[lat, lon], ...]
+            latlngs = []
+            for i in range(0, len(vertexes), 2):
+                if i + 1 < len(vertexes):
+                    latlngs.append([vertexes[i+1], vertexes[i]])  # [lat, lon]
+
+            if not latlngs:
+                continue
+
+            # Map Kakao traffic_state directly
+            # Kakao: 0=정보없음, 1=정체, 2=지체, 3=서행, 4=원활, 6=교통사고
+            cong = traffic_state
+
+            # Build tooltip with road info
+            tooltip_parts = []
+            if road_name:
+                tooltip_parts.append(road_name)
+            tooltip_parts.append(CONG_LABELS.get(cong, "미확인"))
+            if traffic_speed is not None:
+                tooltip_parts.append(f"{traffic_speed:.0f}km/h")
+            tooltip_text = " · ".join(tooltip_parts)
+
+            folium.PolyLine(
+                locations=latlngs,
+                color=CONG_COLORS.get(cong, "#888888"),
+                weight=8 if highlight else 5,
+                opacity=0.9 if highlight else 0.7,
+                tooltip=tooltip_text
+            ).add_to(m)
+
     else:
-        folium.PolyLine(locations=latlngs, color="#3388ff", weight=8 if highlight else 5, opacity=0.7).add_to(m)
+        # Naver API: Original logic
+        payload = (route_obj.get("payload") or {}).get("naver_response", {})
+        route_list = payload.get("route", {}).get("trafast", [])
+        if not route_list:
+            return
+        r0 = route_list[0]
+        path = r0.get("path", [])
+        latlngs = [[p[1], p[0]] for p in path if isinstance(p, (list,tuple)) and len(p) >= 2]
+        if not latlngs:
+            return
+        sections = r0.get("section", [])
+        if sections:
+            try:
+                idx = 0
+                for sec in sections:
+                    road_kind = ROADTYPE_TO_KIND.get(int(sec.get("roadType", -1)), "일반도로") if isinstance(sec.get("roadType"), (int,float)) else "일반도로"
+                    spd = float(sec.get("speed", np.nan)) if sec.get("speed") is not None else np.nan
+                    cong_by_speed = _classify_cong_by_speed(road_kind, (None if np.isnan(spd) else spd))
+                    cong = cong_by_speed if cong_by_speed is not None else int(sec.get("congestion", 0))
+                    cnt = int(sec.get("pointCount", 0))
+                    if cnt > 0 and idx + cnt <= len(latlngs):
+                        seg = latlngs[idx:idx+cnt]
+                        idx += cnt
+                    else:
+                        seg = latlngs
+                    folium.PolyLine(
+                        locations=seg,
+                        color=CONG_COLORS.get(cong, "#888888"),
+                        weight=8 if highlight else 5,
+                        opacity=0.9 if highlight else 0.7,
+                    ).add_to(m)
+            except Exception:
+                folium.PolyLine(locations=latlngs, color="#3388ff", weight=8 if highlight else 5, opacity=0.7).add_to(m)
+        else:
+            folium.PolyLine(locations=latlngs, color="#3388ff", weight=8 if highlight else 5, opacity=0.7).add_to(m)
 
 
 def _offset_line(start: Tuple[float,float], end: Tuple[float,float], meters: float=30.0) -> List[Tuple[float,float]]:
@@ -919,28 +1006,28 @@ def get_speed_from_yaml(yaml_path: Optional[str]) -> Tuple[Optional[float], Opti
     except Exception:
         return None, None
 
+
+def get_total_samples_from_yaml(yaml_path: Optional[str]) -> int:
+    """YAML에서 total_samples 값 읽기 (성능 최적화용)"""
+    if not yaml_path or not exists_file(yaml_path):
+        return 0
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            y = yaml.safe_load(f)
+        return y.get('rule_info', {}).get('total_samples', 0)
+    except Exception:
+        return 0
+
+
 # ------------------------------
 # 실행/재실행
 # ------------------------------
-
-def run_powershell(ps_path: str, args: List[str] = None, env: Dict[str,str] = None, cwd: Optional[str]=None) -> Tuple[int,str,str]:
-    args = args or []
-    cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File", ps_path] + args
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, env=env, text=True, encoding="utf-8", errors="ignore")
-    out, err = proc.communicate()
-    return proc.returncode, out, err
-
-
-def run_main_py(base_path: str, config_path: str) -> Tuple[int,str,str]:
-    cmd = ["python", "-X", "utf8", "main.py", "--config_path", config_path]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=base_path, text=True, encoding="utf-8", errors="ignore")
-    out, err = proc.communicate()
-    return proc.returncode, out, err
+# PowerShell 관련 함수는 더 이상 사용하지 않음 (Orchestrator 사용)
 
 # ------------------------------
 # 페이지 공통 설정 + CSS(멀티셀렉트 ellipsis 완화)
 # ------------------------------
-st.set_page_config(page_title="MCI Dashboard", layout="wide")
+st.set_page_config(page_title="MCI Streamlit (기존 시나리오 대시보드)", page_icon="📊", layout="wide")
 
 
 with st.sidebar:
@@ -948,11 +1035,14 @@ with st.sidebar:
     base_input = st.text_input("base_path", st.session_state.base_path, placeholder="예: C:\\Users\\사용자명\\MCI")
     if st.button("Set base_path"):
         st.session_state.base_path = norm(base_input)
+        if base_ok(norm(base_input)):
+            st.success("✅ base_path 설정 완료!\n\n🧪 Generate 탭에서 새 시나리오를 생성하거나, 기존 시나리오를 선택하세요.")
     if st.session_state.base_path and not base_ok(st.session_state.base_path):
         st.warning("유효한 base_path가 아닙니다. (scenarios 폴더가 필요)")
     st.text("※ 위에 버튼 클릭해야 시작 가능")
     if base_ok(st.session_state.base_path):
         exps = list_experiments_any(st.session_state.base_path)
+        st.caption("📂 기존 시나리오 선택 (선택사항)")
         st.session_state.selected_exp = st.selectbox(
             "Experiment ID",
             options=[""] + exps,
@@ -1043,7 +1133,7 @@ st.markdown("""
 
 st.title("🚑 MCI 재난 시뮬레이션 대시보드")
 
-tabs = st.tabs(["Maps", "Scenarios", "Analytics", "Data Tables", "Generate"])
+tabs = st.tabs(["Maps", "Scenarios", "Analytics", "Data Tables", "Rerun"])
 
 # ------------------------------
 # Scenarios 탭
@@ -1075,8 +1165,23 @@ with tabs[1]:
                     st.caption("summary.csv에서 '시나리오생성_시작' 이후 열을 찾지 못했습니다.")
 
 
+        # 성능 최적화: total_samples 확인
+        yaml_path = find_yaml_in_coord(bp, exp, coord)
+        total_samples = get_total_samples_from_yaml(yaml_path)
+
         st.markdown("### 🧾 실행 로그")
-        logs = experiment_log_candidates(bp, exp, coord)
+
+        # total_samples 기반 조건부 로딩
+        if total_samples > 500:
+            st.warning("⚠️ 시뮬레이션 반복 횟수가 500회를 초과하여 로그 뷰어가 비활성화되었습니다.")
+            st.info(f"📁 로그 파일을 직접 확인하세요: `scenarios/{exp}/{coord}/experiment_logs/`")
+            logs = None
+        elif total_samples > 100:
+            st.info(f"ℹ️ 시뮬레이션 반복 횟수({total_samples}회)가 많아 로딩에 시간이 소요될 수 있습니다.")
+            logs = experiment_log_candidates(bp, exp, coord)
+        else:
+            logs = experiment_log_candidates(bp, exp, coord)
+
         if logs:
             log_sel = st.selectbox("로그 파일 선택 (experiment_logs/<coord>만)", logs)
             log_text = _read_text_any(log_sel)
@@ -1142,17 +1247,6 @@ with tabs[1]:
             st.info("해당 조합의 로그 파일을 찾지 못했습니다.")
 
 
-        st.markdown("### ▶️ 재실행 (main.py --config_path)")
-        st.text("results 폴더의 txt 파일들만 갱신됩니다.")
-        if yaml_path and st.button("main.py 재실행"):
-            st.session_state.py_running = True
-            with st.spinner("main.py 실행 중..."):
-                code, out, err = run_main_py(bp, yaml_path)
-            st.session_state.py_running = False
-            st.success(f"종료 코드: {code}")
-            st.expander("stdout").write(out or "")
-            st.expander("stderr").write(err or "")
-
 # ------------------------------
 # Maps 탭 (복수선택 + UAV 출동/이송 토글 + 범례 강화)
 # ------------------------------
@@ -1195,6 +1289,7 @@ with tabs[0]:
     dist_road_csv = Path(bp) / "scenarios" / exp / coord / "distance_Hos2Site_road.csv"
     dist_road_df  = pd.read_csv(dist_road_csv) if dist_road_csv.is_file() else pd.DataFrame()
     dist_road_map = dict(zip(dist_road_df["Index"], dist_road_df["distance"])) if not dist_road_df.empty else {}
+    dur_road_map = dict(zip(dist_road_df["Index"], dist_road_df["duration"])) if not dist_road_df.empty and "duration" in dist_road_df.columns else {}
 
     hinfo_euc_csv = Path(bp) / "scenarios" / exp / coord / "hospital_info_euc.csv"
     hinfo_euc_df  = pd.read_csv(hinfo_euc_csv) if hinfo_euc_csv.is_file() else pd.DataFrame()
@@ -1244,16 +1339,24 @@ with tabs[0]:
     with col_amb_c2s:
         st.markdown("**안전센터/소방서→사고지점 (출동)**")
 
-        # ✔ amb_info_road.csv 기준 표 구성 (인덱스/이름/거리=init_distance)
+        # ✔ amb_info_road.csv 기준 표 구성 (인덱스/이름/거리=init_distance/시간=duration)
         if not ambinfo_df.empty:
-            c2s_df = ambinfo_df.rename(columns={
+            rename_dict = {
                 "Index":"인덱스",
                 "안전센터/소방서이름":"안전센터/소방서",
                 "init_distance":"거리(km)",
-            })[["인덱스","안전센터/소방서","거리(km)"]].copy()
+            }
+            cols = ["인덱스","안전센터/소방서","거리(km)"]
+            if "duration" in ambinfo_df.columns:
+                rename_dict["duration"] = "시간(분)"
+                cols.append("시간(분)")
+
+            c2s_df = ambinfo_df.rename(columns=rename_dict)[cols].copy()
             c2s_df["거리(km)"] = pd.to_numeric(c2s_df["거리(km)"], errors="coerce").round(2)
+            if "시간(분)" in c2s_df.columns:
+                c2s_df["시간(분)"] = pd.to_numeric(c2s_df["시간(분)"], errors="coerce").round(1)
         else:
-            c2s_df = pd.DataFrame(columns=["인덱스","안전센터/소방서","거리(km)"])
+            c2s_df = pd.DataFrame(columns=["인덱스","안전센터/소방서","거리(km)","시간(분)"])
 
         # 기본 선택 상태
         if "amb_c2s_sel_idx" not in st.session_state:
@@ -1268,19 +1371,26 @@ with tabs[0]:
         c2s_df_show = c2s_df.copy()
         c2s_df_show["표시"] = c2s_df_show["인덱스"].apply(lambda i: i in st.session_state.amb_c2s_sel_idx)
         # ▶ 표시를 맨 앞으로
-        c2s_df_show = c2s_df_show[["표시","인덱스","안전센터/소방서","거리(km)"]]
+        show_cols = ["표시","인덱스","안전센터/소방서","거리(km)"]
+        if "시간(분)" in c2s_df_show.columns:
+            show_cols.append("시간(분)")
+        c2s_df_show = c2s_df_show[show_cols]
+
+        col_cfg = {
+            "표시": st.column_config.CheckboxColumn("표시"),
+            "인덱스": st.column_config.NumberColumn("인덱스", disabled=True),
+            "안전센터/소방서": st.column_config.TextColumn("안전센터/소방서", disabled=True),
+            "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
+        }
+        if "시간(분)" in c2s_df_show.columns:
+            col_cfg["시간(분)"] = st.column_config.NumberColumn("시간(분)", disabled=True, format="%.1f")
 
         edited_c2s = st.data_editor(
             c2s_df_show,
             use_container_width=True,
             num_rows="fixed",
             hide_index=True,
-            column_config={
-                "표시": st.column_config.CheckboxColumn("표시"),
-                "인덱스": st.column_config.NumberColumn("인덱스", disabled=True),
-                "안전센터/소방서": st.column_config.TextColumn("안전센터/소방서", disabled=True),
-                "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
-            },
+            column_config=col_cfg,
             key="tbl_c2s"
         )
         st.session_state.amb_c2s_sel_idx = set(edited_c2s.loc[edited_c2s["표시"]==True, "인덱스"].tolist())
@@ -1298,8 +1408,10 @@ with tabs[0]:
             s2h_df["병원등급"] = s2h_df["종별코드"].apply(code_to_grade)
             if dist_road_map:
                 s2h_df["거리(km)"] = s2h_df["인덱스"].map(dist_road_map).round(2)
+            if dur_road_map:
+                s2h_df["시간(분)"] = s2h_df["인덱스"].map(dur_road_map).round(1)
         else:
-            s2h_df = pd.DataFrame(columns=["인덱스","병원","종별코드","병원등급","거리(km)"])
+            s2h_df = pd.DataFrame(columns=["인덱스","병원","종별코드","병원등급","거리(km)","시간(분)"])
 
         if "amb_s2h_sel_idx" not in st.session_state:
             st.session_state.amb_s2h_sel_idx = set(s2h_df["인덱스"].tolist())
@@ -1313,21 +1425,28 @@ with tabs[0]:
         s2h_df_show = s2h_df.copy()
         s2h_df_show["표시"] = s2h_df_show["인덱스"].apply(lambda i: i in st.session_state.amb_s2h_sel_idx)
         # ▶ 표시를 맨 앞으로
-        s2h_df_show = s2h_df_show[["표시","인덱스","병원","종별코드","병원등급","거리(km)"]]
+        s2h_show_cols = ["표시","인덱스","병원","종별코드","병원등급","거리(km)"]
+        if "시간(분)" in s2h_df_show.columns:
+            s2h_show_cols.append("시간(분)")
+        s2h_df_show = s2h_df_show[s2h_show_cols]
+
+        s2h_col_cfg = {
+            "표시":     st.column_config.CheckboxColumn("표시"),
+            "인덱스":   st.column_config.NumberColumn("인덱스", disabled=True),
+            "병원":     st.column_config.TextColumn("병원", disabled=True),
+            "종별코드": st.column_config.NumberColumn("종별코드", disabled=True),
+            "병원등급": st.column_config.TextColumn("병원등급", disabled=True),
+            "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
+        }
+        if "시간(분)" in s2h_df_show.columns:
+            s2h_col_cfg["시간(분)"] = st.column_config.NumberColumn("시간(분)", disabled=True, format="%.1f")
 
         edited_s2h = st.data_editor(
             s2h_df_show,
             use_container_width=True,
             num_rows="fixed",
             hide_index=True,
-            column_config={
-                "표시":     st.column_config.CheckboxColumn("표시"),
-                "인덱스":   st.column_config.NumberColumn("인덱스", disabled=True),
-                "병원":     st.column_config.TextColumn("병원", disabled=True),
-                "종별코드": st.column_config.NumberColumn("종별코드", disabled=True),
-                "병원등급": st.column_config.TextColumn("병원등급", disabled=True),
-                "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
-            },
+            column_config=s2h_col_cfg,
             key="tbl_s2h"
         )
         st.session_state.amb_s2h_sel_idx = set(edited_s2h.loc[edited_s2h["표시"]==True, "인덱스"].tolist())
@@ -1353,14 +1472,17 @@ with tabs[0]:
                     tier1_latlons.append((y, x, name, 1))
 
         uav_out_rows = []
+        uav_velocity = 80  # UAV 기본 속도 (km/h)
         for i, (y, x, nm, code) in enumerate(tier1_latlons):
             dkm = _haversine_km(y, x, lat, lon)  # 직선거리
+            duration_min = (dkm / uav_velocity) * 60  # 시간(분) = 거리 / 속도 * 60
             uav_out_rows.append({
                 "인덱스": i,
                 "병원": nm,
                 "종별코드": code,
                 "병원등급": code_to_grade(code),
-                "거리(km)": round(dkm, 2)
+                "거리(km)": round(dkm, 2),
+                "시간(분)": round(duration_min, 1)
             })
         uav_out_df = pd.DataFrame(uav_out_rows)
 
@@ -1375,8 +1497,8 @@ with tabs[0]:
 
         uav_out_df_show = uav_out_df.copy()
         uav_out_df_show["표시"] = uav_out_df_show["인덱스"].apply(lambda i: i in st.session_state.uav_c2s_sel_idx)
-        # ▶ 표시를 맨 앞으로, 거리(km)는 마지막
-        uav_out_df_show = uav_out_df_show[["표시","인덱스","병원","종별코드","병원등급","거리(km)"]]
+        # ▶ 표시를 맨 앞으로, 거리와 시간은 마지막
+        uav_out_df_show = uav_out_df_show[["표시","인덱스","병원","종별코드","병원등급","거리(km)","시간(분)"]]
 
         edited_uav_out = st.data_editor(
             uav_out_df_show,
@@ -1390,6 +1512,7 @@ with tabs[0]:
                 "종별코드": st.column_config.NumberColumn("종별코드", disabled=True),
                 "병원등급": st.column_config.TextColumn("병원등급", disabled=True),
                 "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
+                "시간(분)": st.column_config.NumberColumn("시간(분)", disabled=True, format="%.1f"),
             },
             key="tbl_uav_out"
         )
@@ -1402,18 +1525,23 @@ with tabs[0]:
         # ✔ hospital_info_euc + distance_Hos2Site_euc 기준 표 구성
         uav_back_rows = []
         name_to_idx_euc = {}
+        uav_velocity = 80  # UAV 기본 속도 (km/h)
         if not hinfo_euc_df.empty:
             for _, rr in hinfo_euc_df.iterrows():
                 idx  = int(rr.get("Index"))
                 nm   = str(rr.get("요양기관명","")).strip()
                 code = rr.get("종별코드", "")
                 dkm  = dist_euc_map.get(idx, None)
+                duration_min = None
+                if dkm is not None:
+                    duration_min = (float(dkm) / uav_velocity) * 60  # 시간(분) = 거리 / 속도 * 60
                 uav_back_rows.append({
                     "인덱스": idx,
                     "병원": nm,
                     "종별코드": code,
                     "병원등급": code_to_grade(code),
-                    "거리(km)": round(float(dkm), 2) if dkm is not None else None
+                    "거리(km)": round(float(dkm), 2) if dkm is not None else None,
+                    "시간(분)": round(duration_min, 1) if duration_min is not None else None
                 })
                 name_to_idx_euc[nm] = idx
         uav_back_df = pd.DataFrame(uav_back_rows)
@@ -1429,8 +1557,8 @@ with tabs[0]:
 
         uav_back_df_show = uav_back_df.copy()
         uav_back_df_show["표시"] = uav_back_df_show["인덱스"].apply(lambda i: i in st.session_state.uav_s2h_sel_idx)
-        # ▶ 표시를 맨 앞으로, 거리(km)는 마지막
-        uav_back_df_show = uav_back_df_show[["표시","인덱스","병원","종별코드","병원등급","거리(km)"]]
+        # ▶ 표시를 맨 앞으로, 거리와 시간은 마지막
+        uav_back_df_show = uav_back_df_show[["표시","인덱스","병원","종별코드","병원등급","거리(km)","시간(분)"]]
 
         edited_uav_back = st.data_editor(
             uav_back_df_show,
@@ -1444,6 +1572,7 @@ with tabs[0]:
                 "종별코드": st.column_config.NumberColumn("종별코드", disabled=True),
                 "병원등급": st.column_config.TextColumn("병원등급", disabled=True),
                 "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
+                "시간(분)": st.column_config.NumberColumn("시간(분)", disabled=True, format="%.1f"),
             },
             key="tbl_uav_back"
         )
@@ -1616,11 +1745,13 @@ with tabs[0]:
     amb_speed, uav_speed = get_speed_from_yaml(find_yaml_in_coord(bp, exp, coord))
     legend_html = [
         '<div style="position: fixed; bottom: 18px; left: 12px; z-index: 9999; background: rgba(255,255,255,0.94); padding: 10px 12px; border-radius: 10px; font-size: 12px; line-height: 1.35; box-shadow: 0 2px 6px rgba(0,0,0,.15);">',
-        '<b>범례</b><br>',
+        '<b>범례 (카카오 교통정보)</b><br>',
         f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[0]};margin:2px 6px 2px 0;"></span>정보없음(0)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[1]};margin:2px 6px 2px 0;"></span>원활(1)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[2]};margin:2px 6px 2px 0;"></span>서행(2)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[3]};margin:2px 6px 2px 0;"></span>혼잡(3)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[1]};margin:2px 6px 2px 0;"></span>정체(1)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[2]};margin:2px 6px 2px 0;"></span>지체(2)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[3]};margin:2px 6px 2px 0;"></span>서행(3)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[4]};margin:2px 6px 2px 0;"></span>원활(4)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[6]};margin:2px 6px 2px 0;"></span>교통사고(6)<br>',
         f'<span style="display:inline-block;width:26px;height:0;border-top:3px dashed {UAV_OUT_COLOR};margin:6px 6px 2px 0;"></span>UAV 출동(병원→사고)<br>',
         f'<span style="display:inline-block;width:26px;height:0;border-top:3px dashed {UAV_BACK_COLOR};margin:2px 6px 0 0;"></span>UAV 이송(사고→병원)<br>',
     ]
@@ -1658,6 +1789,7 @@ with tabs[0]:
 # Analytics 탭 (정렬 테이블 + ANOVA 스위트)
 # ------------------------------
 
+@st.cache_data
 def gen_scenario_keys() -> pd.DataFrame:
     rows = []
     for ph in PHASES:
@@ -2412,11 +2544,24 @@ with tabs[3]:
                     st.experimental_rerun()
             with c3:
                 yaml_path = find_yaml_in_coord(bp, exp, coord)
-                if yaml_path and st.button("▶️ 수정값으로 재실행 (main.py)"):
-                    code, out, err = run_main_py(bp, yaml_path)
-                    st.success(f"종료 코드: {code}")
-                    st.expander("stdout").write(out or "")
-                    st.expander("stderr").write(err or "")
+                if yaml_path and st.button("▶️ 수정값으로 재실행"):
+                    try:
+                        from orchestrator import Orchestrator
+                        with st.spinner("시뮬레이션 실행 중..."):
+                            orc = Orchestrator(base_path=bp)
+                            result = orc.run_simulation(config_path=yaml_path)
+                        if result["ok"]:
+                            st.success("✅ 시뮬레이션 완료!")
+                            st.write(f"• 로그 파일: `{result['log_file']}`")
+                        else:
+                            st.error(f"❌ 실행 실패 (코드: {result['returncode']})")
+                            with st.expander("stdout"):
+                                st.text(result.get("stdout", ""))
+                            with st.expander("stderr"):
+                                st.text(result.get("stderr", ""))
+                    except Exception as e:
+                        st.error("시뮬레이션 실행 중 오류")
+                        st.exception(e)
 
         st.markdown("#### 병원 마스터(엑셀, 읽기전용)")
         hdf = read_excel_hospital(bp)
@@ -2453,13 +2598,53 @@ if "env_txt" not in st.session_state:
 if "env_txt2" not in st.session_state:
     st.session_state.env_txt2 = ""
 
+# ------------------------------
+# Generate 탭 (독립적, 마지막 탭)
+# ------------------------------
+# ──────────────────────────────────────────────────────────────────────────────
+# Rerun 탭 (기존 시나리오 재실행)
+# ──────────────────────────────────────────────────────────────────────────────
 with tabs[4]:
-    st.subheader("🧪 시나리오 생성 · 실행")
+    st.subheader("🔄 기존 시나리오 재실행")
+    st.info("💡 이 탭은 사이드바 설정과 **독립적**으로 작동합니다. 기존 시나리오를 선택하여 파라미터를 수정한 후 재실행할 수 있습니다.")
 
-    bp = st.session_state.base_path
-    if not base_ok(bp):
-        st.info("좌측에서 base_path를 먼저 설정하세요.")
+    # ─────────────────────────────────────────────────────────────────
+    # Rerun 탭 전용 base_path 입력
+    # ─────────────────────────────────────────────────────────────────
+    if "rerun_base_path" not in st.session_state:
+        st.session_state.rerun_base_path = ""
+
+    st.markdown("---")
+    st.markdown("### 📁 프로젝트 경로 설정")
+
+    col_path, col_btn = st.columns([4, 1])
+    with col_path:
+        rerun_bp_input = st.text_input(
+            "🗂️ 프로젝트 경로 (base_path)",
+            value=st.session_state.rerun_base_path,
+            placeholder="예: C:\\Users\\사용자명\\MCI_ADV\\Simul_team",
+            help="scenarios 폴더가 있는 프로젝트 루트 경로를 입력하세요",
+            key="rerun_bp_input"
+        )
+    with col_btn:
+        st.write("")  # 정렬용
+        st.write("")  # 정렬용
+        if st.button("✅ 경로 확인", key="rerun_check_path"):
+            st.session_state.rerun_base_path = rerun_bp_input
+
+    bp_rerun = st.session_state.rerun_base_path
+
+    # 경로 유효성 검사
+    if not bp_rerun:
+        st.warning("⚠️ 위에서 프로젝트 경로를 입력하고 **✅ 경로 확인** 버튼을 클릭하세요.")
         st.stop()
+
+    if not base_ok(bp_rerun):
+        st.error(f"❌ 유효하지 않은 경로입니다: `{bp_rerun}`")
+        st.caption("• 경로가 존재하는지 확인하세요\n• `scenarios` 폴더가 있는지 확인하세요")
+        st.stop()
+
+    st.success(f"✅ 유효한 경로: `{bp_rerun}`")
 
     # ─────────────────────────────────────────────────────────────────
     # Orchestrator 로드
@@ -2467,146 +2652,265 @@ with tabs[4]:
     try:
         from orchestrator import Orchestrator
     except Exception as e:
-        st.error("orchestrator.py를 프로젝트 루트에 두세요.")
+        st.error("❌ orchestrator.py를 프로젝트 루트에 두세요.")
         st.exception(e)
         st.stop()
 
-    # 유틸
-    def parse_env_kv(text: str):
-        env = {}
-        for line in (text or "").splitlines():
-            line = line.strip()
-            if not line or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            env[k.strip()] = v.strip()
-        return env
-
-    if "gen_state" not in st.session_state:
-        st.session_state.gen_state = {}
-    if "env_txt" not in st.session_state:
-        st.session_state.env_txt = ""
-    if "env_txt2" not in st.session_state:
-        st.session_state.env_txt2 = ""
-
     # ─────────────────────────────────────────────────────────────────
-    # 1) 시나리오 생성
+    # 실험 폴더 및 좌표 폴더 선택
     # ─────────────────────────────────────────────────────────────────
-    st.markdown("### 1) 시나리오 생성")
-    colA, colB, colC = st.columns(3)
-    with colA:
-        latitude  = st.number_input("위도 (latitude)", value=37.465833, format="%.6f")
-        incident_size = st.number_input("환자수 (incident_size)", value=30, min_value=1, step=1)
-        amb_velocity  = st.number_input("구급차 속도 (km/h)", value=40, min_value=1, step=1)
-        total_samples = st.number_input("시뮬레이션 반복 (totalSamples)", value=10, min_value=1, step=1)
-    with colB:
-        longitude = st.number_input("경도 (longitude)", value=126.443333, format="%.6f")
-        amb_size  = st.number_input("구급차 수 (amb_size)", value=30, min_value=1, step=1)
-        uav_velocity = st.number_input("UAV 속도 (km/h)", value=80, min_value=1, step=1)
-        random_seed  = st.number_input("랜덤시드", value=0, min_value=0, step=1)
-    with colC:
-        uav_size = st.number_input("UAV 수 (uav_size)", value=3, min_value=0, step=1)
-        exp_id   = st.text_input("실험ID(선택, 미입력시 자동: exp_타임스탬프)", value="")
-        hospital_max_send_coeff = st.text_input("max_send_coeff (예: 1.05,1)", value="1,1")
-        buffer_ratio = st.number_input("buffer_ratio", value=1.5, min_value=1.0, step=0.1)
-
-
-    if st.button("📦 시나리오 생성"):
-        try:
-            env = parse_env_kv(st.session_state.env_txt)
-            extra_args = {
-                "buffer_ratio": buffer_ratio,
-                "hospital_max_send_coeff": hospital_max_send_coeff.strip()
-            }
-            orc = Orchestrator(base_path=bp)
-            res = orc.generate_scenario(
-                latitude=latitude, longitude=longitude,
-                incident_size=int(incident_size),
-                amb_size=int(amb_size), uav_size=int(uav_size),
-                amb_velocity=int(amb_velocity), uav_velocity=int(uav_velocity),
-                total_samples=int(total_samples), random_seed=int(random_seed),
-                exp_id=(exp_id.strip() or None),
-                extra_env=env, extra_args=extra_args
-            )
-
-            # 최신 상태 보관
-            st.session_state.gen_state = {
-                "exp_id": res["exp_id"],
-                "coord": res["coord"],
-                "config_path": res["config_path"],
-                "summary_csv_path": res["summary_csv_path"],
-                "summary_csv_path_legacy": res["summary_csv_path_legacy"],
-                "log_file": res["log_file"]
-            }
-
-            st.success("시나리오 생성 완료!")
-            st.write(f"• 실험ID: `{res['exp_id']}`")
-            st.write(f"• 좌표: `{res['coord']}`")
-            st.write(f"• CONFIG_PATH: `{res['config_path']}`")
-            st.write(f"• 요약 CSV(신규): `{res['summary_csv_path']}`")
-            st.write(f"• 로그 파일: `{res['log_file']}`")
-
-        except Exception as e:
-            st.error("시나리오 생성 중 오류")
-            st.exception(e)
-
     st.markdown("---")
+    st.markdown("### 🗂️ 시나리오 선택")
 
-    # ─────────────────────────────────────────────────────────────────
-    # 2) 시뮬레이션 실행 (CONFIG_PATH 자동)
-    # ─────────────────────────────────────────────────────────────────
-    st.markdown("### 2) 시뮬레이션 실행 (실험·좌표 선택)")
     # 실험/좌표 목록 만들기
-    exps = list_experiments_any(bp)
-    # 기본 선택: 방금 생성한 실험이 있으면 우선 사용
-    default_exp = st.session_state.gen_state.get("exp_id") if st.session_state.gen_state else ""
-    if default_exp not in exps:
-        default_exp = st.session_state.selected_exp if "selected_exp" in st.session_state else ""
-    exp_idx = (exps.index(default_exp) if default_exp in exps else 0)
-    sel_exp = st.selectbox("실험 선택", options=exps, index=exp_idx)
+    exps_rerun = list_experiments_any(bp_rerun)
+    if not exps_rerun:
+        st.warning("⚠️ scenarios 폴더에 실험이 없습니다.")
+        st.stop()
 
-    coords = list_coords_from_scenarios(bp, sel_exp) if sel_exp else []
-    default_coord = st.session_state.gen_state.get("coord") if st.session_state.gen_state and st.session_state.gen_state.get("exp_id")==sel_exp else ""
-    if default_coord not in coords:
-        default_coord = st.session_state.selected_coord if "selected_coord" in st.session_state and st.session_state.selected_exp==sel_exp else ""
-    coord_idx = (coords.index(default_coord) if default_coord in coords else 0) if coords else 0
-    sel_coord = st.selectbox("좌표 선택", options=coords or [""], index=coord_idx)
+    sel_exp_rerun = st.selectbox(
+        "📂 실험 폴더 선택",
+        options=exps_rerun,
+        key="sel_exp_rerun",
+        help="scenarios 폴더 내의 실험 폴더를 선택하세요"
+    )
 
+    coords_rerun = list_coords_from_scenarios(bp_rerun, sel_exp_rerun) if sel_exp_rerun else []
+    if not coords_rerun:
+        st.warning(f"⚠️ 실험 `{sel_exp_rerun}`에 좌표 폴더가 없습니다.")
+        st.stop()
 
-    # 실행 버튼
-    if st.button("▶️ 시뮬레이션 실행"):
+    sel_coord_rerun = st.selectbox(
+        "📍 좌표 폴더 선택",
+        options=coords_rerun,
+        key="sel_coord_rerun",
+        help="선택한 실험 폴더 내의 좌표 폴더를 선택하세요"
+    )
+
+    # ─────────────────────────────────────────────────────────────────
+    # YAML 파일 읽기 및 파라미터 수정 UI
+    # ─────────────────────────────────────────────────────────────────
+    if sel_exp_rerun and sel_coord_rerun:
+        cfg_path_rerun = os.path.join(bp_rerun, "scenarios", sel_exp_rerun, sel_coord_rerun, f"config_{sel_coord_rerun}.yaml")
+
+        if not os.path.exists(cfg_path_rerun):
+            st.error(f"❌ CONFIG 파일을 찾을 수 없습니다: `{cfg_path_rerun}`")
+            st.stop()
+
+        st.success(f"✅ CONFIG 파일: `{os.path.basename(cfg_path_rerun)}`")
+
         try:
-            if not sel_exp or not sel_coord:
-                st.warning("실험과 좌표를 먼저 선택하세요.")
-                st.stop()
-            # CONFIG_PATH 자동 조립
-            cfg_path = os.path.join(bp, "scenarios", sel_exp, sel_coord, f"config_{sel_coord}.yaml")
-            if not os.path.exists(cfg_path):
-                st.error(f"CONFIG 파일을 찾을 수 없습니다: {cfg_path}")
-                st.stop()
+            with open(cfg_path_rerun, "r", encoding="utf-8") as f:
+                yaml_data_rerun = yaml.safe_load(f)
 
-            env2 = parse_env_kv(st.session_state.env_txt2)
-            orc = Orchestrator(base_path=bp)
-            res2 = orc.run_simulation(config_path=cfg_path, extra_env=env2)
+            # ─────────────────────────────────────────────────────────────────
+            # 현재 설정 표시
+            # ─────────────────────────────────────────────────────────────────
+            st.markdown("---")
+            st.markdown("### ⚙️ 현재 설정")
 
-            # 최신 상태 업데이트
-            st.session_state.gen_state.update({
-                "exp_id": res2["exp_id"],
-                "coord": res2["coord"],
-                "config_path": res2["config_path"],
-                "summary_csv_path": res2["summary_csv_path"],
-                "summary_csv_path_legacy": res2["summary_csv_path_legacy"],
-                "log_file": res2["log_file"]
-            })
+            with st.expander("📋 현재 시나리오 설정 보기", expanded=False):
+                st.json(yaml_data_rerun)
 
-            st.success("시뮬레이션 완료!")
-            st.write(f"• 실험ID: `{res2['exp_id']}`")
-            st.write(f"• 좌표: `{res2['coord']}`")
-            st.write(f"• 요약 CSV(신규): `{res2['summary_csv_path']}`")
-            st.write(f"• 로그 파일: `{res2['log_file']}`")
-            st.caption("Scenarios/Maps 탭에서 바로 확인해 보세요.")
+            # ─────────────────────────────────────────────────────────────────
+            # 파라미터 수정 UI
+            # ─────────────────────────────────────────────────────────────────
+            st.markdown("---")
+            st.markdown("### 🔧 파라미터 수정")
+            st.caption("⚠️ 출발시각, 사고규모, 위경도 변경은 시나리오 재생성이 필요합니다 (API 재호출)")
 
-        except Exception as e:
-            st.error("시뮬레이션 실행 중 오류")
-            st.exception(e)
+            col1, col2 = st.columns(2)
+
+            # Ambulance 파라미터
+            with col1:
+                st.markdown("**🚑 Ambulance**")
+                amb_cfg_rerun = yaml_data_rerun.get('entity_info', {}).get('ambulance', {})
+                is_use_time_amb_rerun = st.checkbox(
+                    "API duration 사용",
+                    value=amb_cfg_rerun.get('is_use_time', True),
+                    key="rerun_is_use_time",
+                    help="True: API duration 사용, False: 거리/속도 계산"
+                )
+                amb_velocity_rerun = st.number_input(
+                    "구급차 속도 (km/h)",
+                    value=float(amb_cfg_rerun.get('velocity', 60)),
+                    min_value=1.0,
+                    step=1.0,
+                    key="rerun_amb_velocity"
+                )
+                amb_handover_rerun = st.number_input(
+                    "환자 인계시간 (분)",
+                    value=float(amb_cfg_rerun.get('handover_time', 0)),
+                    min_value=0.0,
+                    step=0.5,
+                    key="rerun_amb_handover"
+                )
+                duration_coeff_rerun = st.number_input(
+                    "API duration 시간가중치",
+                    value=float(amb_cfg_rerun.get('duration_coeff', 1.0)),
+                    min_value=0.1,
+                    max_value=10.0,
+                    step=0.1,
+                    format="%.1f",
+                    key="rerun_duration_coeff",
+                    help="API duration에 곱해지는 계수 (기본값: 1.0)"
+                )
+
+            # UAV 파라미터
+            with col2:
+                st.markdown("**🛩️ UAV**")
+                uav_cfg_rerun = yaml_data_rerun.get('entity_info', {}).get('uav', {})
+                uav_velocity_rerun = st.number_input(
+                    "UAV 속도 (km/h)",
+                    value=float(uav_cfg_rerun.get('velocity', 80)),
+                    min_value=1.0,
+                    step=1.0,
+                    key="rerun_uav_velocity"
+                )
+                uav_handover_rerun = st.number_input(
+                    "환자 인계시간 (분)",
+                    value=float(uav_cfg_rerun.get('handover_time', 0)),
+                    min_value=0.0,
+                    step=0.5,
+                    key="rerun_uav_handover"
+                )
+
+            st.markdown("**🏥 Hospital**")
+            col3, col4 = st.columns(2)
+            with col3:
+                hosp_cfg_rerun = yaml_data_rerun.get('entity_info', {}).get('hospital', {})
+                max_send_coeff_rerun = st.text_input(
+                    "hospital_max_send_coeff",
+                    value=str(hosp_cfg_rerun.get('max_send_coeff', [1.0, 1.0])).strip('[]'),
+                    key="rerun_max_send_coeff",
+                    help="예: 1.1, 1.0"
+                )
+
+            with col4:
+                run_cfg_rerun = yaml_data_rerun.get('run_setting', {})
+                total_samples_rerun = st.number_input(
+                    "시뮬레이션 반복 횟수",
+                    value=int(run_cfg_rerun.get('totalSamples', 10)),
+                    min_value=1,
+                    step=1,
+                    key="rerun_total_samples"
+                )
+
+            # ─────────────────────────────────────────────────────────────────
+            # 실행 버튼
+            # ─────────────────────────────────────────────────────────────────
+            st.markdown("---")
+            if st.button("▶️ 파라미터 수정 및 시뮬레이션 실행", key="btn_rerun_execute"):
+                try:
+                    # YAML 백업 생성 (타임스탬프) - 수정 전에 백업
+                    import shutil
+                    backup_path_rerun = cfg_path_rerun.replace(".yaml", f"_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}.yaml")
+                    shutil.copy(cfg_path_rerun, backup_path_rerun)
+                    st.info(f"📦 원본 YAML 백업: `{os.path.basename(backup_path_rerun)}`")
+
+                    # YAML 파일을 문자열로 읽어서 직접 수정 (주석과 형식 유지)
+                    with open(cfg_path_rerun, "r", encoding="utf-8") as f:
+                        yaml_text_rerun = f.read()
+
+                    # max_send_coeff 파싱
+                    try:
+                        coeff_list_rerun = [float(x.strip()) for x in max_send_coeff_rerun.split(',')]
+                        coeff_str_rerun = "[" + ", ".join(str(c) for c in coeff_list_rerun) + "]"
+                    except:
+                        st.warning("max_send_coeff 형식 오류, 기존 값 유지")
+                        coeff_str_rerun = None
+
+                    # 정규식으로 값만 교체 (주석 및 형식 유지)
+                    # ambulance velocity
+                    yaml_text_rerun = re.sub(
+                        r'(ambulance:.*?velocity:\s*)[\d.]+',
+                        rf'\g<1>{amb_velocity_rerun}',
+                        yaml_text_rerun, flags=re.DOTALL
+                    )
+                    # ambulance handover_time
+                    yaml_text_rerun = re.sub(
+                        r'(ambulance:.*?handover_time:\s*)[\d.]+',
+                        rf'\g<1>{amb_handover_rerun}',
+                        yaml_text_rerun, flags=re.DOTALL
+                    )
+                    # ambulance is_use_time
+                    yaml_text_rerun = re.sub(
+                        r'(ambulance:.*?is_use_time:\s*)(True|False|true|false)',
+                        rf'\g<1>{"True" if is_use_time_amb_rerun else "False"}',
+                        yaml_text_rerun, flags=re.DOTALL
+                    )
+                    # ambulance duration_coeff
+                    # 기존 YAML에 duration_coeff가 있으면 업데이트, 없으면 추가
+                    if re.search(r'ambulance:.*?duration_coeff:', yaml_text_rerun, flags=re.DOTALL):
+                        # 기존 필드 업데이트
+                        yaml_text_rerun = re.sub(
+                            r'(ambulance:.*?duration_coeff:\s*)[\d.]+',
+                            rf'\g<1>{duration_coeff_rerun}',
+                            yaml_text_rerun, flags=re.DOTALL
+                        )
+                    else:
+                        # 필드가 없으면 is_use_time 다음에 추가
+                        yaml_text_rerun = re.sub(
+                            r'(ambulance:.*?is_use_time:\s*(?:True|False|true|false)[^\n]*\n)',
+                            rf'\g<1>    duration_coeff: {duration_coeff_rerun} # API duration 시간가중치 (기본값: 1.0, 환경적 요인 반영시 조정)\n',
+                            yaml_text_rerun, flags=re.DOTALL
+                        )
+                    # uav velocity
+                    yaml_text_rerun = re.sub(
+                        r'(uav:.*?velocity:\s*)[\d.]+',
+                        rf'\g<1>{uav_velocity_rerun}',
+                        yaml_text_rerun, flags=re.DOTALL
+                    )
+                    # uav handover_time
+                    yaml_text_rerun = re.sub(
+                        r'(uav:.*?handover_time:\s*)[\d.]+',
+                        rf'\g<1>{uav_handover_rerun}',
+                        yaml_text_rerun, flags=re.DOTALL
+                    )
+
+                    if coeff_str_rerun:
+                        yaml_text_rerun = re.sub(
+                            r'max_send_coeff:\s*\[[\d.,\s]+\]',
+                            f'max_send_coeff: {coeff_str_rerun}',
+                            yaml_text_rerun
+                        )
+
+                    yaml_text_rerun = re.sub(
+                        r'(totalSamples:\s*)[\d]+',
+                        rf'\g<1>{total_samples_rerun}',
+                        yaml_text_rerun
+                    )
+
+                    # YAML 저장 - 원본 형식 완벽 유지
+                    with open(cfg_path_rerun, "w", encoding="utf-8") as f:
+                        f.write(yaml_text_rerun)
+
+                    st.success("✅ YAML 파일 업데이트 완료!")
+
+                    # 시뮬레이션 실행
+                    with st.spinner("시뮬레이션 실행 중..."):
+                        orc_rerun = Orchestrator(base_path=bp_rerun)
+                        res_rerun = orc_rerun.run_simulation(config_path=cfg_path_rerun)
+
+                    if res_rerun["ok"]:
+                        st.success("✅ 시뮬레이션 완료!")
+                        st.write(f"• 실험ID: `{res_rerun['exp_id']}`")
+                        st.write(f"• 좌표: `{res_rerun['coord']}`")
+                        st.write(f"• 로그 파일: `{res_rerun['log_file']}`")
+                        st.write(f"• Summary CSV가 자동 업데이트되었습니다")
+                        st.caption("💡 Scenarios/Maps 탭에서 바로 확인해 보세요.")
+                    else:
+                        st.error(f"❌ 시뮬레이션 실패 (코드: {res_rerun['returncode']})")
+                        with st.expander("stdout"):
+                            st.text(res_rerun.get("stdout", ""))
+                        with st.expander("stderr"):
+                            st.text(res_rerun.get("stderr", ""))
+
+                except Exception as e_rerun:
+                    st.error("❌ 시뮬레이션 실행 중 오류")
+                    st.exception(e_rerun)
+
+        except Exception as e_yaml_rerun:
+            st.error(f"❌ YAML 파일 읽기 실패: {e_yaml_rerun}")
+            st.exception(e_yaml_rerun)
 

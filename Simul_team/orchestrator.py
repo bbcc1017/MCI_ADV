@@ -97,7 +97,7 @@ SUMMARY_COLS = [
     "위도","경도","주소","도로명주소",
     "시나리오생성_시작","시나리오생성_소요(초)",
     "시뮬레이션_시작","시뮬레이션_소요(초)","실험_완료시간","좌표별_총소요(초)","성공여부","로그파일",
-    "환자수","max_send_coeff","구급차수","UAV수","구급차속도","UAV속도","시뮬레이션반복","랜덤시드",
+    "환자수","max_send_coeff","구급차수","UAV수","구급차속도","UAV속도","구급차인계시간","UAV인계시간","API_duration사용","duration_coeff","시뮬레이션반복","랜덤시드",
 ]
 # (추가) 안정적인 dtype 스키마
 SUMMARY_DTYPES = {
@@ -108,7 +108,7 @@ SUMMARY_DTYPES = {
     "실험_완료시간":"object","좌표별_총소요(초)":"float64",
     "성공여부":"object","로그파일":"object",
     "환자수":"Int64","max_send_coeff":"object","구급차수":"Int64","UAV수":"Int64",
-    "구급차속도":"float64","UAV속도":"float64","시뮬레이션반복":"Int64","랜덤시드":"Int64",
+    "구급차속도":"float64","UAV속도":"float64","구급차인계시간":"float64","UAV인계시간":"float64","API_duration사용":"object","duration_coeff":"float64","시뮬레이션반복":"Int64","랜덤시드":"Int64",
 }
 
 
@@ -198,20 +198,28 @@ def upsert_summary_row_dual(base_path: str, row: Dict[str,Any]):
 
     df = _load_summary_df(path_main, path_legacy)
     key = (row.get("실험ID"), row.get("좌표"))
-    mask = (df["실험ID"]==key[0]) & (df["좌표"]==key[1]) & (df["시도번호"].isna() | (df["시도번호"]==0))
-    if mask.any():
-        for k, v in row.items():
-            df.loc[mask, k] = v
-    else:
-        # concat 없이 행 단위 추가 (향후 pandas 동작 변경 대비)
-        for c in SUMMARY_COLS:
-            if c not in df.columns:
-                df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
-        df = df.reindex(columns=SUMMARY_COLS)
 
-        next_idx = len(df)
-        for k, v in row.items():
-            df.loc[next_idx, k] = v
+    # 시도번호 자동 계산: 같은 실험ID + 좌표 조합의 최대 시도번호 + 1
+    existing = df[(df["실험ID"]==key[0]) & (df["좌표"]==key[1])]
+    if not existing.empty:
+        max_trial = existing["시도번호"].max()
+        next_trial = 1 if pd.isna(max_trial) else int(max_trial) + 1
+    else:
+        next_trial = 1
+
+    # 시도번호가 명시되지 않았으면 자동 할당
+    if "시도번호" not in row or row.get("시도번호") is None or row.get("시도번호") == 0:
+        row["시도번호"] = next_trial
+
+    # 항상 새로운 행으로 추가 (업데이트 하지 않음)
+    for c in SUMMARY_COLS:
+        if c not in df.columns:
+            df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
+    df = df.reindex(columns=SUMMARY_COLS)
+
+    next_idx = len(df)
+    for k, v in row.items():
+        df.loc[next_idx, k] = v
 
     _save_summary(path_main, df)
 
@@ -235,6 +243,10 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
         "UAV수": None,
         "구급차속도": None,
         "UAV속도": None,
+        "구급차인계시간": None,
+        "UAV인계시간": None,
+        "API_duration사용": None,
+        "duration_coeff": None,
         "시뮬레이션반복": None,
         "랜덤시드": None,
         "max_send_coeff": None,
@@ -250,10 +262,26 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
     uav = ent.get("uav", {}) or {}
     hosp = ent.get("hospital", {}) or {}
 
-    # incident_size / speeds
+    # incident_size / speeds / handover_time / is_use_time / duration_coeff
     meta["환자수"] = patient.get("incident_size")
     meta["구급차속도"] = amb.get("velocity")
     meta["UAV속도"] = uav.get("velocity")
+    meta["구급차인계시간"] = amb.get("handover_time")
+    meta["UAV인계시간"] = uav.get("handover_time")
+
+    # API duration 사용 여부 (True/False를 문자열로 저장)
+    is_use_time_val = amb.get("is_use_time")
+    if is_use_time_val is not None:
+        meta["API_duration사용"] = str(is_use_time_val)
+    else:
+        meta["API_duration사용"] = None
+
+    # duration_coeff (API duration 시간가중치)
+    duration_coeff_val = amb.get("duration_coeff")
+    if duration_coeff_val is not None:
+        meta["duration_coeff"] = float(duration_coeff_val)
+    else:
+        meta["duration_coeff"] = 1.0  # 기본값
 
     # max_send_coeff (리스트/문자열 모두 처리)
     msc = hosp.get("max_send_coeff")
@@ -293,7 +321,24 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
         pass
     try:
         if uav_csv and os.path.isfile(uav_csv) and pd is not None:
-            meta["UAV수"] = len(pd.read_csv(uav_csv, encoding="utf-8-sig"))
+            # UAV 대수: 전체 UAV CSV 행 수를 상급종합병원 수로 나눔
+            uav_df = pd.read_csv(uav_csv, encoding="utf-8-sig")
+            total_uav_count = len(uav_df)
+
+            # 상급종합병원 수 계산 (hospital_info에서 종별코드=1)
+            hosp_info_csv = _resolve(hosp.get("info_path"))
+            if hosp_info_csv and os.path.isfile(hosp_info_csv):
+                hosp_df = pd.read_csv(hosp_info_csv, encoding="utf-8-sig")
+                if "종별코드" in hosp_df.columns:
+                    tertiary_hospital_count = (hosp_df["종별코드"] == 1).sum()
+                    if tertiary_hospital_count > 0:
+                        meta["UAV수"] = total_uav_count // tertiary_hospital_count
+                    else:
+                        meta["UAV수"] = total_uav_count
+                else:
+                    meta["UAV수"] = total_uav_count
+            else:
+                meta["UAV수"] = total_uav_count
     except Exception:
         pass
 
@@ -327,7 +372,8 @@ class Orchestrator:
 
         if not exists_file(self.paths["make_script"]):
             raise FileNotFoundError(f"make_csv_yaml_dynamic.py not found: {self.paths['make_script']}")
-        exp_id = exp_id or ("exp_" + datetime.now(KST).strftime("%Y%m%d_%H%M%S"))
+        # exp_YYYYMMDDHHMM 형식 (언더스코어 제거)
+        exp_id = exp_id or ("exp_" + datetime.now(KST).strftime("%Y%m%d%H%M"))
 
         cmd = [
             self.python_cmd, "-X", "utf8", self.paths["make_script"],
@@ -414,6 +460,10 @@ class Orchestrator:
             "UAV수": meta.get("UAV수"),
             "구급차속도": meta.get("구급차속도"),
             "UAV속도": meta.get("UAV속도"),
+            "구급차인계시간": meta.get("구급차인계시간"),
+            "UAV인계시간": meta.get("UAV인계시간"),
+            "API_duration사용": meta.get("API_duration사용"),
+            "duration_coeff": meta.get("duration_coeff"),
             "시뮬레이션반복": meta.get("시뮬레이션반복"),
             "랜덤시드": meta.get("랜덤시드"),
         })
@@ -484,6 +534,9 @@ class Orchestrator:
             mask_pair = (df["실험ID"]==exp_id2) & (df["좌표"]==coord2)
 
             def _base_fields_for_pair() -> Dict[str,Any]:
+                # 항상 YAML에서 최신 파라미터를 읽어옴 (재실행 시 수정된 파라미터 반영)
+                meta = extract_params_from_yaml(config_path)
+
                 if mask_pair.any():
                     d0 = df[mask_pair].sort_index().iloc[0].to_dict()
                     return {
@@ -492,17 +545,21 @@ class Orchestrator:
                         "주소": d0.get("주소"), "도로명주소": d0.get("도로명주소"),
                         "시나리오생성_시작": d0.get("시나리오생성_시작"),
                         "시나리오생성_소요(초)": d0.get("시나리오생성_소요(초)"),
-                        "환자수": d0.get("환자수"),
-                        "max_send_coeff": d0.get("max_send_coeff"),
-                        "구급차수": d0.get("구급차수"),
-                        "UAV수": d0.get("UAV수"),
-                        "구급차속도": d0.get("구급차속도"),
-                        "UAV속도": d0.get("UAV속도"),
-                        "시뮬레이션반복": d0.get("시뮬레이션반복"),
-                        "랜덤시드": d0.get("랜덤시드"),
+                        # YAML에서 읽은 최신 파라미터 사용 (수정된 값 반영)
+                        "환자수": meta.get("환자수"),
+                        "max_send_coeff": meta.get("max_send_coeff"),
+                        "구급차수": meta.get("구급차수"),
+                        "UAV수": meta.get("UAV수"),
+                        "구급차속도": meta.get("구급차속도"),
+                        "UAV속도": meta.get("UAV속도"),
+                        "구급차인계시간": meta.get("구급차인계시간"),
+                        "UAV인계시간": meta.get("UAV인계시간"),
+                        "API_duration사용": meta.get("API_duration사용"),
+                        "duration_coeff": meta.get("duration_coeff"),
+                        "시뮬레이션반복": meta.get("시뮬레이션반복"),
+                        "랜덤시드": meta.get("랜덤시드"),
                     }
                 else:
-                    meta = extract_params_from_yaml(config_path)
                     return {
                         "실험ID": exp_id2, "좌표": coord2,
                         "위도": None, "경도": None, "주소": "", "도로명주소": "",
@@ -513,12 +570,20 @@ class Orchestrator:
                         "UAV수": meta.get("UAV수"),
                         "구급차속도": meta.get("구급차속도"),
                         "UAV속도": meta.get("UAV속도"),
+                        "구급차인계시간": meta.get("구급차인계시간"),
+                        "UAV인계시간": meta.get("UAV인계시간"),
+                        "API_duration사용": meta.get("API_duration사용"),
+                        "duration_coeff": meta.get("duration_coeff"),
                         "시뮬레이션반복": meta.get("시뮬레이션반복"),
                         "랜덤시드": meta.get("랜덤시드"),
                     }
 
+            # 항상 새로운 행으로 추가 (재실험시에도 시도번호 증가)
             mask_first = mask_pair & (df["시도번호"].fillna(0)==0)
             if mask_first.any():
+                # 첫 실행: 시도번호 0을 1로 업데이트
+                # YAML에서 최신 파라미터를 읽어서 업데이트 (수정된 값 반영)
+                meta_first = extract_params_from_yaml(config_path)
                 df.loc[mask_first, "시도번호"] = 1
                 df.loc[mask_first, "비고"] = "1차시도 " + ("성공" if ok else "실패")
                 df.loc[mask_first, "시뮬레이션_시작"] = sim_started
@@ -531,53 +596,51 @@ class Orchestrator:
                 df.loc[mask_first, "실험_완료시간"] = now_kst_iso()
                 df.loc[mask_first, "성공여부"] = bool(ok)
                 df.loc[mask_first, "로그파일"] = log_file
+                # YAML에서 읽은 최신 파라미터 반영
+                df.loc[mask_first, "환자수"] = meta_first.get("환자수")
+                df.loc[mask_first, "max_send_coeff"] = meta_first.get("max_send_coeff")
+                df.loc[mask_first, "구급차수"] = meta_first.get("구급차수")
+                df.loc[mask_first, "UAV수"] = meta_first.get("UAV수")
+                df.loc[mask_first, "구급차속도"] = meta_first.get("구급차속도")
+                df.loc[mask_first, "UAV속도"] = meta_first.get("UAV속도")
+                df.loc[mask_first, "구급차인계시간"] = meta_first.get("구급차인계시간")
+                df.loc[mask_first, "UAV인계시간"] = meta_first.get("UAV인계시간")
+                df.loc[mask_first, "API_duration사용"] = meta_first.get("API_duration사용")
+                df.loc[mask_first, "duration_coeff"] = meta_first.get("duration_coeff")
+                df.loc[mask_first, "시뮬레이션반복"] = meta_first.get("시뮬레이션반복")
+                df.loc[mask_first, "랜덤시드"] = meta_first.get("랜덤시드")
 
             else:
+                # 재실험: 항상 새로운 행 추가 (성공 여부와 상관없이)
+                import pandas as _pd
                 prev_rows = df[mask_pair].sort_values("시도번호")
-                need_new_row = True
-                if not prev_rows.empty:
-                    last_success = bool(prev_rows.iloc[-1].get("성공여부"))
-                    if last_success:
-                        need_new_row = False
-                        mask_last = (df.index == prev_rows.index[-1])
-                        df.loc[mask_last, "시도번호"] = int(prev_rows.iloc[-1].get("시도번호") or 1)
-                        df.loc[mask_last, "비고"] = "재실행(성공)" if ok else "재실행(실패)"
-                        df.loc[mask_last, "시뮬레이션_시작"] = sim_started
-                        df.loc[mask_last, "시뮬레이션_소요(초)"] = elapsed
-                        df.loc[mask_last, "실험_완료시간"] = now_kst_iso()
-                        df.loc[mask_last, "성공여부"] = bool(ok)
-                        df.loc[mask_last, "로그파일"] = log_file
+                next_try = int(_pd.to_numeric(prev_rows["시도번호"], errors="coerce").fillna(0).max()) + 1 if not prev_rows.empty else 1
+                base = _base_fields_for_pair()
+                newrow = {
+                    **base,
+                    "시도번호": next_try,
+                    "비고": f"{next_try}차시도 " + ("성공" if ok else "실패"),
+                    "시뮬레이션_시작": sim_started,
+                    "시뮬레이션_소요(초)": elapsed,
+                    "실험_완료시간": now_kst_iso(),
+                    "좌표별_총소요(초)": None,
+                    "성공여부": bool(ok),
+                    "로그파일": log_file,
+                }
+                try:
+                    prev = float(base.get("시나리오생성_소요(초)") or 0.0)
+                except Exception:
+                    prev = 0.0
+                newrow["좌표별_총소요(초)"] = round(prev + float(elapsed), 3)
+                # concat 없이 행 단위 추가
+                for c in SUMMARY_COLS:
+                    if c not in df.columns:
+                        df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
+                df = df.reindex(columns=SUMMARY_COLS)
 
-
-                if need_new_row:
-                    import pandas as _pd
-                    next_try = int(_pd.to_numeric(prev_rows["시도번호"], errors="coerce").fillna(0).max()) + 1 if not prev_rows.empty else 1
-                    base = _base_fields_for_pair()
-                    newrow = {
-                        **base,
-                        "시도번호": next_try,
-                        "비고": f"{next_try}차시도 " + ("성공" if ok else "실패"),
-                        "시뮬레이션_시작": sim_started,
-                        "시뮬레이션_소요(초)": elapsed,
-                        "실험_완료시간": now_kst_iso(),
-                        "좌표별_총소요(초)": None,
-                        "성공여부": bool(ok),
-                        "로그파일": log_file,
-                    }
-                    try:
-                        prev = float(base.get("시나리오생성_소요(초)") or 0.0)
-                    except Exception:
-                        prev = 0.0
-                    newrow["좌표별_총소요(초)"] = round(prev + float(elapsed), 3)
-                    # concat 없이 행 단위 추가
-                    for c in SUMMARY_COLS:
-                        if c not in df.columns:
-                            df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
-                    df = df.reindex(columns=SUMMARY_COLS)
-
-                    next_idx = len(df)
-                    for k, v in newrow.items():
-                        df.loc[next_idx, k] = v
+                next_idx = len(df)
+                for k, v in newrow.items():
+                    df.loc[next_idx, k] = v
 
 
             _save_summary(summary_main, df)

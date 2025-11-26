@@ -12,8 +12,13 @@ class ScenarioManager():
         else:
             self.rng = np.random.default_rng()
         self.scenario = {}
+
         # 1. 개체 정보 생성
-        self.en_manager = EntityManager(configs['entity_info'].keys())
+        # departure_time 등 메타데이터는 제외하고 실제 개체만 추출
+        entity_keys = [k for k in configs['entity_info'].keys()
+                       if k in ["patient", "hospital", "ambulance", "uav"]]
+        self.en_manager = EntityManager(entity_keys)
+
         for en_name, raw_prop in configs['entity_info'].items():
             if en_name == "patient":
                 reg_prop = self.setup_patient(raw_prop)
@@ -23,6 +28,9 @@ class ScenarioManager():
                 reg_prop = self.setup_ambulance(raw_prop)
             elif en_name == "uav":
                 reg_prop = self.setup_uav(raw_prop)
+            elif en_name == "departure_time":
+                # 메타데이터: 시뮬레이션에서는 사용하지 않음 (시나리오 생성 시 사용됨)
+                continue
             else:
                 raise NotImplementedError(f"{en_name}은 아직 구현되지 않은 개체입니다.")
             self.en_manager.en_register(en_name, reg_prop)
@@ -122,6 +130,15 @@ class ScenarioManager():
                 amb_info = pd.read_csv(cfg_amb['dispatch_distance_info'])
                 reg_prop['amb_num'] = len(amb_info)
                 reg_prop['amb_dispatch_d'] = amb_info['init_distance'].to_numpy(dtype='float32')
+
+                # duration 컬럼 확인 및 로드
+                if 'duration' in amb_info.columns:
+                    reg_prop['amb_dispatch_t'] = amb_info['duration'].to_numpy(dtype='float32')
+                else:
+                    # duration 컬럼이 없으면 경고 출력
+                    print("  ⚠️ amb_info에 duration 컬럼이 없습니다. 거리/속도 기반 계산으로 전환합니다.")
+                    reg_prop['amb_dispatch_t'] = None
+
                 reg_prop['amb_v'] = cfg_amb['velocity']
                 reg_prop['amb_handover_time'] = cfg_amb['handover_time']
             except FileNotFoundError:
@@ -129,9 +146,21 @@ class ScenarioManager():
         else:
             # call generator
             raise NotImplementedError("시나리오 생성 모듈 불러오기 기능 추가 전입니다.")
+
         # Modify & Add
         # 1. 초기 출동 시간 parameter 저장
-        response_mean = reg_prop['amb_dispatch_d'] * 60 / reg_prop['amb_v'] # unit: minutes
+        # is_use_time 플래그 확인 (YAML의 ambulance.is_use_time)
+        use_api_time = cfg_amb.get('is_use_time', False)
+        # duration_coeff 가중치 확인 (YAML의 ambulance.duration_coeff, 기본값: 1.0)
+        duration_coeff = cfg_amb.get('duration_coeff', 1.0)
+
+        if use_api_time and reg_prop.get('amb_dispatch_t') is not None:
+            # API에서 받은 duration(분)에 가중치 적용
+            response_mean = reg_prop['amb_dispatch_t'] * duration_coeff
+        else:
+            # 거리/속도 기반 계산 (기존 방식)
+            response_mean = reg_prop['amb_dispatch_d'] * 60 / reg_prop['amb_v']  # unit: minutes
+
         response_mean_logn, response_std_logn = self.get_lognormal_param(response_mean)
         reg_prop['amb_response_t'] = (response_mean, response_mean_logn, response_std_logn)
         # 2. 병원-현장 이동 시간 parameter 저장

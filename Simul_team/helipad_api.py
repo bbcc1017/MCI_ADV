@@ -4,8 +4,12 @@ import math
 VWORLD_KEY = "712D5EBF-00BB-35D8-B14F-59F82A50EF39"  # vworld API key
 
 # 사고 위치 (위도, 경도)
-ACC_LAT = 37.451287
-ACC_LON = 126.655959
+ACC_LAT = 38.038466
+ACC_LON = 128.005865
+# 탐색 범위 (m 단위)
+buffer_m=100000
+# 탐색 결과 개수 (최대)
+max_results=5
 
 def haversine(lat1, lon1, lat2, lon2):
     """두 점(위도/경도) 사이 거리(km) 계산"""
@@ -194,7 +198,7 @@ def print_helipads_pretty(records, acc_lat=ACC_LAT, acc_lon=ACC_LON):
     print("✅ 조회 완료: 주변 헬기장 정보를 위와 같이 확인할 수 있습니다.")
 
 if __name__ == "__main__":
-    helipads = fetch_nearby_helipads(ACC_LAT, ACC_LON, buffer_m=30000, max_results=5)
+    helipads = fetch_nearby_helipads(ACC_LAT, ACC_LON, buffer_m, max_results)
     print_helipads_pretty(helipads, acc_lat=ACC_LAT, acc_lon=ACC_LON)
 
 

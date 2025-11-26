@@ -14,7 +14,7 @@ destination = "126.879946,37.498529"
 
 # 오늘 오후 6시 (18:00)
 today = datetime.now()
-departure_datetime = today.replace(hour=18, minute=0, second=0, microsecond=0)
+departure_datetime = today.replace(hour=12, minute=0, second=0, microsecond=0)
 
 # 만약 현재 시각이 이미 오후 6시를 넘었다면, 내일 오후 6시로 설정
 if datetime.now() >= departure_datetime:

@@ -63,15 +63,26 @@ def parse_util_map(text: str):
 
 class ScenarioGenerator:
     """동적 파라미터 기반 시나리오 생성 클래스 (크로스 환경 호환)"""
-    
-    def __init__(self, base_path, experiment_id=None, client_id=None, client_secret=None):
+
+    def __init__(self, base_path, experiment_id=None, kakao_api_key=None, departure_time=None):
         # 프로젝트 경로 절대화
         self.base_path = os.path.abspath(base_path)
-        self.experiment_id = experiment_id or datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # API 키 설정
-        self.client_id = client_id or os.environ.get('NAVER_CLIENT_ID')
-        self.client_secret = client_secret or os.environ.get('NAVER_CLIENT_SECRET')
+
+        # experiment_id 생성: exp_YYYYMMDDHHMM_dep_YYYYMMDDHHMM 형식
+        # 이미 "exp_" 접두사가 있으면 제거 (중복 방지)
+        if experiment_id:
+            base_exp_id = experiment_id.replace("exp_", "").replace("_", "")
+        else:
+            base_exp_id = datetime.now().strftime("%Y%m%d%H%M")
+
+        if departure_time:
+            self.experiment_id = f"exp_{base_exp_id}_dep_{departure_time}"
+        else:
+            self.experiment_id = f"exp_{base_exp_id}"
+
+        # 카카오 API 키 설정
+        self.kakao_api_key = kakao_api_key
+        self.departure_time = departure_time  # YYYYMMDDHHMM 형식
         
         # 데이터 파일 경로들 (절대경로로 설정)
         self.scenarios_path = os.path.join(self.base_path, "scenarios")
@@ -81,13 +92,18 @@ class ScenarioGenerator:
         
         # 파일 존재성 검증
         self._validate_data_files()
-        
-        # 좌표 생성기 초기화
-        self.coord_generator = CoordinateGenerator(
-            client_id=self.client_id,
-            client_secret=self.client_secret,
-            shp_path=self.shp_path
-        )
+
+        # 좌표 생성기 초기화 (필요시 - 역지오코딩 용도)
+        self.coord_generator = None
+        if kakao_api_key:
+            try:
+                self.coord_generator = CoordinateGenerator(
+                    client_id=None,  # 카카오 API 사용으로 변경 필요시 수정
+                    client_secret=None,
+                    shp_path=self.shp_path
+                )
+            except Exception as e:
+                print(f"⚠️ 좌표 생성기 초기화 실패: {e}")
         
         # Patient 정보 (하드코딩)
         self.patient_config = {
@@ -141,75 +157,122 @@ class ScenarioGenerator:
             raise FileNotFoundError("필수 데이터 파일들을 확인해주세요.")
         print("✅ 모든 필수 데이터 파일 확인 완료")
 
-    def get_road_distance(self, start, end, max_retries=3, save_json_dir=None, route_type=None, source_index=None, name=None, start_label="start", goal_label="goal"):
-        """도로 거리 계산 (재시도 로직 포함)"""
-        if not self.client_id or not self.client_secret:
-            # API 키 없으면 유클리드로 대체
-            return haversine(start, end)
-        
-        url = "https://maps.apigw.ntruss.com/map-direction/v1/driving"
+    def get_road_distance_kakao(self, start, end, max_retries=3, save_json_dir=None, route_type=None, source_index=None, name=None, start_label="start", goal_label="goal"):
+        """카카오 모빌리티 API를 사용한 도로 거리 및 시간 계산 (재시도 로직 포함)
+
+        Args:
+            start: (lat, lon) 튜플
+            end: (lat, lon) 튜플
+            save_json_dir: JSON 저장 디렉토리
+            route_type: "center2site" 또는 "hos2site"
+
+        Returns:
+            (distance_km, duration_min) 튜플 - 거리(km)와 이송시간(분)
+        """
+        if not self.kakao_api_key:
+            # API 키 없으면 유클리드 거리 + 추정 시간 반환
+            dist_km = haversine(start, end)
+            estimated_duration_min = (dist_km / 40) * 60  # 40km/h 가정
+            return dist_km, estimated_duration_min
+
+        url = "https://apis-navi.kakaomobility.com/v1/future/directions"
         headers = {
-            "X-NCP-APIGW-API-KEY-ID": self.client_id,
-            "X-NCP-APIGW-API-KEY": self.client_secret
+            "Authorization": f"KakaoAK {self.kakao_api_key}",
+            "Content-Type": "application/json"
         }
         params = {
-            "start": f"{start[1]},{start[0]}",
-            "goal": f"{end[1]},{end[0]}",
-            "option": "trafast",
-            "car_type": 0,
-            "fuel_type": "DIESEL",
-            "summary": "true"               # [ADD]
+            "origin": f"{start[1]},{start[0]}",  # lon,lat 순서
+            "destination": f"{end[1]},{end[0]}",
+            "priority": "TIME",  # 최단시간 우선
+            "car_fuel": "GASOLINE",
+            "car_hipass": "false",
+            "alternatives": "false",
+            "road_details": "false"
         }
+
+        # departure_time 파라미터 추가 (실시간 또는 미래시간)
+        if self.departure_time:
+            params["departure_time"] = self.departure_time
 
         for attempt in range(max_retries):
             try:
                 response = requests.get(url, headers=headers, params=params, timeout=15)
                 if response.status_code == 200:
                     data = response.json()
-                    # --- 기존 반환용 거리(km)
-                    summary = data["route"]["trafast"][0]["summary"]
-                    distance_km = summary["distance"] / 1000.0
 
-                    # --- [ADD] 저장 메타
+                    # 카카오 API 응답 구조: routes[0].summary
+                    if not data.get("routes") or len(data["routes"]) == 0:
+                        print(f"  ⚠️ 카카오 API 응답에 경로 정보가 없습니다.")
+                        break
+
+                    route = data["routes"][0]
+                    summary = route.get("summary", {})
+
+                    # 거리(m) → km 변환
+                    distance_km = summary.get("distance", 0) / 1000.0
+
+                    # 시간(초) → 분 변환
+                    duration_sec = summary.get("duration", 0)
+                    duration_min = duration_sec / 60.0
+
+                    # JSON 저장
                     if save_json_dir:
                         now = datetime.now(KST).isoformat()
                         meta = {
+                            "api_provider": "kakao",
                             "route_type": route_type,
                             "source_index": source_index,
                             "name": name,
-                            # 좌표는 경량/호환 목적상 [lon,lat]로 저장
+                            # 좌표는 [lon, lat] 형식으로 저장
                             start_label: [start[1], start[0]],
-                            goal_label:  [end[1],   end[0]],
-                            "option": params.get("option"),
-                            "car_type": params.get("car_type"),
-                            "fuel_type": params.get("fuel_type"),
+                            goal_label: [end[1], end[0]],
+                            "departure_time": self.departure_time or "realtime",
+                            "priority": params.get("priority"),
                             "saved_at": now,
                             # 요약 필드
-                            "distance_km": distance_km,
-                            "duration_sec": summary.get("duration"),
-                            "tollFare": summary.get("tollFare"),
-                            "taxiFare": summary.get("taxiFare"),
-                            "fuelPrice": summary.get("fuelPrice"),
-                            # 참고: 현재 방향 (site→hospital 여부)도 명시 가능
+                            "distance_km": round(distance_km, 3),
+                            "duration_min": round(duration_min, 2),
+                            "duration_sec": duration_sec,
+                            "toll_fare": summary.get("fare", {}).get("toll", 0),
+                            "taxi_fare": summary.get("fare", {}).get("taxi", 0),
                             "direction_note": f"{start_label}->{goal_label}"
                         }
                         fname = f"{(source_index if source_index is not None else 0):03d}_{slugify(name)}.json"
                         out_path = os.path.join(save_json_dir, fname)
-                        save_route_json(meta, data, out_path)
-                        print(f"  📦 [{route_type}] idx={source_index:03d} {name} → saved: {out_path}")
-                    return distance_km
+
+                        # 카카오 응답 저장
+                        ensure_dir(os.path.dirname(out_path))
+                        json_data = {
+                            "meta": meta,
+                            "payload": {"kakao_response": data}
+                        }
+                        with open(out_path, "w", encoding="utf-8") as f:
+                            json.dump(json_data, f, ensure_ascii=False, indent=2)
+
+                        print(f"  📦 [{route_type}] idx={source_index:03d} {name} → {distance_km:.2f}km, {duration_min:.1f}min")
+
+                    return distance_km, duration_min
+
                 elif response.status_code == 401:
-                    time.sleep(1)
+                    print(f"  ❌ 카카오 API 인증 실패 (401): API 키를 확인하세요.")
+                    break
                 elif response.status_code == 429:
+                    print(f"  ⚠️ API 호출 한도 초과 (429): 3초 대기 중...")
                     time.sleep(3)
                 else:
+                    print(f"  ⚠️ API 호출 실패 (status {response.status_code})")
                     break
-            except Exception:
+
+            except Exception as e:
+                print(f"  ⚠️ API 호출 중 오류 발생: {e}")
                 if attempt < max_retries - 1:
                     time.sleep(2)
-        
-        # API 실패 시 유클리드 거리로 대체
-        return haversine(start, end)
+
+        # API 실패 시 유클리드 거리 + 추정 시간으로 대체
+        dist_km = haversine(start, end)
+        estimated_duration_min = (dist_km / 40) * 60  # 40km/h 가정
+        print(f"  ⚠️ API 실패, 유클리드 거리 사용: {dist_km:.2f}km")
+        return dist_km, estimated_duration_min
 
     def generate_coordinate_for_scenario(self, mode="korea_random", sido_name=None):
         """
@@ -276,29 +339,35 @@ class ScenarioGenerator:
         routes_dir = os.path.join(save_folder, "routes", "center2site")
         ensure_dir(routes_dir)
 
-        # 후보군 확장 및 도로 거리 계산
+        # 후보군 확장 및 도로 거리/시간 계산 (카카오 API)
         df_candidates = df.sort_values("euclidean_distance").head(int(incident_size * self.multiplier)).copy()
         road_distances = []
+        road_durations = []
+
         for j, (_, row) in enumerate(df_candidates.iterrows()):
-            coord = (row["y좌표"], row["x좌표"])  # (lat,lon) of center
-            dist = self.get_road_distance(
-                start=coord, end=(latitude, longitude),           # center → site
+            coord = (row["y좌표"], row["x좌표"])  # (lat, lon) of center
+            dist_km, duration_min = self.get_road_distance_kakao(
+                start=coord, end=(latitude, longitude),  # center → site
                 save_json_dir=routes_dir, route_type="center2site",
                 source_index=j, name=row.get("기관명", f"center_{j}"),
                 start_label="center", goal_label="site"
             )
-            road_distances.append(dist)
+            road_distances.append(dist_km)
+            road_durations.append(duration_min)
             time.sleep(0.05)
-        df_candidates["road_distance"] = road_distances
 
-        # ROAD 저장
-        df_sorted_road = df_candidates.sort_values("road_distance").head(incident_size).copy()
+        df_candidates["road_distance"] = road_distances
+        df_candidates["road_duration"] = road_durations
+
+        # ROAD 저장 (duration 기준으로 정렬 후 상위 incident_size개 선택)
+        df_sorted_road = df_candidates.sort_values("road_duration").head(incident_size).copy()
         df_sorted_road = df_sorted_road.rename(columns={
             "road_distance": "init_distance",
+            "road_duration": "duration",
             "기관명": "안전센터/소방서이름"
         })
         df_sorted_road = df_sorted_road.reset_index(drop=True)
-        df_sorted_road = df_sorted_road[["init_distance", "안전센터/소방서이름"]]
+        df_sorted_road = df_sorted_road[["init_distance", "duration", "안전센터/소방서이름"]]
         road_save_path = os.path.join(save_folder, "amb_info_road.csv")
         df_sorted_road.to_csv(road_save_path, index=True, index_label="Index", encoding="utf-8-sig")
         
@@ -422,23 +491,32 @@ class ScenarioGenerator:
         
         routes_dir_hos = os.path.join(save_folder, "routes", "hos2site")
         ensure_dir(routes_dir_hos)
-        # ---------- (7) ROAD 거리 계산 & 저장 (선정 병원만) ----------
+        # ---------- (7) ROAD 거리 & 시간 계산 & 저장 (선정 병원만) ----------
         road_distances = []
+        road_durations = []
+
         for j, (_, row) in enumerate(df_euc.iterrows()):
             end = (row["y좌표"], row["x좌표"])
-            road_km = self.get_road_distance(
-                start=(latitude, longitude), end=end,
+            road_km, duration_min = self.get_road_distance_kakao(
+                start=(latitude, longitude), end=end,  # site → hospital
                 save_json_dir=routes_dir_hos, route_type="hos2site",
                 source_index=j, name=row.get("요양기관명", f"hospital_{j}"),
                 start_label="site", goal_label="hospital"
             )
             road_distances.append(road_km)
+            road_durations.append(duration_min)
             time.sleep(0.05)
+
         df_euc = df_euc.copy()
         df_euc["road_distance"] = road_distances
-        df_road = df_euc.sort_values("road_distance").reset_index(drop=True).copy()
-        
-        dist_road_df = pd.DataFrame({"distance": df_road["road_distance"]})
+        df_euc["road_duration"] = road_durations
+        df_road = df_euc.sort_values("road_duration").reset_index(drop=True).copy()
+
+        # distance_Hos2Site_road.csv에 duration 컬럼 추가
+        dist_road_df = pd.DataFrame({
+            "distance": df_road["road_distance"],
+            "duration": df_road["road_duration"]
+        })
         dist_road_path = os.path.join(save_folder, "distance_Hos2Site_road.csv")
         dist_road_df.to_csv(dist_road_path, index=True, index_label="Index", encoding="utf-8-sig")
         
@@ -608,31 +686,50 @@ class ScenarioGenerator:
         except Exception as e:
             print(f"❌ 유클리드 거리 계산 실패: {e}")
 
-        # Road
+        # Road (엑셀 파일 사용 - 기존 계산 데이터)
         try:
             file_road = os.path.join(save_folder, "hospital_info_road.csv")
             df_road = pd.read_csv(file_road, encoding="utf-8-sig")
             names_road = df_road["요양기관명"].tolist()
-            coords_road = []
-            for name in names_road:
-                row = df_full[df_full["요양기관명"] == name]
-                if not row.empty:
-                    coords_road.append((row.iloc[0]["y좌표"], row.iloc[0]["x좌표"]))
-                else:
-                    coords_road.append((0, 0))
-            N = len(coords_road)
+
+            # Load pre-calculated distance matrix from Excel
+            excel_path = os.path.join(self.base_path, "scenarios", "DISTANCE_MATRIX_FINAL.xlsx")
+            print(f"  📂 엑셀 거리 행렬 로드 중: {excel_path}")
+            df_matrix = pd.read_excel(excel_path, sheet_name="Distance_Matrix", engine="openpyxl")
+
+            # Use first column as index (hospital names)
+            df_matrix_indexed = df_matrix.set_index(df_matrix.columns[0])  # Use first column as index
+
+            # Build distance matrix by looking up values
+            N = len(names_road)
             matrix = np.zeros((N, N))
+            missing_hospitals = []
+
             for i in range(N):
-                for j in range(i, N):
+                for j in range(N):
                     if i == j:
-                        dist = 0
+                        matrix[i][j] = 0
                     else:
-                        dist = self.get_road_distance(coords_road[i], coords_road[j])
-                        time.sleep(0.05)
-                    matrix[i][j] = dist
-                    matrix[j][i] = dist
+                        hospital_i = names_road[i]
+                        hospital_j = names_road[j]
+
+                        # Look up distance from Excel matrix
+                        if hospital_i in df_matrix_indexed.index and hospital_j in df_matrix_indexed.columns:
+                            dist = df_matrix_indexed.loc[hospital_i, hospital_j]
+                            matrix[i][j] = float(dist) if pd.notna(dist) else 0
+                        else:
+                            matrix[i][j] = 0
+                            if hospital_i not in missing_hospitals:
+                                missing_hospitals.append(hospital_i)
+                            if hospital_j not in missing_hospitals:
+                                missing_hospitals.append(hospital_j)
+
+            if missing_hospitals:
+                print(f"  ⚠️ 엑셀에서 찾지 못한 병원 ({len(missing_hospitals)}개): {missing_hospitals[:5]}...")
+
             save_path_road = os.path.join(save_folder, "distance_Hos2Hos_road.csv")
             pd.DataFrame(matrix).to_csv(save_path_road, index=True, encoding="utf-8-sig")
+            print(f"  ✅ 병원간 도로 거리 행렬 생성 완료 (엑셀 데이터 사용)")
         except Exception as e:
             print(f"❌ 도로 거리 계산 실패: {e}")
         print(f"  ✅ 병원간 거리 행렬 생성 완료")
@@ -654,14 +751,21 @@ class ScenarioGenerator:
             return "1,1"
         return f"{a},{b}".replace(",", ", ")
     
-    def make_config_yaml(self, latitude, longitude, incident_size, amb_velocity, 
-                         uav_velocity, total_samples, random_seed, save_folder):
+    def make_config_yaml(self, latitude, longitude, incident_size, amb_velocity,
+                         uav_velocity, total_samples, random_seed, save_folder, is_use_time=True,
+                         amb_handover_time=0, uav_handover_time=0, duration_coeff=1.0):
         """Config YAML 파일 생성"""
         print(f"  ⚙️ Config YAML 생성 중...")
         folder_name = f"({latitude},{longitude})"
         config_filename = f"config_{folder_name}.yaml"
         config_path = os.path.join(save_folder, config_filename)
         relative_folder = f"./scenarios/{self.experiment_id}/{folder_name}"
+
+        # departure_time 정보
+        departure_time_field = ""
+        if self.departure_time:
+            departure_time_field = f'  departure_time: "{self.departure_time}" # API 조회 시각 (YYYYMMDDHHMM)\n'
+
         yaml_content = f"""#incident_info:
 #  incident_size: {incident_size} # 사고 규모 (총 환자 수)
 #  latitude: {latitude} # 위도
@@ -669,7 +773,7 @@ class ScenarioGenerator:
 #  incident_type: null # 사고 타입 설정 가능하게 추후 확장
 
 entity_info:
-  patient:
+{departure_time_field}  patient:
     incident_size: {incident_size} # 사고 규모 (총 환자 수)
     latitude: {latitude} # 위도
     longitude: {longitude} # 경도
@@ -687,12 +791,15 @@ entity_info:
     load_data: True
     dispatch_distance_info: "{relative_folder}/amb_info_road.csv"
     velocity: {amb_velocity} # unit: km/h
-    handover_time: 0 # unit: minutes
+    handover_time: {amb_handover_time} # unit: minutes
+    is_use_time: {str(is_use_time)} # True: API duration 사용, False: 거리/속도 기반 계산
+    duration_coeff: {duration_coeff} # API duration 시간가중치 (기본값: 1.0, 환경적 요인 반영시 조정)
   uav:
     load_data: True
     dispatch_distance_info: "{relative_folder}/uav_info.csv"
     velocity: {uav_velocity} # unit: km/h
-    handover_time: 0 # unit: minutes
+    handover_time: {uav_handover_time} # unit: minutes
+    is_use_time: False # UAV는 항상 유클리드 거리 기반
 
 event_info_path: "event_info.json"
 
@@ -718,11 +825,16 @@ run_setting:
         print(f"CONFIG_PATH:{absolute_config_path}")
         return absolute_config_path
 
-    def generate_scenario(self, latitude, longitude, incident_size, amb_size, 
-                          uav_size, amb_velocity, uav_velocity, 
-                          total_samples, random_seed):
+    def generate_scenario(self, latitude, longitude, incident_size, amb_size,
+                          uav_size, amb_velocity, uav_velocity,
+                          total_samples, random_seed, is_use_time=True,
+                          amb_handover_time=0, uav_handover_time=0, duration_coeff=1.0):
         """
         완전한 시나리오 생성 (모든 CSV + YAML)
+        Args:
+            is_use_time: True면 API duration 사용, False면 거리/속도 기반 계산
+            amb_handover_time: 구급차 환자 인계시간 (분)
+            uav_handover_time: UAV 환자 인계시간 (분)
         Returns: 생성된 config 파일 경로
         """
         print(f"""\n📍 좌표 ({latitude},{longitude}) 시나리오 생성 시작...""")
@@ -731,15 +843,13 @@ run_setting:
         save_folder = os.path.join(self.base_path, "scenarios", self.experiment_id, folder_name)
         os.makedirs(save_folder, exist_ok=True)
 
-        # 수동 좌표도 역지오코딩 수행
+        # 수동 좌표도 역지오코딩 수행 (선택사항)
         print(f"🔍 좌표 ({latitude},{longitude}) 주소 정보 조회 중...")
         try:
-            coord_gen = CoordinateGenerator(
-                client_id=self.client_id,
-                client_secret=self.client_secret,
-                shp_path=self.shp_path
-            )
-            addr_info = coord_gen.reverse_geocode(latitude, longitude)
+            if self.coord_generator is None:
+                # coord_generator가 없으면 간단한 정보만 저장
+                raise Exception("CoordinateGenerator not initialized")
+            addr_info = self.coord_generator.reverse_geocode(latitude, longitude)
             if addr_info.get("is_valid", False):
                 coordinate_info = {
                     "latitude": latitude,
@@ -791,9 +901,10 @@ run_setting:
         self.make_patient_info(save_folder)
         self.make_distance_Hos2Hos(save_folder)
         config_path = self.make_config_yaml(
-            latitude, longitude, incident_size, 
-            amb_velocity, uav_velocity, total_samples, 
-            random_seed, save_folder
+            latitude, longitude, incident_size,
+            amb_velocity, uav_velocity, total_samples,
+            random_seed, save_folder, is_use_time,
+            amb_handover_time, uav_handover_time, duration_coeff
         )
         
         elapsed = round(time.time() - start_time, 2)
@@ -825,6 +936,14 @@ if __name__ == "__main__":
     parser.add_argument("--util_by_tier", type=str, help='예: "1:0.90,11:0.75,etc:0.60"')
     parser.add_argument("--hospital_max_send_coeff", type=str, default=None, help="전송계수 'a,b' 형식 (예: 1.1,1.0). 미입력시 ENV(MCI_MAX_SEND_COEFF) 또는 기본 1,1")
 
+    # 카카오 API 관련 파라미터
+    parser.add_argument("--kakao_api_key", type=str, default=None, help="카카오 모빌리티 REST API 키")
+    parser.add_argument("--departure_time", type=str, default=None, help="출발시간 (YYYYMMDDHHMM 형식, 예: 202512241800)")
+    parser.add_argument("--is_use_time", type=str, default=True, help="API duration 사용 여부 (true/false)")
+    parser.add_argument("--amb_handover_time", type=float, default=0.0, help="구급차 환자 인계시간 (분)")
+    parser.add_argument("--uav_handover_time", type=float, default=0.0, help="UAV 환자 인계시간 (분)")
+    parser.add_argument("--duration_coeff", type=float, default=1.0, help="API duration 시간가중치 (기본값: 1.0)")
+
     args = parser.parse_args()
     try:
         # UTF-8 출력 설정
@@ -834,7 +953,15 @@ if __name__ == "__main__":
         pass
 
     try:
-        generator = ScenarioGenerator(args.base_path, args.experiment_id)
+        # is_use_time 파싱 (문자열 "true"/"false" → bool)
+        is_use_time_bool = args.is_use_time.lower() in ("true", "1", "yes")
+
+        generator = ScenarioGenerator(
+            args.base_path,
+            args.experiment_id,
+            kakao_api_key=args.kakao_api_key,
+            departure_time=args.departure_time
+        )
 
         # CLI가 주어지면 ENV 기본값을 덮어씀
         if args.hospital_max_send_coeff:
@@ -870,7 +997,11 @@ if __name__ == "__main__":
             latitude, longitude,
             args.incident_size, args.amb_size, args.uav_size,
             args.amb_velocity, args.uav_velocity,
-            args.total_samples, args.random_seed
+            args.total_samples, args.random_seed,
+            is_use_time=is_use_time_bool,
+            amb_handover_time=args.amb_handover_time,
+            uav_handover_time=args.uav_handover_time,
+            duration_coeff=args.duration_coeff
         )
         
         if config_path:
