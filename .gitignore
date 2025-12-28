@@ -256,6 +256,7 @@ $RECYCLE.BIN/
 
 
 /Simul_team/scenarios/
+!/DISTANCE_MATRIX_FINAL.xlsx
 /Simul_team/experiment_logs/
 /Simul_team/results/
 /Map_team/disaster_response_project/data

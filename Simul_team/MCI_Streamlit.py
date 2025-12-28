@@ -502,18 +502,22 @@ def summarize_experiment_extended(df: Optional[pd.DataFrame]) -> Tuple[Dict[str,
     site_info = {"좌표":"","주소":"","도로명 주소":""}
     sim_info: Dict[str,str] = {}
     if df is None or df.empty: return site_info, sim_info
+
+    # 최신 차수 데이터 사용 (마지막 행)
+    latest_row_idx = -1
+
     addr_cols = [c for c in df.columns if ("주소" in str(c) and "도로" not in str(c)) or "address" in str(c).lower()]
     road_cols = [c for c in df.columns if "도로명" in str(c)]
     if addr_cols:
-        v = df.iloc[0][addr_cols[0]]; site_info["주소"] = "" if pd.isna(v) else str(v)
+        v = df.iloc[latest_row_idx][addr_cols[0]]; site_info["주소"] = "" if pd.isna(v) else str(v)
     if road_cols:
-        v = df.iloc[0][road_cols[0]]; site_info["도로명 주소"] = "" if pd.isna(v) else str(v)
+        v = df.iloc[latest_row_idx][road_cols[0]]; site_info["도로명 주소"] = "" if pd.isna(v) else str(v)
     start_idx = None
     for i,c in enumerate(df.columns):
         if "시나리오생성_시작" in str(c):
             start_idx = i; break
     if start_idx is not None:
-        row = df.iloc[0, start_idx:]
+        row = df.iloc[latest_row_idx, start_idx:]
         for k,v in row.items():
             if pd.notna(v): sim_info[str(k)] = str(v)
     return site_info, sim_info
@@ -985,24 +989,28 @@ def get_speed_from_yaml(yaml_path: Optional[str]) -> Tuple[Optional[float], Opti
     try:
         with open(yaml_path, "r", encoding="utf-8") as f:
             y = yaml.safe_load(f)
-        def _search(d, key):
-            if isinstance(d, dict):
-                for k,v in d.items():
-                    if key.lower() in str(k).lower():
-                        if isinstance(v, (int,float)):
-                            return float(v)
-                    res = _search(v, key)
-                    if res is not None:
-                        return res
-            elif isinstance(d, list):
-                for it in d:
-                    res = _search(it, key)
-                    if res is not None:
-                        return res
-            return None
-        amb = _search(y, "amb_speed") or _search(y, "ambulance_speed") or _search(y, "amb_kmph")
-        uav = _search(y, "uav_speed") or _search(y, "uav_kmph")
-        return amb, uav
+
+        # 정확한 경로로 속도 읽기
+        amb_speed = None
+        uav_speed = None
+
+        # entity_info 구조에서 읽기
+        if isinstance(y, dict) and "entity_info" in y:
+            entity = y["entity_info"]
+
+            # ambulance.velocity
+            if isinstance(entity, dict) and "ambulance" in entity:
+                amb_data = entity["ambulance"]
+                if isinstance(amb_data, dict) and "velocity" in amb_data:
+                    amb_speed = float(amb_data["velocity"])
+
+            # uav.velocity
+            if isinstance(entity, dict) and "uav" in entity:
+                uav_data = entity["uav"]
+                if isinstance(uav_data, dict) and "velocity" in uav_data:
+                    uav_speed = float(uav_data["velocity"])
+
+        return amb_speed, uav_speed
     except Exception:
         return None, None
 
@@ -1114,11 +1122,11 @@ with st.sidebar:
                 .leaflet-bottom.leaflet-right { bottom: auto !important; top: 6px !important; right: 8px !important; }
                 </style>
                 """))
-                st_folium(m, use_container_width=True, height=260)
+                st_folium(m, width='stretch', height=260)
 
             except Exception:
                 # (폴백) streamlit 기본 지도 (타일 커스텀 불가)
-                st.map(pd.DataFrame({"lat": [lat], "lon": [lon]}), use_container_width=True)
+                st.map(pd.DataFrame({"lat": [lat], "lon": [lon]}), width='stretch')
 
         st.divider()
 
@@ -1156,11 +1164,11 @@ with tabs[1]:
             left, right = st.columns([0.42, 0.58])
             with left:
                 st.markdown("**사고지점**")
-                st.dataframe(pd.DataFrame({"항목":list(site_info.keys()), "값":list(site_info.values())}), use_container_width=True, height=170)
+                st.dataframe(pd.DataFrame({"항목":list(site_info.keys()), "값":list(site_info.values())}), width='stretch', height=170)
             with right:
                 st.markdown("**시뮬레이션 정보** (summary.csv: '시나리오생성_시작'→끝)")
                 if sim_info:
-                    st.dataframe(pd.DataFrame(sorted(sim_info.items(), key=lambda x: x[0]), columns=["항목","값"]), use_container_width=True, height=170)
+                    st.dataframe(pd.DataFrame(sorted(sim_info.items(), key=lambda x: x[0]), columns=["항목","값"]), width='stretch', height=170)
                 else:
                     st.caption("summary.csv에서 '시나리오생성_시작' 이후 열을 찾지 못했습니다.")
 
@@ -1220,7 +1228,7 @@ with tabs[1]:
                 if psum.empty:
                     st.caption("환자 이벤트를 찾지 못했습니다.")
                 else:
-                    st.dataframe(psum, use_container_width=True, height=340)
+                    st.dataframe(psum, width='stretch', height=340)
                     _suffix = f"_iter{sel_iter}" if sel_iter is not None else ""
                     st.download_button(
                         "⬇️ 환자 타임라인(csv)",
@@ -1231,7 +1239,7 @@ with tabs[1]:
 
                 st.markdown("#### 🧰 전체 이벤트 표")
                 ev_df = pd.DataFrame(blk["events"]).rename(columns={"t":"시각","eid":"이벤트ID","ev":"이벤트","p":"환자","a":"구급차","u":"UAV","h":"병원"}) if blk else pd.DataFrame()
-                st.dataframe(ev_df, use_container_width=True, height=320)
+                st.dataframe(ev_df, width='stretch', height=320)
                 _suffix = f"_iter{sel_iter}" if sel_iter is not None else ""
                 st.download_button("⬇️ 전체 이벤트(csv)", ev_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"events_all{_suffix}.csv")
 
@@ -1268,6 +1276,7 @@ with tabs[0]:
     # 경로/데이터 로드
     rdirs = get_routes_dirs(bp, exp, coord)
     patient_cnt = get_patient_count(bp, exp, coord)
+    yaml_path = find_yaml_in_coord(bp, exp, coord)
 
     # JSON 경로(전체 로드; patient_cnt로 자르지 않음)
     c2s_all = load_json_files(rdirs["center2site"])  # Center→Site
@@ -1352,11 +1361,20 @@ with tabs[0]:
                 cols.append("시간(분)")
 
             c2s_df = ambinfo_df.rename(columns=rename_dict)[cols].copy()
-            c2s_df["거리(km)"] = pd.to_numeric(c2s_df["거리(km)"], errors="coerce").round(2)
+            # 모든 숫자 컬럼을 명시적으로 변환
+            c2s_df["인덱스"] = pd.to_numeric(c2s_df["인덱스"], errors="coerce").fillna(0).astype(int)
+            c2s_df["거리(km)"] = pd.to_numeric(c2s_df["거리(km)"], errors="coerce").fillna(0.0).round(2)
             if "시간(분)" in c2s_df.columns:
-                c2s_df["시간(분)"] = pd.to_numeric(c2s_df["시간(분)"], errors="coerce").round(1)
+                c2s_df["시간(분)"] = pd.to_numeric(c2s_df["시간(분)"], errors="coerce").fillna(0.0).round(1)
+            # 안전센터/소방서는 문자열로 확실히 변환
+            c2s_df["안전센터/소방서"] = c2s_df["안전센터/소방서"].astype(str)
         else:
-            c2s_df = pd.DataFrame(columns=["인덱스","안전센터/소방서","거리(km)","시간(분)"])
+            c2s_df = pd.DataFrame({
+                "인덱스": pd.Series(dtype='int'),
+                "안전센터/소방서": pd.Series(dtype='str'),
+                "거리(km)": pd.Series(dtype='float'),
+                "시간(분)": pd.Series(dtype='float')
+            })
 
         # 기본 선택 상태
         if "amb_c2s_sel_idx" not in st.session_state:
@@ -1370,11 +1388,13 @@ with tabs[0]:
 
         c2s_df_show = c2s_df.copy()
         c2s_df_show["표시"] = c2s_df_show["인덱스"].apply(lambda i: i in st.session_state.amb_c2s_sel_idx)
+        # Explicit boolean conversion to prevent React error #185
+        c2s_df_show["표시"] = c2s_df_show["표시"].astype(bool)
         # ▶ 표시를 맨 앞으로
         show_cols = ["표시","인덱스","안전센터/소방서","거리(km)"]
         if "시간(분)" in c2s_df_show.columns:
             show_cols.append("시간(분)")
-        c2s_df_show = c2s_df_show[show_cols]
+        c2s_df_show = c2s_df_show[show_cols].reset_index(drop=True)
 
         col_cfg = {
             "표시": st.column_config.CheckboxColumn("표시"),
@@ -1387,7 +1407,7 @@ with tabs[0]:
 
         edited_c2s = st.data_editor(
             c2s_df_show,
-            use_container_width=True,
+            width='stretch',
             num_rows="fixed",
             hide_index=True,
             column_config=col_cfg,
@@ -1443,7 +1463,7 @@ with tabs[0]:
 
         edited_s2h = st.data_editor(
             s2h_df_show,
-            use_container_width=True,
+            width='stretch',
             num_rows="fixed",
             hide_index=True,
             column_config=s2h_col_cfg,
@@ -1457,23 +1477,62 @@ with tabs[0]:
     st.markdown("### UAV 경로")
     col_uav_out, col_uav_back = st.columns(2)
 
-    # 출동(병원→사고): 상급종합(종별코드=1)만 대상
+    # 출동(병원→사고): 헬기장 병원 (uav_info.csv에서 읽기)
     with col_uav_out:
-        st.markdown("**상급종합병원→사고지점 (출동)**")
+        st.markdown("**헬기장 병원→사고지점 (출동)**")
 
-        tier1_latlons = []
-        if not hinfo_df.empty and {"종별코드","요양기관명"}.issubset(hinfo_df.columns):
+        uav_dispatch_latlons = []
+
+        # uav_info.csv 읽기
+        uav_info_path = Path(bp) / "scenarios" / exp / coord / "uav_info.csv"
+        if os.path.exists(uav_info_path):
+            try:
+                uav_df = pd.read_csv(uav_info_path, encoding="utf-8-sig")
+
+                # 새 형식 확인 (6컬럼)
+                if "요양기관명" in uav_df.columns:
+                    for _, row in uav_df.iterrows():
+                        name = str(row["요양기관명"]).strip()
+                        code = row.get("종별코드", 1)
+
+                        # 엑셀에서 좌표 조회
+                        if name in xl_coord:
+                            y, x = xl_coord[name]
+                            uav_dispatch_latlons.append((y, x, name, code))
+                        else:
+                            print(f"⚠️ UAV 병원 '{name}' 좌표 없음")
+                else:
+                    print("⚠️ uav_info.csv 구 형식 (2컬럼) - 업데이트 필요")
+                    # 폴백: tier1 사용
+                    if not hinfo_df.empty and {"종별코드","요양기관명"}.issubset(hinfo_df.columns):
+                        tmp = hinfo_df.copy()
+                        tmp["종별코드"] = pd.to_numeric(tmp["종별코드"], errors="coerce")
+                        for _, rr in tmp[tmp["종별코드"]==1].iterrows():
+                            name = str(rr.get("요양기관명","Tier1")).strip()
+                            if name in xl_coord:
+                                y, x = xl_coord[name]
+                                uav_dispatch_latlons.append((y, x, name, 1))
+            except Exception as e:
+                print(f"⚠️ uav_info.csv 로드 실패: {e}")
+        else:
+            print(f"⚠️ uav_info.csv 없음: {uav_info_path}")
+
+        # 데이터가 없으면 tier1 폴백
+        if not uav_dispatch_latlons and not hinfo_df.empty and {"종별코드","요양기관명"}.issubset(hinfo_df.columns):
             tmp = hinfo_df.copy()
             tmp["종별코드"] = pd.to_numeric(tmp["종별코드"], errors="coerce")
             for _, rr in tmp[tmp["종별코드"]==1].iterrows():
                 name = str(rr.get("요양기관명","Tier1")).strip()
                 if name in xl_coord:
-                    y, x = xl_coord[name]       # (lat, lon)
-                    tier1_latlons.append((y, x, name, 1))
+                    y, x = xl_coord[name]
+                    uav_dispatch_latlons.append((y, x, name, 1))
 
         uav_out_rows = []
-        uav_velocity = 80  # UAV 기본 속도 (km/h)
-        for i, (y, x, nm, code) in enumerate(tier1_latlons):
+        # UAV 속도를 YAML에서 읽기 (Rerun 탭에서 변경한 속도 반영)
+        _, uav_velocity_from_yaml = get_speed_from_yaml(yaml_path)
+        uav_velocity = uav_velocity_from_yaml if uav_velocity_from_yaml else 80  # 기본값 80 km/h
+
+        for i, (y, x, nm, code) in enumerate(uav_dispatch_latlons):
             dkm = _haversine_km(y, x, lat, lon)  # 직선거리
             duration_min = (dkm / uav_velocity) * 60  # 시간(분) = 거리 / 속도 * 60
             uav_out_rows.append({
@@ -1502,7 +1561,7 @@ with tabs[0]:
 
         edited_uav_out = st.data_editor(
             uav_out_df_show,
-            use_container_width=True,
+            width='stretch',
             num_rows="fixed",
             hide_index=True,
             column_config={
@@ -1516,44 +1575,30 @@ with tabs[0]:
             },
             key="tbl_uav_out"
         )
-        st.session_state.uav_c2s_sel_idx = set(edited_uav_out.loc[edited_uav_out["표시"]==True, "인덱스"].tolist())
+        # 출동과 이송 선택 동기화
+        selected_indices = set(edited_uav_out.loc[edited_uav_out["표시"]==True, "인덱스"].tolist())
+        st.session_state.uav_c2s_sel_idx = selected_indices
+        st.session_state.uav_s2h_sel_idx = selected_indices
 
-    # 이송(사고→병원): hospital_info_euc + distance_Hos2Site_euc 기준
+    # 이송(사고→병원): 출동과 동일한 헬기장 병원 (왕복 셔틀)
     with col_uav_back:
-        st.markdown("**사고지점→병원 (이송)**")
+        st.markdown("**사고지점→헬기장 병원 (이송)**")
 
-        # ✔ hospital_info_euc + distance_Hos2Site_euc 기준 표 구성
-        uav_back_rows = []
-        name_to_idx_euc = {}
-        uav_velocity = 80  # UAV 기본 속도 (km/h)
-        if not hinfo_euc_df.empty:
-            for _, rr in hinfo_euc_df.iterrows():
-                idx  = int(rr.get("Index"))
-                nm   = str(rr.get("요양기관명","")).strip()
-                code = rr.get("종별코드", "")
-                dkm  = dist_euc_map.get(idx, None)
-                duration_min = None
-                if dkm is not None:
-                    duration_min = (float(dkm) / uav_velocity) * 60  # 시간(분) = 거리 / 속도 * 60
-                uav_back_rows.append({
-                    "인덱스": idx,
-                    "병원": nm,
-                    "종별코드": code,
-                    "병원등급": code_to_grade(code),
-                    "거리(km)": round(float(dkm), 2) if dkm is not None else None,
-                    "시간(분)": round(duration_min, 1) if duration_min is not None else None
-                })
-                name_to_idx_euc[nm] = idx
-        uav_back_df = pd.DataFrame(uav_back_rows)
+        # ✔ UAV는 왕복 셔틀: 출동과 동일한 헬기장 병원으로 이송
+        # uav_out_df와 동일한 데이터 사용
+        uav_back_df = uav_out_df.copy()
 
+        # 세션 상태 공유 (출동과 이송이 동일한 선택 상태)
         if "uav_s2h_sel_idx" not in st.session_state:
-            st.session_state.uav_s2h_sel_idx = set(uav_back_df["인덱스"].tolist())
+            st.session_state.uav_s2h_sel_idx = st.session_state.uav_c2s_sel_idx.copy()
 
         g1, g2 = st.columns(2)
         if g1.button("UAV 이송 전체선택"):
             st.session_state.uav_s2h_sel_idx = set(uav_back_df["인덱스"].tolist())
+            st.session_state.uav_c2s_sel_idx = set(uav_back_df["인덱스"].tolist())
         if g2.button("UAV 이송 전체해제"):
             st.session_state.uav_s2h_sel_idx = set()
+            st.session_state.uav_c2s_sel_idx = set()
 
         uav_back_df_show = uav_back_df.copy()
         uav_back_df_show["표시"] = uav_back_df_show["인덱스"].apply(lambda i: i in st.session_state.uav_s2h_sel_idx)
@@ -1562,7 +1607,7 @@ with tabs[0]:
 
         edited_uav_back = st.data_editor(
             uav_back_df_show,
-            use_container_width=True,
+            width='stretch',
             num_rows="fixed",
             hide_index=True,
             column_config={
@@ -1576,7 +1621,10 @@ with tabs[0]:
             },
             key="tbl_uav_back"
         )
-        st.session_state.uav_s2h_sel_idx = set(edited_uav_back.loc[edited_uav_back["표시"]==True, "인덱스"].tolist())
+        # 출동과 이송 선택 동기화
+        selected_indices = set(edited_uav_back.loc[edited_uav_back["표시"]==True, "인덱스"].tolist())
+        st.session_state.uav_s2h_sel_idx = selected_indices
+        st.session_state.uav_c2s_sel_idx = selected_indices
 
     # ─────────────────────────────────────────────────────────────────────
     # ③ 지도 생성 및 출력(최상단 map_holder에 표출)
@@ -1710,35 +1758,55 @@ with tabs[0]:
         draw_route_from_json(m, obj, highlight=False)
 
     # ─ UAV 출동(병원→사고) ─
-    for i, (y, x, name, code) in enumerate(tier1_latlons):
+    for i, (y, x, name, code) in enumerate(uav_dispatch_latlons):
         if i not in st.session_state.uav_c2s_sel_idx:
             continue
         dkm = _haversine_km(y, x, lat, lon)
+
+        # 헬기장 병원 마커 추가
+        # uav_out_df에서 병상수/수술실수 가져오기
+        beds_val = None
+        ops_val = None
+        if i < len(uav_out_df):
+            row = uav_out_df.iloc[i]
+            # uav_info.csv에서 병상수/수술실수가 있는지 확인
+            uav_info_path = Path(bp) / "scenarios" / exp / coord / "uav_info.csv"
+            if os.path.exists(uav_info_path):
+                try:
+                    uav_csv = pd.read_csv(uav_info_path, encoding="utf-8-sig")
+                    if "병상수" in uav_csv.columns and i < len(uav_csv):
+                        beds_val = uav_csv.iloc[i].get("병상수", None)
+                    if "수술실수" in uav_csv.columns and i < len(uav_csv):
+                        ops_val = uav_csv.iloc[i].get("수술실수", None)
+                except:
+                    pass
+
+        grade_label = code_to_grade(code)
+        extras = [
+            f"병원등급: {grade_label}",
+            f"🛩️ 헬기장→Site: {dkm:.2f} km"
+        ]
+
+        add_hospital_marker(m, name, code, (y, x), ops_val, beds_val, extras)
+
+        # 출동 경로 그리기
         draw_uav_dash(
             m, (y,x), (lat,lon),
             UAV_OUT_COLOR,
             f"🛩️ 출동 {name}→Site · {dkm:.2f} km"
         )
 
-    # ─ UAV 이송(사고→병원) ─
-    # ✔ 표 선택은 euc 인덱스 기준(uav_s2h_sel_idx). 그려줄 좌표는 엑셀(xl_coord)에서 획득.
-    for _, r in uav_back_df.iterrows():
-        idx = int(r["인덱스"])
-        if idx not in st.session_state.uav_s2h_sel_idx:
+    # ─ UAV 이송(사고→헬기장 병원) ─
+    # ✔ UAV는 왕복 셔틀: 헬기장 병원에서 출발해서 다시 헬기장 병원으로 돌아감
+    # uav_dispatch_latlons와 동일한 병원 리스트 사용
+    for i, (y, x, name, code) in enumerate(uav_dispatch_latlons):
+        if i not in st.session_state.uav_s2h_sel_idx:
             continue
-        nm   = str(r["병원"]).strip()
-        code = r.get("종별코드", "")
-        if nm not in xl_coord:
-            continue
-        y, x = xl_coord[nm]
-        is_tier1 = (str(code).isdigit() and int(code) == 1)
-        off = 30.0 if is_tier1 else 0.0
         dkm = _haversine_km(lat, lon, y, x)
         draw_uav_dash(
             m, (lat,lon), (y,x),
             UAV_BACK_COLOR,
-            f"🛩️ 이송 Site→{nm} · {dkm:.2f} km",
-            offset_m=off
+            f"🛩️ 이송 Site→{name} · {dkm:.2f} km"
         )
 
     # ─ 범례/속도 ─
@@ -1875,7 +1943,7 @@ with tabs[2]:
                 )
                 for m in picked:
                     st.markdown(f"#### ▶ RAW 테이블 — **{m}** (run별)")
-                    st.dataframe(raw_tables[m], use_container_width=True)
+                    st.dataframe(raw_tables[m], width='stretch')
             else:
                 st.warning("RAW(results_*.txt)에서 읽을 수 있는 블록이 없습니다.")
         else:
@@ -1902,7 +1970,7 @@ with tabs[2]:
                 "M4_mean":"Reward w.o.G 평균","M4_std":"Reward w.o.G 표준편차","M4_ci":"Reward w.o.G 95%CI",
                 "M5_mean":"PDR w.o.G 평균","M5_std":"PDR w.o.G 표준편차","M5_ci":"PDR w.o.G 95%CI",
             })
-            st.dataframe(display, use_container_width=True)
+            st.dataframe(display, width='stretch')
 
             st.markdown("#### 🏆 시나리오 추천(정렬 기준)")
             crit = st.selectbox("정렬 기준", ["Reward 큰 순","PDR 작은 순","Time 짧은 순"], index=0)
@@ -1915,7 +1983,7 @@ with tabs[2]:
             else:
                 df_sorted = wide.sort_values("M2_mean", ascending=True)
                 cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M2_mean","M2_ci"]
-            st.dataframe(df_sorted[cols], use_container_width=True)
+            st.dataframe(df_sorted[cols], width='stretch')
         else:
             st.info("STAT 요약 파일을 찾지 못했거나 비어 있습니다.")
 
@@ -2166,7 +2234,7 @@ with tabs[2]:
 
                         # Total 포함 + η²
                         out = make_total_row(anova_tbl, d[yvar])
-                        st.dataframe(out, use_container_width=True)
+                        st.dataframe(out, width='stretch')
 
                         # 유의한 주효과(룰 등) 요약
                         alpha = st.slider("유의수준(alpha)", 0.001, 0.1, 0.05, 0.001)
@@ -2298,7 +2366,7 @@ with tabs[2]:
                         # --- 결과 출력 & CLD ---
                         if not posthoc.empty:
                             st.caption(explain)
-                            st.dataframe(posthoc, use_container_width=True)
+                            st.dataframe(posthoc, width='stretch')
 
                             ph = posthoc.copy()
                             if ("p-adj" not in ph.columns) and ("reject" not in ph.columns):
@@ -2306,12 +2374,12 @@ with tabs[2]:
                             else:
                                 cld = cld_from_pairs(means_for_cld, ph, alpha=alpha)
                                 st.markdown("##### CLD (동일 문자=유의차 없음, A=최상위)")
-                                st.dataframe(cld, use_container_width=True)
+                                st.dataframe(cld, width='stretch')
 
                                 # 최종 후보(‘A’ 그룹) — 지표 방향에 맞춰 정렬
                                 st.markdown(f"#### ✅ 최종 후보(**{metric} 기준 A=Best**)")
                                 top = cld[cld["CLD"]=="A"].sort_values("mean", ascending=_small_is_better(metric))
-                                st.dataframe(top, use_container_width=True)
+                                st.dataframe(top, width='stretch')
 
                                 # ================== A그룹 교집합 (Reward ∩ Time ∩ PDR, RCBD 기준) ==================구해도 좋습니다.")
                                 st.markdown("### 🔗 A그룹 교집합 (Reward ∩ Time(작은순) ∩ PDR(작은순), RCBD)")
@@ -2500,7 +2568,7 @@ with tabs[2]:
                                         elif "Time∩PDR" in title:
                                             out = out.sort_values(["Time_mean(orig)", "PDR_mean(orig)"],
                                                                 ascending=[True, True], kind="mergesort")
-                                        st.dataframe(out, use_container_width=True)
+                                        st.dataframe(out, width='stretch')
 
                                     _show_table("3중 교집합 (Reward ∩ Time ∩ PDR)", inter_RTP)
                                     _show_table("2중 교집합 (Reward∩Time)", inter_RT)
@@ -2533,7 +2601,7 @@ with tabs[3]:
             labels = {p: os.path.basename(p) for p in csvs_editable}
             target = st.selectbox("편집할 CSV", options=list(labels.keys()), format_func=lambda p: labels[p])
             df = read_csv_smart(target)
-            edit = st.data_editor(df, use_container_width=True, num_rows="dynamic", height=400)
+            edit = st.data_editor(df, width='stretch', num_rows="dynamic", height=400)
             c1, c2, c3 = st.columns(3)
             with c1:
                 if st.button("💾 저장(백업 자동)"):
@@ -2566,7 +2634,7 @@ with tabs[3]:
         st.markdown("#### 병원 마스터(엑셀, 읽기전용)")
         hdf = read_excel_hospital(bp)
         if hdf is not None and not hdf.empty:
-            st.dataframe(hdf.head(200), use_container_width=True, height=280)
+            st.dataframe(hdf.head(200), width='stretch', height=280)
         else:
             st.caption("엑셀 결합 데이터.xlsx 미존재 또는 로드 실패")
 
@@ -2574,7 +2642,7 @@ with tabs[3]:
         global_center_csv = Path(bp) / "scenarios" / "안전센터와 소방서.csv"
         if global_center_csv.is_file():
             cdf = read_csv_smart(str(global_center_csv))
-            st.dataframe(cdf.head(200), use_container_width=True, height=260)
+            st.dataframe(cdf.head(200), width='stretch', height=260)
         else:
             st.caption("안전센터와 소방서.csv 미존재")
 
