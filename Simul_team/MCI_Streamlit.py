@@ -57,8 +57,18 @@ KST = timezone(timedelta(hours=9))
 # ------------------------------
 # Session defaults
 # ------------------------------
+# Session defaults
+# ------------------------------
+CLOUD_BASE_PATH = "/mount/src/mci_adv/Simul_team"
+IS_CLOUD = Path(CLOUD_BASE_PATH).exists()
+
 if "base_path" not in st.session_state:
-    st.session_state.base_path = ""
+    st.session_state.base_path = CLOUD_BASE_PATH if IS_CLOUD else ""
+else:
+    # Cloud에서는 항상 고정 (사용자가 바꿔도 즉시 원복)
+    if IS_CLOUD and st.session_state.base_path != CLOUD_BASE_PATH:
+        st.session_state.base_path = CLOUD_BASE_PATH
+
 if "selected_exp" not in st.session_state:
     st.session_state.selected_exp = ""
 if "selected_coord" not in st.session_state:
@@ -1040,8 +1050,19 @@ st.set_page_config(page_title="MCI Streamlit (기존 시나리오 대시보드)"
 
 with st.sidebar:
     st.header("⚙️ Settings")
-    base_input = st.text_input("base_path", st.session_state.base_path, placeholder="예: C:\\Users\\사용자명\\MCI")
-    if st.button("Set base_path"):
+
+    base_input = st.text_input(
+        "base_path",
+        st.session_state.base_path,
+        placeholder="예: C:\\Users\\사용자명\\MCI",
+        disabled=IS_CLOUD,
+    )
+
+    if IS_CLOUD:
+        st.caption(f"☁️ Streamlit Cloud에서는 base_path가 `{CLOUD_BASE_PATH}` 로 자동 고정됩니다.")
+
+    # 로컬에서만 버튼 동작
+    if (not IS_CLOUD) and st.button("Set base_path"):
         st.session_state.base_path = norm(base_input)
         if base_ok(norm(base_input)):
             st.success("✅ base_path 설정 완료!\n\n🧪 Generate 탭에서 새 시나리오를 생성하거나, 기존 시나리오를 선택하세요.")
@@ -2730,7 +2751,11 @@ with tabs[4]:
     # Rerun 탭 전용 base_path 입력
     # ─────────────────────────────────────────────────────────────────
     if "rerun_base_path" not in st.session_state:
-        st.session_state.rerun_base_path = ""
+        st.session_state.rerun_base_path = CLOUD_BASE_PATH if IS_CLOUD else ""
+    else:
+        if IS_CLOUD and st.session_state.rerun_base_path != CLOUD_BASE_PATH:
+            st.session_state.rerun_base_path = CLOUD_BASE_PATH
+
 
     st.markdown("---")
     st.markdown("### 📁 프로젝트 경로 설정")
@@ -2742,13 +2767,18 @@ with tabs[4]:
             value=st.session_state.rerun_base_path,
             placeholder="예: C:\\Users\\사용자명\\MCI_ADV\\Simul_team",
             help="scenarios 폴더가 있는 프로젝트 루트 경로를 입력하세요",
-            key="rerun_bp_input"
+            key="rerun_bp_input",
+            disabled=IS_CLOUD,
         )
+        if IS_CLOUD:
+            st.caption(f"☁️ Cloud에서는 `{CLOUD_BASE_PATH}` 로 자동 고정됩니다.")
+
     with col_btn:
         st.write("")  # 정렬용
         st.write("")  # 정렬용
-        if st.button("✅ 경로 확인", key="rerun_check_path"):
+        if (not IS_CLOUD) and st.button("✅ 경로 확인", key="rerun_check_path"):
             st.session_state.rerun_base_path = rerun_bp_input
+
 
     bp_rerun = st.session_state.rerun_base_path
 
