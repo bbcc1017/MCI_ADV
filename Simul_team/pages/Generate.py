@@ -42,8 +42,16 @@ def parse_env_kv(text: str):
 # ─────────────────────────────────────────────────────────────────
 # Session State 초기화
 # ─────────────────────────────────────────────────────────────────
+CLOUD_BASE_PATH = "/mount/src/mci_adv/Simul_team"
+IS_CLOUD = os.path.isdir(CLOUD_BASE_PATH)
+
 if "generate_base_path" not in st.session_state:
-    st.session_state.generate_base_path = ""
+    st.session_state.generate_base_path = CLOUD_BASE_PATH if IS_CLOUD else ""
+else:
+    # Cloud에서는 항상 고정 (사용자가 바꿔도 즉시 원복)
+    if IS_CLOUD and st.session_state.generate_base_path != CLOUD_BASE_PATH:
+        st.session_state.generate_base_path = CLOUD_BASE_PATH
+
 if "gen_state" not in st.session_state:
     st.session_state.gen_state = {}
 if "env_txt" not in st.session_state:
@@ -67,13 +75,18 @@ with col_path:
         "🗂️ 프로젝트 경로 (base_path)",
         value=st.session_state.generate_base_path,
         placeholder="예: C:\\Users\\사용자명\\MCI_ADV\\Simul_team",
-        help="scenarios 폴더가 있는 프로젝트 루트 경로를 입력하세요"
+        help="scenarios 폴더가 있는 프로젝트 루트 경로를 입력하세요",
+        disabled=IS_CLOUD,
     )
+    if IS_CLOUD:
+        st.caption(f"☁️ Streamlit Cloud에서는 base_path가 `{CLOUD_BASE_PATH}` 로 자동 고정됩니다.")
+
 with col_btn:
     st.write("")  # 정렬용
     st.write("")  # 정렬용
-    if st.button("✅ 경로 확인", key="gen_check_path"):
+    if (not IS_CLOUD) and st.button("✅ 경로 확인", key="gen_check_path"):
         st.session_state.generate_base_path = generate_bp_input
+
 
 bp = st.session_state.generate_base_path
 
