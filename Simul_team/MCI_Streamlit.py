@@ -1149,6 +1149,13 @@ tabs = st.tabs(["Maps", "Scenarios", "Analytics", "Data Tables", "Rerun"])
 with tabs[1]:
     st.subheader("📁 선택된 시나리오")
     bp = st.session_state.base_path; exp = st.session_state.selected_exp; coord = st.session_state.selected_coord
+
+    # 시나리오 변경 시 로그 로드 상태 리셋
+    current_scenario_key = f"{exp}_{coord}"
+    if st.session_state.get("last_scenario_key") != current_scenario_key:
+        st.session_state.logs_loaded = False
+        st.session_state.last_scenario_key = current_scenario_key
+
     if bp and exp and coord:
         yaml_path = find_yaml_in_coord(bp, exp, coord)
         st.write("**YAML**:", yaml_path or "(없음)")
@@ -1173,22 +1180,42 @@ with tabs[1]:
                     st.caption("summary.csv에서 '시나리오생성_시작' 이후 열을 찾지 못했습니다.")
 
 
-        # 성능 최적화: total_samples 확인
-        yaml_path = find_yaml_in_coord(bp, exp, coord)
-        total_samples = get_total_samples_from_yaml(yaml_path)
+        # 성능 최적화: summary CSV에서 시뮬레이션반복 직접 확인 (가장 최신 시도)
+        total_samples = 0
+        if smdf is not None and not smdf.empty and "시뮬레이션반복" in smdf.columns:
+            # 현재 좌표에 해당하는 행들 중 가장 최근 시도 (마지막 행)
+            coord_rows = smdf[smdf["좌표"] == coord]
+            if not coord_rows.empty:
+                latest_row = coord_rows.iloc[-1]  # 가장 마지막 시도
+                total_samples_val = latest_row.get("시뮬레이션반복")
+                if pd.notna(total_samples_val):
+                    total_samples = int(total_samples_val)
 
         st.markdown("### 🧾 실행 로그")
 
-        # total_samples 기반 조건부 로딩
-        if total_samples > 500:
-            st.warning("⚠️ 시뮬레이션 반복 횟수가 500회를 초과하여 로그 뷰어가 비활성화되었습니다.")
-            st.info(f"📁 로그 파일을 직접 확인하세요: `scenarios/{exp}/{coord}/experiment_logs/`")
+        # 디버깅: total_samples 값 확인
+        if total_samples > 0:
+            st.caption(f"🔍 감지된 시뮬레이션 반복 횟수: {total_samples}회 (summary CSV의 가장 최신 시도 기준)")
+
+        # total_samples 기반 조건부 로딩 (50회 이상은 버튼도 비활성화)
+        if total_samples >= 50:
+            st.warning(f"⚠️ 시뮬레이션 반복 횟수({total_samples}회)가 50회 이상이어서 로그 뷰어를 비활성화합니다.")
+            st.info(f"📁 로그 파일을 직접 확인하세요: `experiment_logs/{coord}_*.txt`")
+            st.caption(f"💡 대시보드 성능 최적화를 위해 50회 이상의 로그는 원본 폴더에서 직접 확인해주세요.")
+
+            # 버튼 비활성화 상태로 표시
+            st.button("📂 로그 파일 로드하기", key="load_logs_btn_disabled", disabled=True, help="50회 이상은 로그 뷰어가 비활성화됩니다")
             logs = None
-        elif total_samples > 100:
-            st.info(f"ℹ️ 시뮬레이션 반복 횟수({total_samples}회)가 많아 로딩에 시간이 소요될 수 있습니다.")
-            logs = experiment_log_candidates(bp, exp, coord)
         else:
-            logs = experiment_log_candidates(bp, exp, coord)
+            # 성능 최적화: 버튼 클릭 시에만 로그 로드 (다른 탭 로딩 속도 개선)
+            if st.button("📂 로그 파일 로드하기", key="load_logs_btn", help="로그를 로드하려면 클릭하세요"):
+                st.session_state.logs_loaded = True
+
+            if st.session_state.get("logs_loaded", False):
+                logs = experiment_log_candidates(bp, exp, coord)
+            else:
+                st.info("💡 로그를 보려면 위의 '로그 파일 로드하기' 버튼을 클릭하세요. (다른 탭의 로딩 속도를 위해 기본적으로 비활성화됨)")
+                logs = None
 
         if logs:
             log_sel = st.selectbox("로그 파일 선택 (experiment_logs/<coord>만)", logs)
@@ -1278,7 +1305,7 @@ with tabs[0]:
     patient_cnt = get_patient_count(bp, exp, coord)
     yaml_path = find_yaml_in_coord(bp, exp, coord)
 
-    # JSON 경로(전체 로드; patient_cnt로 자르지 않음)
+    # JSON 경로(전체 로드; 지도 시각화용 - 시뮬레이션 반복수와 무관)
     c2s_all = load_json_files(rdirs["center2site"])  # Center→Site
     h2s_all = load_json_files(rdirs["hos2site"])     # Site→Hospitals
 
@@ -1664,10 +1691,18 @@ with tabs[0]:
         clatlon = (c[1], c[0]) if (isinstance(c, list) and len(c)==2) else None
 
         addr = tel = ""
-        if not center_df.empty and "기관명" in center_df.columns:
+        if not center_df.empty and "기관명" in center_df.columns and clatlon:
+            # 좌표 기반 매칭: 같은 이름의 센터가 여러 개일 경우 가장 가까운 것 선택
             msk = (center_df["기관명"].astype(str) == cname)
             if msk.any():
-                rowc = center_df[msk].iloc[0]
+                candidates = center_df[msk].copy()
+                # 거리 계산 (Haversine이 아닌 간단한 유클리드 거리)
+                if "y좌표" in candidates.columns and "x좌표" in candidates.columns:
+                    candidates["_dist"] = ((candidates["y좌표"] - clatlon[0])**2 +
+                                          (candidates["x좌표"] - clatlon[1])**2)**0.5
+                    rowc = candidates.sort_values("_dist").iloc[0]
+                else:
+                    rowc = candidates.iloc[0]
                 addr = str(rowc.get("주소","")); tel = str(rowc.get("전화번호",""))
 
         # 거리는 ✔ amb_info_road의 init_distance 사용
@@ -1850,7 +1885,8 @@ with tabs[0]:
 
     # 지도는 '최상단' 컨테이너에 출력
     with map_holder:
-        st_folium(m, width=None, height=690)
+        # 성능 최적화: key 설정으로 불필요한 재렌더링 방지
+        st_folium(m, width=None, height=690, key="main_map", returned_objects=[])
 
 
 # ------------------------------
@@ -1923,660 +1959,674 @@ with tabs[2]:
     exp  = st.session_state.selected_exp
     coord= st.session_state.selected_coord
 
+    # 시나리오 변경 시 Analytics 로드 상태 리셋
+    current_analytics_key = f"{exp}_{coord}"
+    if st.session_state.get("last_analytics_key") != current_analytics_key:
+        st.session_state.analytics_loaded = False
+        st.session_state.last_analytics_key = current_analytics_key
+
     if not (bp and exp and coord):
         st.info("좌측에서 시나리오를 먼저 선택하세요.")
     else:
         spath = results_stat_path(bp, exp, coord)   # 기존 함수
         rpath = results_raw_path(bp, exp, coord)    # 기존 함수
 
-        # ── RAW: 선택한 지표만 토글 표출
-        if rpath and os.path.exists(rpath):
-            raw_tables = parse_raw_all_metrics(rpath)  # {metric: df}
-            if raw_tables:
-                # 파일에 실제 들어있는 지표만 옵션으로 노출
-                metric_options = [m for m in RAW_METRIC_NAMES if m in raw_tables.keys()]
-                picked = st.multiselect(
-                    "표시할 지표를 선택하세요",
-                    options=metric_options,
-                    default=[metric_options[0]] if metric_options else [],
-                    help="선택한 지표만 아래에 표로 표시됩니다."
-                )
-                for m in picked:
-                    st.markdown(f"#### ▶ RAW 테이블 — **{m}** (run별)")
-                    st.dataframe(raw_tables[m], width='stretch')
-            else:
-                st.warning("RAW(results_*.txt)에서 읽을 수 있는 블록이 없습니다.")
+        # 성능 최적화: 버튼 클릭 시에만 Analytics 데이터 로드
+        st.info("💡 대용량 시뮬레이션 결과는 로딩에 시간이 소요될 수 있습니다. 아래 버튼을 클릭하여 분석을 시작하세요.")
+
+        if st.button("📊 분석 데이터 로드하기", key="load_analytics_btn", help="RAW 결과를 파싱하고 분석합니다"):
+            st.session_state.analytics_loaded = True
+
+        if not st.session_state.get("analytics_loaded", False):
+            st.caption("💡 분석을 보려면 위의 '분석 데이터 로드하기' 버튼을 클릭하세요. (다른 탭의 로딩 속도를 위해 기본적으로 비활성화됨)")
         else:
-            st.warning("RAW(results_*.txt) 파일을 찾지 못했습니다.")
+            # ── RAW: 선택한 지표만 토글 표출
+            raw_tables = {}
+            if rpath and os.path.exists(rpath):
+                with st.spinner("RAW 결과 파싱 중... (대용량 파일은 시간이 걸릴 수 있습니다)"):
+                    raw_tables = parse_raw_all_metrics(rpath)  # {metric: df}
 
-        st.divider()
-
-        # ===== (기존) stat 요약 분석 섹션 =====
-        st.subheader("📈 STAT 요약 분석 (_stat.txt 기반)")
-        st.info(
-            "📂 results/exp_YYYYMMDD_HHMMSS/(lat,lon)/results_{coord}.txt (Raw), results_{coord}_stat.txt (통계)\n\n"
-            "- **Reward**: 생존확률 합\n- **Time**: 소요시간\n- **PDR**\n- **w.o.G**: Green 제외 지표"
-        )
-
-        wide, long_df = (pd.DataFrame(), pd.DataFrame())
-        if spath and os.path.exists(spath):
-            wide, long_df = parse_stat_file(spath)
-
-        if not wide.empty:
-            display = wide.rename(columns={
-                "M1_mean":"Reward(생존) 평균","M1_std":"Reward 표준편차","M1_ci":"Reward 95%CI",
-                "M2_mean":"Time 평균","M2_std":"Time 표준편차","M2_ci":"Time 95%CI",
-                "M3_mean":"PDR 평균","M3_std":"PDR 표준편차","M3_ci":"PDR 95%CI",
-                "M4_mean":"Reward w.o.G 평균","M4_std":"Reward w.o.G 표준편차","M4_ci":"Reward w.o.G 95%CI",
-                "M5_mean":"PDR w.o.G 평균","M5_std":"PDR w.o.G 표준편차","M5_ci":"PDR w.o.G 95%CI",
-            })
-            st.dataframe(display, width='stretch')
-
-            st.markdown("#### 🏆 시나리오 추천(정렬 기준)")
-            crit = st.selectbox("정렬 기준", ["Reward 큰 순","PDR 작은 순","Time 짧은 순"], index=0)
-            if crit == "Reward 큰 순":
-                df_sorted = wide.sort_values("M1_mean", ascending=False)
-                cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M1_mean","M1_ci"]
-            elif crit == "PDR 작은 순":
-                df_sorted = wide.sort_values("M3_mean", ascending=True)
-                cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M3_mean","M3_ci"]
+                if raw_tables:
+                    # 파일에 실제 들어있는 지표만 옵션으로 노출
+                    metric_options = [m for m in RAW_METRIC_NAMES if m in raw_tables.keys()]
+                    picked = st.multiselect(
+                        "표시할 지표를 선택하세요",
+                        options=metric_options,
+                        default=[metric_options[0]] if metric_options else [],
+                        help="선택한 지표만 아래에 표로 표시됩니다."
+                    )
+                    for m in picked:
+                        st.markdown(f"#### ▶ RAW 테이블 — **{m}** (run별)")
+                        st.dataframe(raw_tables[m], width='stretch')
+                else:
+                    st.warning("RAW(results_*.txt)에서 읽을 수 있는 블록이 없습니다.")
             else:
-                df_sorted = wide.sort_values("M2_mean", ascending=True)
-                cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M2_mean","M2_ci"]
-            st.dataframe(df_sorted[cols], width='stretch')
-        else:
-            st.info("STAT 요약 파일을 찾지 못했거나 비어 있습니다.")
+                st.warning("RAW(results_*.txt) 파일을 찾지 못했습니다.")
 
+            st.divider()
 
-        # ── ANOVA 스위트 (raw가 있을 때)
-        st.markdown("#### 🧪 ANOVA (One-way / RCBD / Full-factorial)")
-
-        import numpy as np, pandas as pd, itertools
-        import altair as alt
-        
-
-        def make_total_row(anova_tbl: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
-            ss_total = float(((y - y.mean())**2).sum())
-            total = pd.DataFrame(
-                {"sum_sq":[ss_total], "df":[len(y)-1], "mean_sq":[np.nan], "F":[np.nan], "PR(>F)":[np.nan], "eta_sq":[np.nan]},
-                index=["Total"]
+            # ===== (기존) stat 요약 분석 섹션 =====
+            st.subheader("📈 STAT 요약 분석 (_stat.txt 기반)")
+            st.info(
+                "📂 results/exp_YYYYMMDD_HHMMSS/(lat,lon)/results_{coord}.txt (Raw), results_{coord}_stat.txt (통계)\n\n"
+                "- **Reward**: 생존확률 합\n- **Time**: 소요시간\n- **PDR**\n- **w.o.G**: Green 제외 지표"
             )
-            out = anova_tbl.copy()
-            # η²
-            out["eta_sq"] = out["sum_sq"] / ss_total
-            # mean_sq 보완
-            if "df" in out.columns and "sum_sq" in out.columns:
-                out["mean_sq"] = out["sum_sq"] / out["df"]
-            # 열 순서 정리
-            cols = ["sum_sq","df","mean_sq","F","PR(>F)","eta_sq"]
-            out = out.reindex(columns=cols)
-            return pd.concat([out, total], axis=0)
+
+            wide, long_df = (pd.DataFrame(), pd.DataFrame())
+            if spath and os.path.exists(spath):
+                wide, long_df = parse_stat_file(spath)
+
+            if not wide.empty:
+                display = wide.rename(columns={
+                    "M1_mean":"Reward(생존) 평균","M1_std":"Reward 표준편차","M1_ci":"Reward 95%CI",
+                    "M2_mean":"Time 평균","M2_std":"Time 표준편차","M2_ci":"Time 95%CI",
+                    "M3_mean":"PDR 평균","M3_std":"PDR 표준편차","M3_ci":"PDR 95%CI",
+                    "M4_mean":"Reward w.o.G 평균","M4_std":"Reward w.o.G 표준편차","M4_ci":"Reward w.o.G 95%CI",
+                    "M5_mean":"PDR w.o.G 평균","M5_std":"PDR w.o.G 표준편차","M5_ci":"PDR w.o.G 95%CI",
+                })
+                st.dataframe(display, width='stretch')
+
+                st.markdown("#### 🏆 시나리오 추천(정렬 기준)")
+                crit = st.selectbox("정렬 기준", ["Reward 큰 순","PDR 작은 순","Time 짧은 순"], index=0)
+                if crit == "Reward 큰 순":
+                    df_sorted = wide.sort_values("M1_mean", ascending=False)
+                    cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M1_mean","M1_ci"]
+                elif crit == "PDR 작은 순":
+                    df_sorted = wide.sort_values("M3_mean", ascending=True)
+                    cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M3_mean","M3_ci"]
+                else:
+                    df_sorted = wide.sort_values("M2_mean", ascending=True)
+                    cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M2_mean","M2_ci"]
+                st.dataframe(df_sorted[cols], width='stretch')
+            else:
+                st.info("STAT 요약 파일을 찾지 못했거나 비어 있습니다.")
 
 
-        def block_adjust(df, yvar, block_col):
-            """블록-잔차화: y* = y - 블록평균."""
-            df = df.copy()
-            df["y_adj"] = df[yvar] - df.groupby(block_col)[yvar].transform("mean")
-            return df
-        def _means_series(df: pd.DataFrame, group_col: str, value_col: str) -> pd.Series:
-            """
-            그룹 평균을 '항상 Series'로 반환 (중복 컬럼명/버전 이슈 방어).
-            - df[value_col]이 DataFrame로 떨어지면 첫 컬럼만 사용
-            - 값은 숫자로 강제 변환
-            """
-            col = df.loc[:, value_col]  # 중복 이름이면 DataFrame
-            if isinstance(col, pd.DataFrame):
-                col = col.iloc[:, 0]     # 첫 컬럼만 채택
-            col = pd.to_numeric(col.squeeze(), errors="coerce")
-            g = pd.DataFrame({group_col: df[group_col].values, "__y__": col.values})
-            tmp = g.groupby(group_col, as_index=False)["__y__"].mean()
-            s = tmp.set_index(group_col)["__y__"]
-            return s
+            # ── ANOVA 스위트 (raw가 있을 때)
+            st.markdown("#### 🧪 ANOVA (One-way / RCBD / Full-factorial)")
+
+            def make_total_row(anova_tbl: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
+                ss_total = float(((y - y.mean())**2).sum())
+                total = pd.DataFrame(
+                    {"sum_sq":[ss_total], "df":[len(y)-1], "mean_sq":[np.nan], "F":[np.nan], "PR(>F)":[np.nan], "eta_sq":[np.nan]},
+                    index=["Total"]
+                )
+                out = anova_tbl.copy()
+                # η²
+                out["eta_sq"] = out["sum_sq"] / ss_total
+                # mean_sq 보완
+                if "df" in out.columns and "sum_sq" in out.columns:
+                    out["mean_sq"] = out["sum_sq"] / out["df"]
+                # 열 순서 정리
+                cols = ["sum_sq","df","mean_sq","F","PR(>F)","eta_sq"]
+                out = out.reindex(columns=cols)
+                return pd.concat([out, total], axis=0)
+
+
+            def block_adjust(df, yvar, block_col):
+                """블록-잔차화: y* = y - 블록평균."""
+                df = df.copy()
+                df["y_adj"] = df[yvar] - df.groupby(block_col)[yvar].transform("mean")
+                return df
+            def _means_series(df: pd.DataFrame, group_col: str, value_col: str) -> pd.Series:
+                """
+                그룹 평균을 '항상 Series'로 반환 (중복 컬럼명/버전 이슈 방어).
+                - df[value_col]이 DataFrame로 떨어지면 첫 컬럼만 사용
+                - 값은 숫자로 강제 변환
+                """
+                col = df.loc[:, value_col]  # 중복 이름이면 DataFrame
+                if isinstance(col, pd.DataFrame):
+                    col = col.iloc[:, 0]     # 첫 컬럼만 채택
+                col = pd.to_numeric(col.squeeze(), errors="coerce")
+                g = pd.DataFrame({group_col: df[group_col].values, "__y__": col.values})
+                tmp = g.groupby(group_col, as_index=False)["__y__"].mean()
+                s = tmp.set_index(group_col)["__y__"]
+                return s
         
-        def _scalar(x, default=np.nan) -> float:
-            """어떤 타입이 와도 확실히 float 스칼라로 변환."""
-            try:
-                a = np.asarray(x)
-                return float(a.ravel()[0])
-            except Exception:
-                return float(default)
-
-
-        def games_howell_fallback(df, grp, yvar, alpha=0.05):
-            """pingouin이 없을 때 Welch t + Holm으로 근사."""
-            from scipy import stats as sps
-            pairs, pvals = [], []
-            for g1, g2 in itertools.combinations(sorted(df[grp].unique()), 2):
-                x = df.loc[df[grp]==g1, yvar].values
-                y = df.loc[df[grp]==g2, yvar].values
-                _, p = sps.ttest_ind(x, y, equal_var=False)
-                pairs.append((g1,g2)); pvals.append(p)
-            ph = pd.DataFrame(pairs, columns=["group1","group2"])
-            from statsmodels.stats.multitest import multipletests
-            ph["p-adj"] = multipletests(pvals, method="holm")[1]
-            ph["reject"] = ph["p-adj"] < alpha
-            return ph
-
-        def tukey_table(endog, groups, alpha=0.05):
-            from statsmodels.stats.multicomp import pairwise_tukeyhsd
-            th = pairwise_tukeyhsd(endog=endog, groups=groups, alpha=alpha)
-            tb = pd.DataFrame(th.summary().data[1:], columns=th.summary().data[0])
-            # 표준화 컬럼명
-            tb = tb.rename(columns={"group1":"group1","group2":"group2","reject":"reject","p-adj":"p-adj"})
-            if "p-adj" not in tb.columns:
-                # statsmodels 버전에 따라 p-adj가 없을 수 있음 → 계산 불가 시 NaN
-                tb["p-adj"] = np.nan
-            return tb
-
-        def conover_friedman(df_block_rule: pd.DataFrame, alpha: float = 0.05):
-            """
-            Friedman 유의 후 사후검정:
-            1순위: Conover + Holm (scikit-posthocs)
-            실패 시: Nemenyi (fallback)
-            항상 (posthoc_df, err_msg) 튜플을 반환.
-            """
-            import numpy as np
-            import pandas as pd
-            try:
-                import scikit_posthocs as sp
-            except Exception as e:
-                return pd.DataFrame(), f"scikit-posthocs 가져오기 실패: {e}"
-
-            # 공통: wide → long 변환 함수
-            def _wide_to_long(ph_wide: pd.DataFrame) -> pd.DataFrame:
-                tmp = ph_wide.copy()
-                # 인덱스 이름 보정
-                if tmp.index.name is None:
-                    tmp.index.name = "group1"
-                long = tmp.reset_index().melt(id_vars=tmp.index.name, var_name="group2", value_name="p-adj")
-                long = long[long["group1"] < long["group2"]].reset_index(drop=True)
-                long["reject"] = long["p-adj"] < alpha
-                return long
-
-            # 1) Conover + Holm
-            try:
-                ph = sp.posthoc_conover_friedman(df_block_rule, p_adjust='holm')
-                return _wide_to_long(ph), None
-            except Exception as e1:
-                # 2) Nemenyi fallback
+            def _scalar(x, default=np.nan) -> float:
+                """어떤 타입이 와도 확실히 float 스칼라로 변환."""
                 try:
-                    ph2 = sp.posthoc_nemenyi_friedman(df_block_rule)
-                    msg = f"Conover 실패로 Nemenyi로 대체: {e1}"
-                    return _wide_to_long(ph2), msg
-                except Exception as e2:
-                    return pd.DataFrame(), f"Conover/Nemenyi 모두 실패: {e1} / {e2}"
+                    a = np.asarray(x)
+                    return float(a.ravel()[0])
+                except Exception:
+                    return float(default)
 
-        def cld_from_pairs(means: pd.Series, pair_tbl: pd.DataFrame, alpha=0.05):
-            """
-            단조(monotone) CLD: 정렬된 means 순서에서 위→아래로 내려오며
-            현재 그룹의 모든 멤버와 '비유의'일 때만 같은 레터를 부여.
-            하나라도 '유의'면 다음 레터로 넘어감.
-            - means: index=그룹명(룰), values=사후검정과 같은 스케일에서의 평균
-                    (RCBD면 y_adj 평균으로 정렬 권장; 아래 적용부 참조)
-            - pair_tbl: columns 중 ['group1','group2']와 ['reject'] 또는 ['p-adj'] 포함
-            결과: 각 그룹당 단일 레터(A,B,C,...) — 지그재그 방지, 구간형 묶음 보장.
-            """
-            # 빈 테이블이면 전부 A
-            if pair_tbl is None or pair_tbl.empty or len(means) <= 1:
-                return pd.DataFrame({"rule": means.index, "mean": means.values, "CLD": ["A"]*len(means)})
 
-            ph = pair_tbl.copy()
-            # 비유의 여부 계산
-            if "reject" in ph.columns:
-                ph["ns"] = ~ph["reject"].astype(bool)
-            else:
-                ph["ns"] = ph["p-adj"] >= alpha
+            def games_howell_fallback(df, grp, yvar, alpha=0.05):
+                """pingouin이 없을 때 Welch t + Holm으로 근사."""
+                from scipy import stats as sps
+                pairs, pvals = [], []
+                for g1, g2 in itertools.combinations(sorted(df[grp].unique()), 2):
+                    x = df.loc[df[grp]==g1, yvar].values
+                    y = df.loc[df[grp]==g2, yvar].values
+                    _, p = sps.ttest_ind(x, y, equal_var=False)
+                    pairs.append((g1,g2)); pvals.append(p)
+                ph = pd.DataFrame(pairs, columns=["group1","group2"])
+                from statsmodels.stats.multitest import multipletests
+                ph["p-adj"] = multipletests(pvals, method="holm")[1]
+                ph["reject"] = ph["p-adj"] < alpha
+                return ph
 
-            # 빠른 조회용 dict: (a,b)->비유의(True/False), 무정보는 보수적으로 '유의' 취급
-            key = lambda a,b: tuple(sorted((a,b)))
-            ns_map = { key(r["group1"], r["group2"]): bool(r["ns"]) for _, r in ph.iterrows() }
+            def tukey_table(endog, groups, alpha=0.05):
+                from statsmodels.stats.multicomp import pairwise_tukeyhsd
+                th = pairwise_tukeyhsd(endog=endog, groups=groups, alpha=alpha)
+                tb = pd.DataFrame(th.summary().data[1:], columns=th.summary().data[0])
+                # 표준화 컬럼명
+                tb = tb.rename(columns={"group1":"group1","group2":"group2","reject":"reject","p-adj":"p-adj"})
+                if "p-adj" not in tb.columns:
+                    # statsmodels 버전에 따라 p-adj가 없을 수 있음 → 계산 불가 시 NaN
+                    tb["p-adj"] = np.nan
+                return tb
 
-            ordered = list(means.index)  # 이미 바깥에서 정렬되어 들어오는 것을 전제
-            def is_ns(a, b):
-                return ns_map.get(key(a,b), False)  # 무정보는 False(=유의)로 처리해 과도한 병합 방지
+            def conover_friedman(df_block_rule: pd.DataFrame, alpha: float = 0.05):
+                """
+                Friedman 유의 후 사후검정:
+                1순위: Conover + Holm (scikit-posthocs)
+                실패 시: Nemenyi (fallback)
+                항상 (posthoc_df, err_msg) 튜플을 반환.
+                """
+                import numpy as np
+                import pandas as pd
+                try:
+                    import scikit_posthocs as sp
+                except Exception as e:
+                    return pd.DataFrame(), f"scikit-posthocs 가져오기 실패: {e}"
 
-            letters = {}
-            current_letter = "A"
-            current_members = [ordered[0]]
-            letters[ordered[0]] = current_letter
+                # 공통: wide → long 변환 함수
+                def _wide_to_long(ph_wide: pd.DataFrame) -> pd.DataFrame:
+                    tmp = ph_wide.copy()
+                    # 인덱스 이름 보정
+                    if tmp.index.name is None:
+                        tmp.index.name = "group1"
+                    long = tmp.reset_index().melt(id_vars=tmp.index.name, var_name="group2", value_name="p-adj")
+                    long = long[long["group1"] < long["group2"]].reset_index(drop=True)
+                    long["reject"] = long["p-adj"] < alpha
+                    return long
 
-            for g in ordered[1:]:
-                # 현재 그룹의 모든 멤버와 비유의이면 같은 레터 유지
-                if all(is_ns(g, m) for m in current_members):
-                    letters[g] = current_letter
-                    current_members.append(g)
+                # 1) Conover + Holm
+                try:
+                    ph = sp.posthoc_conover_friedman(df_block_rule, p_adjust='holm')
+                    return _wide_to_long(ph), None
+                except Exception as e1:
+                    # 2) Nemenyi fallback
+                    try:
+                        ph2 = sp.posthoc_nemenyi_friedman(df_block_rule)
+                        msg = f"Conover 실패로 Nemenyi로 대체: {e1}"
+                        return _wide_to_long(ph2), msg
+                    except Exception as e2:
+                        return pd.DataFrame(), f"Conover/Nemenyi 모두 실패: {e1} / {e2}"
+
+            def cld_from_pairs(means: pd.Series, pair_tbl: pd.DataFrame, alpha=0.05):
+                """
+                단조(monotone) CLD: 정렬된 means 순서에서 위→아래로 내려오며
+                현재 그룹의 모든 멤버와 '비유의'일 때만 같은 레터를 부여.
+                하나라도 '유의'면 다음 레터로 넘어감.
+                - means: index=그룹명(룰), values=사후검정과 같은 스케일에서의 평균
+                        (RCBD면 y_adj 평균으로 정렬 권장; 아래 적용부 참조)
+                - pair_tbl: columns 중 ['group1','group2']와 ['reject'] 또는 ['p-adj'] 포함
+                결과: 각 그룹당 단일 레터(A,B,C,...) — 지그재그 방지, 구간형 묶음 보장.
+                """
+                # 빈 테이블이면 전부 A
+                if pair_tbl is None or pair_tbl.empty or len(means) <= 1:
+                    return pd.DataFrame({"rule": means.index, "mean": means.values, "CLD": ["A"]*len(means)})
+
+                ph = pair_tbl.copy()
+                # 비유의 여부 계산
+                if "reject" in ph.columns:
+                    ph["ns"] = ~ph["reject"].astype(bool)
                 else:
-                    # 다음 레터로 진행(단조 증가)
-                    nxt = ord(current_letter) + 1
-                    current_letter = chr(nxt) if nxt <= ord('Z') else current_letter  # Z 초과면 Z 유지
-                    letters[g] = current_letter
-                    current_members = [g]
+                    ph["ns"] = ph["p-adj"] >= alpha
 
-            return pd.DataFrame({
-                "rule": ordered,
-                "mean": [means[g] for g in ordered],
-                "CLD":  [letters[g] for g in ordered],
-            })
-        def _series_1d(obj) -> pd.Series:
-            """DataFrame/Series/ndarray/리스트 등 무엇이 와도 1D Series(float)로 강제."""
-            if isinstance(obj, pd.DataFrame):
-                s = obj.iloc[:, 0]
-            elif isinstance(obj, pd.Series):
-                s = obj
-            else:
-                s = pd.Series(obj)
-            return pd.to_numeric(s.astype(float), errors="coerce")
+                # 빠른 조회용 dict: (a,b)->비유의(True/False), 무정보는 보수적으로 '유의' 취급
+                key = lambda a,b: tuple(sorted((a,b)))
+                ns_map = { key(r["group1"], r["group2"]): bool(r["ns"]) for _, r in ph.iterrows() }
 
-        def _make_dd_work(df: pd.DataFrame, yvar: str) -> pd.DataFrame:
-            """
-            사후검정용 워크 테이블을 항상 'rule' + '__y__' 2컬럼으로 생성.
-            - df[yvar]가 DataFrame이어도 1열만 취함(1D 강제)
-            - '__y__'는 pingouin/Tukey 등에서 dv/종속변수명으로 사용
-            """
-            y_s = _series_1d(df.loc[:, yvar])
-            return pd.DataFrame({"rule": df["rule"].values, "__y__": y_s.values})
+                ordered = list(means.index)  # 이미 바깥에서 정렬되어 들어오는 것을 전제
+                def is_ns(a, b):
+                    return ns_map.get(key(a,b), False)  # 무정보는 False(=유의)로 처리해 과도한 병합 방지
 
+                letters = {}
+                current_letter = "A"
+                current_members = [ordered[0]]
+                letters[ordered[0]] = current_letter
 
-        if not rpath:
-            st.caption(f"raw 파일(results_{coord}.txt)을 찾지 못해 ANOVA를 수행하지 않습니다.")
-        else:
-            dfraw = parse_raw_results(rpath)  # 반드시 long 형식
-            if dfraw.empty:
-                st.caption("raw 파싱 결과가 비어 있습니다. 파일 형식을 확인해 주세요.")
-            else:
-                metric = st.selectbox("Metric", ["Reward","Time","PDR","Reward_woG","PDR_woG"], index=0)
-                d = dfraw[dfraw["metric"] == metric].copy()
-                if d.empty:
-                    st.warning("선택한 지표에 해당하는 데이터가 없습니다.")
-                else:
-                    # 변환
-                    # (요청 반영) Time은 원척도, PDR은 logit 선택 가능, Reward는 원척도
-                    if metric == "Time":
-                        trans_opts, trans_idx = ["없음"], 0
-                    elif metric.startswith("PDR"):
-                        trans_opts, trans_idx = ["없음","logit(PDR)"], 1   # 기본 logit
-                    else:  # Reward, Reward_woG
-                        trans_opts, trans_idx = ["없음"], 0
-
-                    trans = st.selectbox("변환", trans_opts, index=trans_idx)
-                    yvar = "value"; eps = 1e-6
-
-                    if trans == "logit(PDR)":
-                        d[yvar] = np.log((d[yvar]+eps)/(1-d[yvar]+eps)); st.caption("PDR에 logit 변환 적용.")
-                    # (Time/Reward는 변환 없음)
-
-                    if "rule" not in d.columns:
-                        d["rule"] = d[["Phase","RedPolicy","RedAction","YellowAction"]].agg(", ".join, axis=1)
-
-                    mode = st.radio("분석 유형", ["One-way(룰만)","One-way + 블록(run) (RCBD 권장)","4요인 Full-factorial"],
-                                    index=1, horizontal=True)
-
-                    if not HAS_SM:
-                        st.warning("statsmodels 미설치로 ANOVA를 실행할 수 없습니다. `pip install statsmodels` 후 재시도하세요.")
+                for g in ordered[1:]:
+                    # 현재 그룹의 모든 멤버와 비유의이면 같은 레터 유지
+                    if all(is_ns(g, m) for m in current_members):
+                        letters[g] = current_letter
+                        current_members.append(g)
                     else:
-                        import statsmodels.api as sm
-                        import statsmodels.formula.api as smf
-                        from scipy import stats as sps
+                        # 다음 레터로 진행(단조 증가)
+                        nxt = ord(current_letter) + 1
+                        current_letter = chr(nxt) if nxt <= ord('Z') else current_letter  # Z 초과면 Z 유지
+                        letters[g] = current_letter
+                        current_members = [g]
 
-                        # 모형 적합
-                        if mode == "One-way(룰만)":
-                            formula = f"{yvar} ~ C(rule)"
-                            st.caption("모형: value ~ C(rule)")
-                        elif mode == "One-way + 블록(run) (RCBD 권장)":
-                            formula = f"{yvar} ~ C(rule) + C(run)"
-                            st.caption("모형: value ~ C(rule) + C(run)  (run=블록)")
+                return pd.DataFrame({
+                    "rule": ordered,
+                    "mean": [means[g] for g in ordered],
+                    "CLD":  [letters[g] for g in ordered],
+                })
+            def _series_1d(obj) -> pd.Series:
+                """DataFrame/Series/ndarray/리스트 등 무엇이 와도 1D Series(float)로 강제."""
+                if isinstance(obj, pd.DataFrame):
+                    s = obj.iloc[:, 0]
+                elif isinstance(obj, pd.Series):
+                    s = obj
+                else:
+                    s = pd.Series(obj)
+                return pd.to_numeric(s.astype(float), errors="coerce")
+
+            def _make_dd_work(df: pd.DataFrame, yvar: str) -> pd.DataFrame:
+                """
+                사후검정용 워크 테이블을 항상 'rule' + '__y__' 2컬럼으로 생성.
+                - df[yvar]가 DataFrame이어도 1열만 취함(1D 강제)
+                - '__y__'는 pingouin/Tukey 등에서 dv/종속변수명으로 사용
+                """
+                y_s = _series_1d(df.loc[:, yvar])
+                return pd.DataFrame({"rule": df["rule"].values, "__y__": y_s.values})
+
+
+            if not rpath:
+                st.caption(f"raw 파일(results_{coord}.txt)을 찾지 못해 ANOVA를 수행하지 않습니다.")
+            else:
+                dfraw = parse_raw_results(rpath)  # 반드시 long 형식
+                if dfraw.empty:
+                    st.caption("raw 파싱 결과가 비어 있습니다. 파일 형식을 확인해 주세요.")
+                else:
+                    metric = st.selectbox("Metric", ["Reward","Time","PDR","Reward_woG","PDR_woG"], index=0)
+                    d = dfraw[dfraw["metric"] == metric].copy()
+                    if d.empty:
+                        st.warning("선택한 지표에 해당하는 데이터가 없습니다.")
+                    else:
+                        # 변환
+                        # (요청 반영) Time은 원척도, PDR은 logit 선택 가능, Reward는 원척도
+                        if metric == "Time":
+                            trans_opts, trans_idx = ["없음"], 0
+                        elif metric.startswith("PDR"):
+                            trans_opts, trans_idx = ["없음","logit(PDR)"], 1   # 기본 logit
+                        else:  # Reward, Reward_woG
+                            trans_opts, trans_idx = ["없음"], 0
+
+                        trans = st.selectbox("변환", trans_opts, index=trans_idx)
+                        yvar = "value"; eps = 1e-6
+
+                        if trans == "logit(PDR)":
+                            d[yvar] = np.log((d[yvar]+eps)/(1-d[yvar]+eps)); st.caption("PDR에 logit 변환 적용.")
+                        # (Time/Reward는 변환 없음)
+
+                        if "rule" not in d.columns:
+                            d["rule"] = d[["Phase","RedPolicy","RedAction","YellowAction"]].agg(", ".join, axis=1)
+
+                        mode = st.radio("분석 유형", ["One-way(룰만)","One-way + 블록(run) (RCBD 권장)","4요인 Full-factorial"],
+                                        index=1, horizontal=True)
+
+                        if not HAS_SM:
+                            st.warning("statsmodels 미설치로 ANOVA를 실행할 수 없습니다. `pip install statsmodels` 후 재시도하세요.")
                         else:
-                            formula = f"{yvar} ~ C(Phase)*C(RedPolicy)*C(RedAction)*C(YellowAction)"
-                            st.caption("모형: value ~ Phase*RedPolicy*RedAction*YellowAction")
+                            import statsmodels.api as sm
+                            import statsmodels.formula.api as smf
+                            from scipy import stats as sps
 
-                        model = smf.ols(formula, data=d).fit()
-                        anova_tbl = sm.stats.anova_lm(model, typ=2)
+                            # 모형 적합
+                            if mode == "One-way(룰만)":
+                                formula = f"{yvar} ~ C(rule)"
+                                st.caption("모형: value ~ C(rule)")
+                            elif mode == "One-way + 블록(run) (RCBD 권장)":
+                                formula = f"{yvar} ~ C(rule) + C(run)"
+                                st.caption("모형: value ~ C(rule) + C(run)  (run=블록)")
+                            else:
+                                formula = f"{yvar} ~ C(Phase)*C(RedPolicy)*C(RedAction)*C(YellowAction)"
+                                st.caption("모형: value ~ Phase*RedPolicy*RedAction*YellowAction")
 
-                        # Total 포함 + η²
-                        out = make_total_row(anova_tbl, d[yvar])
-                        st.dataframe(out, width='stretch')
+                            model = smf.ols(formula, data=d).fit()
+                            anova_tbl = sm.stats.anova_lm(model, typ=2)
 
-                        # 유의한 주효과(룰 등) 요약
-                        alpha = st.slider("유의수준(alpha)", 0.001, 0.1, 0.05, 0.001)
-                        sig = out[(out.index!="Total") & (out["PR(>F)"] < alpha)].sort_values("PR(>F)")
-                        if not sig.empty:
-                            st.markdown("##### 📌 해석 요약")
-                            st.markdown("\n".join([f"- **{idx}**: p={r['PR(>F)']:.3g}, η²={r['eta_sq']:.3f}" 
-                                                for idx, r in sig.iterrows()]))
-                        else:
-                            st.caption("유의한 효과가 발견되지 않았습니다.")
-                        st.caption(f"모형 적합도: R²={model.rsquared:.3f}, Adj.R²={model.rsquared_adj:.3f}")
+                            # Total 포함 + η²
+                            out = make_total_row(anova_tbl, d[yvar])
+                            st.dataframe(out, width='stretch')
 
-                        # 잔차 진단
-                        st.markdown("##### 잔차 진단")
-                        resid = model.resid
-                        if len(resid) >= 3:
-                            try:
-                                W, p_shap = (sps.shapiro(resid.sample(min(len(resid), 500), random_state=0))
-                                            if len(resid) > 500 else sps.shapiro(resid))
-                                st.write(f"Shapiro-Wilk: W={W:.4f}, p={p_shap:.3g}")
-                            except Exception as e:
-                                p_shap = 1.0; st.caption(f"Shapiro-Wilk 계산 실패: {e}")
-                        else:
-                            p_shap = 1.0
+                            # 유의한 주효과(룰 등) 요약
+                            alpha = st.slider("유의수준(alpha)", 0.001, 0.1, 0.05, 0.001)
+                            sig = out[(out.index!="Total") & (out["PR(>F)"] < alpha)].sort_values("PR(>F)")
+                            if not sig.empty:
+                                st.markdown("##### 📌 해석 요약")
+                                st.markdown("\n".join([f"- **{idx}**: p={r['PR(>F)']:.3g}, η²={r['eta_sq']:.3f}" 
+                                                    for idx, r in sig.iterrows()]))
+                            else:
+                                st.caption("유의한 효과가 발견되지 않았습니다.")
+                            st.caption(f"모형 적합도: R²={model.rsquared:.3f}, Adj.R²={model.rsquared_adj:.3f}")
+
+                            # 잔차 진단
+                            st.markdown("##### 잔차 진단")
+                            resid = model.resid
+                            if len(resid) >= 3:
+                                try:
+                                    W, p_shap = (sps.shapiro(resid.sample(min(len(resid), 500), random_state=0))
+                                                if len(resid) > 500 else sps.shapiro(resid))
+                                    st.write(f"Shapiro-Wilk: W={W:.4f}, p={p_shap:.3g}")
+                                except Exception as e:
+                                    p_shap = 1.0; st.caption(f"Shapiro-Wilk 계산 실패: {e}")
+                            else:
+                                p_shap = 1.0
                     
-                        qq = sps.probplot(resid, dist="norm")
-                        qq_df = pd.DataFrame({"Theoretical": qq[0][0], "Residual": np.sort(resid)})
-                        st.altair_chart(alt.Chart(qq_df).mark_point().encode(x="Theoretical:Q", y="Residual:Q").properties(height=280), use_container_width=True)
-                        st.altair_chart(alt.Chart(pd.DataFrame({"resid": resid})).mark_bar().encode(x=alt.X("resid:Q", bin=alt.Bin(maxbins=40)), y="count()").properties(height=200), use_container_width=True)
+                            qq = sps.probplot(resid, dist="norm")
+                            qq_df = pd.DataFrame({"Theoretical": qq[0][0], "Residual": np.sort(resid)})
+                            st.altair_chart(alt.Chart(qq_df).mark_point().encode(x="Theoretical:Q", y="Residual:Q").properties(height=280), use_container_width=True)
+                            st.altair_chart(alt.Chart(pd.DataFrame({"resid": resid})).mark_bar().encode(x=alt.X("resid:Q", bin=alt.Bin(maxbins=40)), y="count()").properties(height=200), use_container_width=True)
                         
 
-                        # 등분산(룰 기준). RCBD면 블록-잔차화 값으로 검사
-                        try:
-                            if mode.startswith("One-way"):
-                                df_lev = d
-                            else:
-                                df_lev = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
-                            groups = [g[yvar].values for _, g in df_lev.groupby("rule")]
-                            p_lev = sps.levene(*groups, center="median").pvalue
-                            st.write(f"Levene(Brown–Forsythe): p={p_lev:.3g}")
-                        except Exception:
-                            p_lev = np.nan
-
-                        # p_shap, p_lev 계산부 바로 다음에 추가
-                        p_shap = _scalar(p_shap, default=1.0)  # 실패 시 '정규성 통과' 쪽으로
-                        p_lev  = _scalar(p_lev,  default=np.nan)
-                        alpha  = _scalar(alpha,  default=0.05)
-
-                        # ===== 사후검정 & CLD =====
-                        st.markdown("##### 사후검정")
-                        posthoc = pd.DataFrame(); explain = ""
-
-                        def _small_is_better(m: str) -> bool:
-                            # Time, PDR(woG 포함)=작을수록 좋음 / Reward류=클수록 좋음
-                            return (m == "Time") or m.startswith("PDR")
-
-                        # --- 사후검정 입력과 CLD용 평균(Series) 확정 ---
-                        if mode == "One-way + 블록(run) (RCBD 권장)":
-                            dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
-                            dd_work = _make_dd_work(dd, yvar)               # ▶ 분석 컬럼을 '__y__'로 1D 보장
-                            y_post  = dd_work["__y__"]
-                            grp_post= dd_work["rule"]
-                            means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
-                                ascending=_small_is_better(metric)
-                            )
-                            # Levene도 dd_work 기반으로 (더 안전)
-                            lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
-                        else:
-                            dd_work = _make_dd_work(d, yvar)                # ▶ One-way도 동일하게 1D 보장
-                            y_post  = dd_work["__y__"]
-                            grp_post= dd_work["rule"]
-                            means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
-                                ascending=_small_is_better(metric)
-                            )
-                            lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
-
-                        try:
-                            if len(lev_groups) >= 2 and all(len(x) > 1 for x in lev_groups):
-                                p_lev = sps.levene(*lev_groups, center="median").pvalue
-                            else:
-                                p_lev = np.nan
-                            st.write(f"Levene(Brown–Forsythe): p={_scalar(p_lev):.3g}")
-                        except Exception:
-                            p_lev = np.nan
-
-
-                        # --- 사후검정 분기 ---
-                        if (p_shap >= alpha) and (np.isnan(p_lev) or p_lev >= alpha):
-                            # 정규 + 등분산 → Tukey
+                            # 등분산(룰 기준). RCBD면 블록-잔차화 값으로 검사
                             try:
-                                posthoc = tukey_table(y_post, grp_post, alpha=alpha)
-                                explain = "Tukey HSD"
-                            except Exception as e:
-                                st.warning(f"Tukey 실패: {e}")
-                        elif (p_shap >= alpha) and (not np.isnan(p_lev) and p_lev < alpha):
-                            # 정규 + 이분산 → Games–Howell (fallback Welch+Holm)
-                            try:
-                                import pingouin as pg
-                                # RCBD면 y_post는 이미 y*, grp_post는 rule
-                                gh = pg.pairwise_gameshowell(dv=yvar if not mode.startswith("One-way + 블록") else yvar,
-                                                            between="rule", data=(dd if mode.startswith("One-way + 블록") else d))
-                                posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
-                                posthoc["reject"] = posthoc["p-adj"] < alpha
-                                explain = "Games–Howell"
-                            except Exception:
-                                posthoc = games_howell_fallback(pd.DataFrame({"rule": grp_post, "y": y_post}), "rule", "y", alpha=alpha)
-                                explain = "Welch t-tests + Holm (fallback)"
-                        else:
-                            # 비정규 → Friedman(+Conover)
-                            try:
-                                piv = d.pivot_table(index="run", columns="rule", values=yvar, aggfunc="mean")
-                                stat, p_f = sps.friedmanchisquare(*[piv[c].dropna().values for c in piv.columns])
-                                st.write(f"Friedman χ²={stat:.3g}, p={p_f:.3g}")
-                                if p_f < alpha:
-                                    ph_long, err = conover_friedman(piv, alpha=alpha)
-                                    if ph_long.empty:
-                                        st.warning(f"사후검정 실패: {err}")
-                                    else:
-                                        posthoc = ph_long
-                                        explain = "Conover post-hoc after Friedman (Holm-adjusted)"
-                                        if err:  # Nemenyi로 대체된 경우 안내
-                                            st.caption(err)
+                                if mode.startswith("One-way"):
+                                    df_lev = d
                                 else:
-                                    posthoc = pd.DataFrame()
-                                    explain = "Friedman 비유의 → 사후검정 생략"
-                            except Exception as e:
-                                st.warning(f"Friedman/사후검정 실패: {e}")
+                                    df_lev = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
+                                groups = [g[yvar].values for _, g in df_lev.groupby("rule")]
+                                p_lev = sps.levene(*groups, center="median").pvalue
+                                st.write(f"Levene(Brown–Forsythe): p={p_lev:.3g}")
+                            except Exception:
+                                p_lev = np.nan
 
-                        # --- 결과 출력 & CLD ---
-                        if not posthoc.empty:
-                            st.caption(explain)
-                            st.dataframe(posthoc, width='stretch')
+                            # p_shap, p_lev 계산부 바로 다음에 추가
+                            p_shap = _scalar(p_shap, default=1.0)  # 실패 시 '정규성 통과' 쪽으로
+                            p_lev  = _scalar(p_lev,  default=np.nan)
+                            alpha  = _scalar(alpha,  default=0.05)
 
-                            ph = posthoc.copy()
-                            if ("p-adj" not in ph.columns) and ("reject" not in ph.columns):
-                                st.info("CLD를 만들기 위한 p값 정보가 없습니다.")
+                            # ===== 사후검정 & CLD =====
+                            st.markdown("##### 사후검정")
+                            posthoc = pd.DataFrame(); explain = ""
+
+                            def _small_is_better(m: str) -> bool:
+                                # Time, PDR(woG 포함)=작을수록 좋음 / Reward류=클수록 좋음
+                                return (m == "Time") or m.startswith("PDR")
+
+                            # --- 사후검정 입력과 CLD용 평균(Series) 확정 ---
+                            if mode == "One-way + 블록(run) (RCBD 권장)":
+                                dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
+                                dd_work = _make_dd_work(dd, yvar)               # ▶ 분석 컬럼을 '__y__'로 1D 보장
+                                y_post  = dd_work["__y__"]
+                                grp_post= dd_work["rule"]
+                                means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
+                                    ascending=_small_is_better(metric)
+                                )
+                                # Levene도 dd_work 기반으로 (더 안전)
+                                lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
                             else:
-                                cld = cld_from_pairs(means_for_cld, ph, alpha=alpha)
-                                st.markdown("##### CLD (동일 문자=유의차 없음, A=최상위)")
-                                st.dataframe(cld, width='stretch')
+                                dd_work = _make_dd_work(d, yvar)                # ▶ One-way도 동일하게 1D 보장
+                                y_post  = dd_work["__y__"]
+                                grp_post= dd_work["rule"]
+                                means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
+                                    ascending=_small_is_better(metric)
+                                )
+                                lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
 
-                                # 최종 후보(‘A’ 그룹) — 지표 방향에 맞춰 정렬
-                                st.markdown(f"#### ✅ 최종 후보(**{metric} 기준 A=Best**)")
-                                top = cld[cld["CLD"]=="A"].sort_values("mean", ascending=_small_is_better(metric))
-                                st.dataframe(top, width='stretch')
+                            try:
+                                if len(lev_groups) >= 2 and all(len(x) > 1 for x in lev_groups):
+                                    p_lev = sps.levene(*lev_groups, center="median").pvalue
+                                else:
+                                    p_lev = np.nan
+                                st.write(f"Levene(Brown–Forsythe): p={_scalar(p_lev):.3g}")
+                            except Exception:
+                                p_lev = np.nan
 
-                                # ================== A그룹 교집합 (Reward ∩ Time ∩ PDR, RCBD 기준) ==================구해도 좋습니다.")
-                                st.markdown("### 🔗 A그룹 교집합 (Reward ∩ Time(작은순) ∩ PDR(작은순), RCBD)")
 
-                                def _prep_metric(dfraw_all: pd.DataFrame, metric_name: str):
-                                    """raw(long)에서 metric 행 추출 + rule 컬럼 보정."""
-                                    dsub = dfraw_all[dfraw_all["metric"] == metric_name].copy()
-                                    if dsub.empty:
-                                        return pd.DataFrame()
-                                    if "rule" not in dsub.columns:
-                                        dsub["rule"] = dsub[["Phase","RedPolicy","RedAction","YellowAction"]].agg(", ".join, axis=1)
-                                    return dsub
-
-                                def _transform_for_metric(d: pd.DataFrame, metric_name: str, eps: float = 1e-6):
-                                    """
-                                    변환 스케일:
-                                    - PDR(woG 포함): logit
-                                    - Time, Reward(woG 포함): 원척도
-                                    """
-                                    d = d.copy(); yvar = "value"
-                                    if metric_name.startswith("PDR"):
-                                        d[yvar] = np.log((d[yvar] + eps)/(1 - d[yvar] + eps))  # logit
-                                        scale = "logit"
-                                    else:
-                                        scale = "original"
-                                    return d, yvar, scale
-
-                                def _rcbd_posthoc_cld(d: pd.DataFrame, yvar: str, alpha: float = 0.05, prefer_small_is_A: bool = False):
-                                    """
-                                    RCBD: y ~ C(rule) + C(run)
-                                    사후: (정규&등분산)Tukey / (정규&이분산)Games-Howell(없으면 Welch+Holm)
-                                        / (비정규)Friedman→Conover(없으면 Nemenyi)
-                                    CLD: cld_from_pairs(단조 레터) — 정렬은 y* 평균 기준.
-                                    prefer_small_is_A=True  → y* 평균 오름차순(A=작은 값=Best)
-                                    prefer_small_is_A=False → y* 평균 내림차순(A=큰 값=Best)
-                                    """
-                                    import statsmodels.formula.api as smf
-                                    from scipy import stats as sps
-
-                                    # ✅ 항상 초기화 (UnboundLocal 방지)
-                                    posthoc = pd.DataFrame()
-                                    explain = ""
-
-                                    # --- RCBD 적합 & 잔차 정규성
-                                    model = smf.ols(f"{yvar} ~ C(rule) + C(run)", data=d).fit()
-                                    resid = model.resid
-                                    try:
-                                        if len(resid) > 500:
-                                            _, p_shap = sps.shapiro(resid.sample(500, random_state=0))
+                            # --- 사후검정 분기 ---
+                            if (p_shap >= alpha) and (np.isnan(p_lev) or p_lev >= alpha):
+                                # 정규 + 등분산 → Tukey
+                                try:
+                                    posthoc = tukey_table(y_post, grp_post, alpha=alpha)
+                                    explain = "Tukey HSD"
+                                except Exception as e:
+                                    st.warning(f"Tukey 실패: {e}")
+                            elif (p_shap >= alpha) and (not np.isnan(p_lev) and p_lev < alpha):
+                                # 정규 + 이분산 → Games–Howell (fallback Welch+Holm)
+                                try:
+                                    import pingouin as pg
+                                    # RCBD면 y_post는 이미 y*, grp_post는 rule
+                                    gh = pg.pairwise_gameshowell(dv=yvar if not mode.startswith("One-way + 블록") else yvar,
+                                                                between="rule", data=(dd if mode.startswith("One-way + 블록") else d))
+                                    posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
+                                    posthoc["reject"] = posthoc["p-adj"] < alpha
+                                    explain = "Games–Howell"
+                                except Exception:
+                                    posthoc = games_howell_fallback(pd.DataFrame({"rule": grp_post, "y": y_post}), "rule", "y", alpha=alpha)
+                                    explain = "Welch t-tests + Holm (fallback)"
+                            else:
+                                # 비정규 → Friedman(+Conover)
+                                try:
+                                    piv = d.pivot_table(index="run", columns="rule", values=yvar, aggfunc="mean")
+                                    stat, p_f = sps.friedmanchisquare(*[piv[c].dropna().values for c in piv.columns])
+                                    st.write(f"Friedman χ²={stat:.3g}, p={p_f:.3g}")
+                                    if p_f < alpha:
+                                        ph_long, err = conover_friedman(piv, alpha=alpha)
+                                        if ph_long.empty:
+                                            st.warning(f"사후검정 실패: {err}")
                                         else:
-                                            _, p_shap = sps.shapiro(resid)
-                                    except Exception:
-                                        p_shap = 1.0
-                                    # 스칼라화
-                                    p_shap = float(np.asarray(p_shap).ravel()[0])
-
-                                    # --- 블록-잔차화한 y*로 사후검정 입력 만들기(1D 보장)
-                                    dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
-                                    dd_work = _make_dd_work(dd, yvar)                # ▶ '__y__' 1D 보장
-                                    y_post, grp_post = dd_work["__y__"], dd_work["rule"]
-                                    means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
-                                        ascending=prefer_small_is_A
-                                    )
-
-                                    # --- 등분산(Levene) — dd_work 기준으로 재계산
-                                    try:
-                                        lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
-                                        if len(lev_groups) >= 2 and all(len(x) > 1 for x in lev_groups):
-                                            p_lev = sps.levene(*lev_groups, center="median").pvalue
-                                        else:
-                                            p_lev = np.nan
-                                    except Exception:
-                                        p_lev = np.nan
-
-                                    # --- 사후검정 분기
-                                    if (p_shap >= alpha) and (np.isnan(p_lev) or p_lev >= alpha):
-                                        # 정규 + 등분산 → Tukey
-                                        try:
-                                            posthoc = tukey_table(y_post, grp_post, alpha=alpha)
-                                            explain = "Tukey HSD (RCBD, y*)"
-                                        except Exception as e:
-                                            explain = f"Tukey 실패: {e}"
-
-                                    elif (p_shap >= alpha) and (not np.isnan(p_lev) and p_lev < alpha):
-                                        # 정규 + 이분산 → Games–Howell (없으면 Welch+Holm)
-                                        try:
-                                            import pingouin as pg
-                                            gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
-                                            posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
-                                            posthoc["reject"] = posthoc["p-adj"] < alpha
-                                            explain = "Games–Howell (RCBD, y*)"
-                                        except Exception:
-                                            posthoc = games_howell_fallback(
-                                                pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
-                                                "rule", "y", alpha=alpha
-                                            )
-                                            explain = "Welch t-tests + Holm (fallback, RCBD, y*)"
-
+                                            posthoc = ph_long
+                                            explain = "Conover post-hoc after Friedman (Holm-adjusted)"
+                                            if err:  # Nemenyi로 대체된 경우 안내
+                                                st.caption(err)
                                     else:
-                                        # 비정규 → Friedman(+Conover/Nemenyi)
+                                        posthoc = pd.DataFrame()
+                                        explain = "Friedman 비유의 → 사후검정 생략"
+                                except Exception as e:
+                                    st.warning(f"Friedman/사후검정 실패: {e}")
+
+                            # --- 결과 출력 & CLD ---
+                            if not posthoc.empty:
+                                st.caption(explain)
+                                st.dataframe(posthoc, width='stretch')
+
+                                ph = posthoc.copy()
+                                if ("p-adj" not in ph.columns) and ("reject" not in ph.columns):
+                                    st.info("CLD를 만들기 위한 p값 정보가 없습니다.")
+                                else:
+                                    cld = cld_from_pairs(means_for_cld, ph, alpha=alpha)
+                                    st.markdown("##### CLD (동일 문자=유의차 없음, A=최상위)")
+                                    st.dataframe(cld, width='stretch')
+
+                                    # 최종 후보(‘A’ 그룹) — 지표 방향에 맞춰 정렬
+                                    st.markdown(f"#### ✅ 최종 후보(**{metric} 기준 A=Best**)")
+                                    top = cld[cld["CLD"]=="A"].sort_values("mean", ascending=_small_is_better(metric))
+                                    st.dataframe(top, width='stretch')
+
+                                    # ================== A그룹 교집합 (Reward ∩ Time ∩ PDR, RCBD 기준) ==================구해도 좋습니다.")
+                                    st.markdown("### 🔗 A그룹 교집합 (Reward ∩ Time(작은순) ∩ PDR(작은순), RCBD)")
+
+                                    def _prep_metric(dfraw_all: pd.DataFrame, metric_name: str):
+                                        """raw(long)에서 metric 행 추출 + rule 컬럼 보정."""
+                                        dsub = dfraw_all[dfraw_all["metric"] == metric_name].copy()
+                                        if dsub.empty:
+                                            return pd.DataFrame()
+                                        if "rule" not in dsub.columns:
+                                            dsub["rule"] = dsub[["Phase","RedPolicy","RedAction","YellowAction"]].agg(", ".join, axis=1)
+                                        return dsub
+
+                                    def _transform_for_metric(d: pd.DataFrame, metric_name: str, eps: float = 1e-6):
+                                        """
+                                        변환 스케일:
+                                        - PDR(woG 포함): logit
+                                        - Time, Reward(woG 포함): 원척도
+                                        """
+                                        d = d.copy(); yvar = "value"
+                                        if metric_name.startswith("PDR"):
+                                            d[yvar] = np.log((d[yvar] + eps)/(1 - d[yvar] + eps))  # logit
+                                            scale = "logit"
+                                        else:
+                                            scale = "original"
+                                        return d, yvar, scale
+
+                                    def _rcbd_posthoc_cld(d: pd.DataFrame, yvar: str, alpha: float = 0.05, prefer_small_is_A: bool = False):
+                                        """
+                                        RCBD: y ~ C(rule) + C(run)
+                                        사후: (정규&등분산)Tukey / (정규&이분산)Games-Howell(없으면 Welch+Holm)
+                                            / (비정규)Friedman→Conover(없으면 Nemenyi)
+                                        CLD: cld_from_pairs(단조 레터) — 정렬은 y* 평균 기준.
+                                        prefer_small_is_A=True  → y* 평균 오름차순(A=작은 값=Best)
+                                        prefer_small_is_A=False → y* 평균 내림차순(A=큰 값=Best)
+                                        """
+                                        import statsmodels.formula.api as smf
+                                        from scipy import stats as sps
+
+                                        # ✅ 항상 초기화 (UnboundLocal 방지)
+                                        posthoc = pd.DataFrame()
+                                        explain = ""
+
+                                        # --- RCBD 적합 & 잔차 정규성
+                                        model = smf.ols(f"{yvar} ~ C(rule) + C(run)", data=d).fit()
+                                        resid = model.resid
                                         try:
-                                            piv = d.pivot_table(index="run", columns="rule", values=yvar, aggfunc="mean")
-                                            stat, p_f = sps.friedmanchisquare(*[piv[c].dropna().values for c in piv.columns])
-                                            if p_f < alpha:
-                                                ph_long, err = conover_friedman(piv, alpha=alpha)
-                                                if not ph_long.empty:
-                                                    posthoc = ph_long
-                                                    explain = "Conover (Holm) after Friedman" + (f" · {err}" if err else "")
-                                                else:
-                                                    explain = f"사후검정 실패: {err}"
+                                            if len(resid) > 500:
+                                                _, p_shap = sps.shapiro(resid.sample(500, random_state=0))
                                             else:
-                                                explain = "Friedman 비유의 → 사후검정 생략"
-                                        except Exception as e:
-                                            explain = f"Friedman/사후검정 실패: {e}"
+                                                _, p_shap = sps.shapiro(resid)
+                                        except Exception:
+                                            p_shap = 1.0
+                                        # 스칼라화
+                                        p_shap = float(np.asarray(p_shap).ravel()[0])
 
-                                    # --- CLD 산출
-                                    if posthoc.empty or (("p-adj" not in posthoc.columns) and ("reject" not in posthoc.columns)):
-                                        return means_for_cld, pd.DataFrame(), explain
+                                        # --- 블록-잔차화한 y*로 사후검정 입력 만들기(1D 보장)
+                                        dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
+                                        dd_work = _make_dd_work(dd, yvar)                # ▶ '__y__' 1D 보장
+                                        y_post, grp_post = dd_work["__y__"], dd_work["rule"]
+                                        means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
+                                            ascending=prefer_small_is_A
+                                        )
 
-                                    cld = cld_from_pairs(means_for_cld, posthoc, alpha=alpha)
-                                    return means_for_cld, cld, explain
+                                        # --- 등분산(Levene) — dd_work 기준으로 재계산
+                                        try:
+                                            lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
+                                            if len(lev_groups) >= 2 and all(len(x) > 1 for x in lev_groups):
+                                                p_lev = sps.levene(*lev_groups, center="median").pvalue
+                                            else:
+                                                p_lev = np.nan
+                                        except Exception:
+                                            p_lev = np.nan
 
-                                with st.expander("🔍 A그룹 교집합 보기 (Reward↑, Time↓, PDR↓)", expanded=True):
-                                    alpha_int = st.slider("교집합 산출용 유의수준(alpha)", 0.001, 0.1, 0.05, 0.001, key="alpha_intersect_all")
-                                    alpha_int = float(alpha_int)   # 슬라이더 값 스칼라화
-                                    # --- Reward (클수록 A) ---
-                                    d_rew = _prep_metric(dfraw, "Reward")
-                                    if d_rew.empty:
-                                        st.info("Reward 데이터가 없습니다.")
-                                        A_rew, disp_rew = set(), pd.Series(dtype=float)
-                                    else:
-                                        d_rew_tr, y_rew, _ = _transform_for_metric(d_rew, "Reward")
-                                        means_rew, cld_rew, _ = _rcbd_posthoc_cld(d_rew_tr, y_rew, alpha=alpha_int, prefer_small_is_A=False)
-                                        A_rew = set(cld_rew.loc[cld_rew["CLD"]=="A","rule"]) if not cld_rew.empty else set()
-                                        disp_rew = d_rew.groupby("rule")["value"].mean().rename("Reward_mean(orig)")
+                                        # --- 사후검정 분기
+                                        if (p_shap >= alpha) and (np.isnan(p_lev) or p_lev >= alpha):
+                                            # 정규 + 등분산 → Tukey
+                                            try:
+                                                posthoc = tukey_table(y_post, grp_post, alpha=alpha)
+                                                explain = "Tukey HSD (RCBD, y*)"
+                                            except Exception as e:
+                                                explain = f"Tukey 실패: {e}"
 
-                                    # --- Time (작을수록 A) ---
-                                    d_time = _prep_metric(dfraw, "Time")
-                                    if d_time.empty:
-                                        st.info("Time 데이터가 없습니다.")
-                                        A_time, disp_time = set(), pd.Series(dtype=float)
-                                    else:
-                                        d_time_tr, y_time, _ = _transform_for_metric(d_time, "Time")
-                                        means_time, cld_time, _ = _rcbd_posthoc_cld(d_time_tr, y_time, alpha=alpha_int, prefer_small_is_A=True)
-                                        A_time = set(cld_time.loc[cld_time["CLD"]=="A","rule"]) if not cld_time.empty else set()
-                                        disp_time = d_time.groupby("rule")["value"].mean().rename("Time_mean(orig)")
+                                        elif (p_shap >= alpha) and (not np.isnan(p_lev) and p_lev < alpha):
+                                            # 정규 + 이분산 → Games–Howell (없으면 Welch+Holm)
+                                            try:
+                                                import pingouin as pg
+                                                gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
+                                                posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
+                                                posthoc["reject"] = posthoc["p-adj"] < alpha
+                                                explain = "Games–Howell (RCBD, y*)"
+                                            except Exception:
+                                                posthoc = games_howell_fallback(
+                                                    pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
+                                                    "rule", "y", alpha=alpha
+                                                )
+                                                explain = "Welch t-tests + Holm (fallback, RCBD, y*)"
 
-                                    # --- PDR (작을수록 A; logit 분석, 표시는 원척도 평균) ---
-                                    d_pdr = _prep_metric(dfraw, "PDR")
-                                    if d_pdr.empty:
-                                        st.info("PDR 데이터가 없습니다.")
-                                        A_pdr, disp_pdr = set(), pd.Series(dtype=float)
-                                    else:
-                                        d_pdr_tr, y_pdr, _ = _transform_for_metric(d_pdr, "PDR")
-                                        means_pdr, cld_pdr, _ = _rcbd_posthoc_cld(d_pdr_tr, y_pdr, alpha=alpha_int, prefer_small_is_A=True)
-                                        A_pdr = set(cld_pdr.loc[cld_pdr["CLD"]=="A","rule"]) if not cld_pdr.empty else set()
-                                        disp_pdr = d_pdr.groupby("rule")["value"].mean().rename("PDR_mean(orig)")
+                                        else:
+                                            # 비정규 → Friedman(+Conover/Nemenyi)
+                                            try:
+                                                piv = d.pivot_table(index="run", columns="rule", values=yvar, aggfunc="mean")
+                                                stat, p_f = sps.friedmanchisquare(*[piv[c].dropna().values for c in piv.columns])
+                                                if p_f < alpha:
+                                                    ph_long, err = conover_friedman(piv, alpha=alpha)
+                                                    if not ph_long.empty:
+                                                        posthoc = ph_long
+                                                        explain = "Conover (Holm) after Friedman" + (f" · {err}" if err else "")
+                                                    else:
+                                                        explain = f"사후검정 실패: {err}"
+                                                else:
+                                                    explain = "Friedman 비유의 → 사후검정 생략"
+                                            except Exception as e:
+                                                explain = f"Friedman/사후검정 실패: {e}"
 
-                                    # --- 집합 & 교집합 결과 표시 ---
-                                    st.markdown(f"- **A(Reward)**: {len(A_rew)}개, **A(Time)**: {len(A_time)}개, **A(PDR)**: {len(A_pdr)}개")
+                                        # --- CLD 산출
+                                        if posthoc.empty or (("p-adj" not in posthoc.columns) and ("reject" not in posthoc.columns)):
+                                            return means_for_cld, pd.DataFrame(), explain
 
-                                    inter_RT  = sorted(A_rew.intersection(A_time))
-                                    inter_RP  = sorted(A_rew.intersection(A_pdr))
-                                    inter_TP  = sorted(A_time.intersection(A_pdr))
-                                    inter_RTP = sorted(A_rew.intersection(A_time).intersection(A_pdr))
+                                        cld = cld_from_pairs(means_for_cld, posthoc, alpha=alpha)
+                                        return means_for_cld, cld, explain
 
-                                    def _show_table(title, rules):
-                                        st.markdown(f"**{title}** — {len(rules)}개")
-                                        if len(rules) == 0:
-                                            st.caption("해당 없음")
-                                            return
-                                        out = (pd.DataFrame({"rule": rules})
-                                                .merge(disp_rew, on="rule", how="left")
-                                                .merge(disp_time, on="rule", how="left")
-                                                .merge(disp_pdr, on="rule", how="left"))
-                                        # 정렬: 3중 교집합은 Reward↓(내림차순), tie-breaker로 Time↑, PDR↑
-                                        if "3중" in title:
-                                            out = out.sort_values(["Reward_mean(orig)", "Time_mean(orig)", "PDR_mean(orig)"],
-                                                                ascending=[False, True, True], kind="mergesort")
-                                        elif "Reward∩Time" in title:
-                                            out = out.sort_values(["Reward_mean(orig)", "Time_mean(orig)"],
-                                                                ascending=[False, True], kind="mergesort")
-                                        elif "Reward∩PDR" in title:
-                                            out = out.sort_values(["Reward_mean(orig)", "PDR_mean(orig)"],
-                                                                ascending=[False, True], kind="mergesort")
-                                        elif "Time∩PDR" in title:
-                                            out = out.sort_values(["Time_mean(orig)", "PDR_mean(orig)"],
-                                                                ascending=[True, True], kind="mergesort")
-                                        st.dataframe(out, width='stretch')
+                                    with st.expander("🔍 A그룹 교집합 보기 (Reward↑, Time↓, PDR↓)", expanded=True):
+                                        alpha_int = st.slider("교집합 산출용 유의수준(alpha)", 0.001, 0.1, 0.05, 0.001, key="alpha_intersect_all")
+                                        alpha_int = float(alpha_int)   # 슬라이더 값 스칼라화
+                                        # --- Reward (클수록 A) ---
+                                        d_rew = _prep_metric(dfraw, "Reward")
+                                        if d_rew.empty:
+                                            st.info("Reward 데이터가 없습니다.")
+                                            A_rew, disp_rew = set(), pd.Series(dtype=float)
+                                        else:
+                                            d_rew_tr, y_rew, _ = _transform_for_metric(d_rew, "Reward")
+                                            means_rew, cld_rew, _ = _rcbd_posthoc_cld(d_rew_tr, y_rew, alpha=alpha_int, prefer_small_is_A=False)
+                                            A_rew = set(cld_rew.loc[cld_rew["CLD"]=="A","rule"]) if not cld_rew.empty else set()
+                                            disp_rew = d_rew.groupby("rule")["value"].mean().rename("Reward_mean(orig)")
 
-                                    _show_table("3중 교집합 (Reward ∩ Time ∩ PDR)", inter_RTP)
-                                    _show_table("2중 교집합 (Reward∩Time)", inter_RT)
-                                    _show_table("2중 교집합 (Reward∩PDR)", inter_RP)
-                                    _show_table("2중 교집합 (Time∩PDR)", inter_TP)
+                                        # --- Time (작을수록 A) ---
+                                        d_time = _prep_metric(dfraw, "Time")
+                                        if d_time.empty:
+                                            st.info("Time 데이터가 없습니다.")
+                                            A_time, disp_time = set(), pd.Series(dtype=float)
+                                        else:
+                                            d_time_tr, y_time, _ = _transform_for_metric(d_time, "Time")
+                                            means_time, cld_time, _ = _rcbd_posthoc_cld(d_time_tr, y_time, alpha=alpha_int, prefer_small_is_A=True)
+                                            A_time = set(cld_time.loc[cld_time["CLD"]=="A","rule"]) if not cld_time.empty else set()
+                                            disp_time = d_time.groupby("rule")["value"].mean().rename("Time_mean(orig)")
 
-                        else:
-                            st.caption("사후검정 결과가 없습니다.")
+                                        # --- PDR (작을수록 A; logit 분석, 표시는 원척도 평균) ---
+                                        d_pdr = _prep_metric(dfraw, "PDR")
+                                        if d_pdr.empty:
+                                            st.info("PDR 데이터가 없습니다.")
+                                            A_pdr, disp_pdr = set(), pd.Series(dtype=float)
+                                        else:
+                                            d_pdr_tr, y_pdr, _ = _transform_for_metric(d_pdr, "PDR")
+                                            means_pdr, cld_pdr, _ = _rcbd_posthoc_cld(d_pdr_tr, y_pdr, alpha=alpha_int, prefer_small_is_A=True)
+                                            A_pdr = set(cld_pdr.loc[cld_pdr["CLD"]=="A","rule"]) if not cld_pdr.empty else set()
+                                            disp_pdr = d_pdr.groupby("rule")["value"].mean().rename("PDR_mean(orig)")
+
+                                        # --- 집합 & 교집합 결과 표시 ---
+                                        st.markdown(f"- **A(Reward)**: {len(A_rew)}개, **A(Time)**: {len(A_time)}개, **A(PDR)**: {len(A_pdr)}개")
+
+                                        inter_RT  = sorted(A_rew.intersection(A_time))
+                                        inter_RP  = sorted(A_rew.intersection(A_pdr))
+                                        inter_TP  = sorted(A_time.intersection(A_pdr))
+                                        inter_RTP = sorted(A_rew.intersection(A_time).intersection(A_pdr))
+
+                                        def _show_table(title, rules):
+                                            st.markdown(f"**{title}** — {len(rules)}개")
+                                            if len(rules) == 0:
+                                                st.caption("해당 없음")
+                                                return
+                                            out = (pd.DataFrame({"rule": rules})
+                                                    .merge(disp_rew, on="rule", how="left")
+                                                    .merge(disp_time, on="rule", how="left")
+                                                    .merge(disp_pdr, on="rule", how="left"))
+                                            # 정렬: 3중 교집합은 Reward↓(내림차순), tie-breaker로 Time↑, PDR↑
+                                            if "3중" in title:
+                                                out = out.sort_values(["Reward_mean(orig)", "Time_mean(orig)", "PDR_mean(orig)"],
+                                                                    ascending=[False, True, True], kind="mergesort")
+                                            elif "Reward∩Time" in title:
+                                                out = out.sort_values(["Reward_mean(orig)", "Time_mean(orig)"],
+                                                                    ascending=[False, True], kind="mergesort")
+                                            elif "Reward∩PDR" in title:
+                                                out = out.sort_values(["Reward_mean(orig)", "PDR_mean(orig)"],
+                                                                    ascending=[False, True], kind="mergesort")
+                                            elif "Time∩PDR" in title:
+                                                out = out.sort_values(["Time_mean(orig)", "PDR_mean(orig)"],
+                                                                    ascending=[True, True], kind="mergesort")
+                                            st.dataframe(out, width='stretch')
+
+                                        _show_table("3중 교집합 (Reward ∩ Time ∩ PDR)", inter_RTP)
+                                        _show_table("2중 교집합 (Reward∩Time)", inter_RT)
+                                        _show_table("2중 교집합 (Reward∩PDR)", inter_RP)
+                                        _show_table("2중 교집합 (Time∩PDR)", inter_TP)
+
+                            else:
+                                st.caption("사후검정 결과가 없습니다.")
 
 
 # ------------------------------

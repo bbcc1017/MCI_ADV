@@ -10,6 +10,7 @@ import json
 import time
 import shutil
 import subprocess
+import requests
 from typing import Dict, Any, Optional, Tuple, Union
 from datetime import datetime, timezone, timedelta
 
@@ -87,6 +88,153 @@ def parse_make_generator_stdout(stdout_text: str):
         elif s.startswith("CONFIG_PATH:"):
             config_path = s.split("CONFIG_PATH:",1)[1].strip()
     return coord_info, config_path
+
+# ------------------------------------------------------------------
+# Reverse Geocoding (Kakao API)
+# ------------------------------------------------------------------
+
+def reverse_geocode_kakao(lat: float, lon: float, api_key: str, max_retries: int = 3) -> Dict[str, Any]:
+    """
+    카카오 로컬 API를 사용한 좌표 → 주소 변환 (역지오코딩)
+
+    Args:
+        lat: 위도
+        lon: 경도
+        api_key: 카카오 REST API 키
+        max_retries: 최대 재시도 횟수
+
+    Returns:
+        {
+            "full_address": "지번 주소",
+            "road_address": "도로명 주소",
+            "area1": "시도",
+            "area2": "시군구",
+            "area3": "읍면동",
+            "area4": "리",
+            "is_valid": True/False,
+            "latitude": lat,
+            "longitude": lon,
+            "api_response_code": 0 (성공) or -999 (실패)
+        }
+    """
+    url = "https://dapi.kakao.com/v2/local/geo/coord2address.json"
+    headers = {
+        "Authorization": f"KakaoAK {api_key}"
+    }
+    params = {
+        "x": str(lon),  # 경도
+        "y": str(lat),  # 위도
+        "input_coord": "WGS84"
+    }
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+                documents = data.get("documents", [])
+
+                if documents and len(documents) > 0:
+                    doc = documents[0]
+
+                    # 지번 주소
+                    address = doc.get("address", {})
+                    area1 = address.get("region_1depth_name", "")  # 시도
+                    area2 = address.get("region_2depth_name", "")  # 구
+                    area3 = address.get("region_3depth_name", "")  # 동
+                    area4 = address.get("region_3depth_h_name", "")  # 리 (법정동 기준)
+
+                    # 지번 주소 조합
+                    full_address = address.get("address_name", "")
+
+                    # 도로명 주소
+                    road_address_obj = doc.get("road_address")
+                    road_address = ""
+                    if road_address_obj:
+                        road_address = road_address_obj.get("address_name", "")
+                    else:
+                        print(f"  ℹ️ 도로명주소 없음 (지번주소만 존재): {full_address}")
+
+                    return {
+                        "full_address": full_address,
+                        "road_address": road_address,
+                        "area1": area1,
+                        "area2": area2,
+                        "area3": area3,
+                        "area4": area4,
+                        "is_valid": True,
+                        "latitude": lat,
+                        "longitude": lon,
+                        "api_response_code": 0
+                    }
+
+                # 주소 정보 없음 (해상, 산악 등)
+                return {
+                    "full_address": "주소 정보 없음",
+                    "road_address": "",
+                    "area1": "해상/미상",
+                    "area2": "",
+                    "area3": "",
+                    "area4": "",
+                    "is_valid": False,
+                    "latitude": lat,
+                    "longitude": lon,
+                    "api_response_code": -1
+                }
+
+            elif response.status_code == 401:
+                print(f"❌ 카카오 API 인증 실패 (401): API 키 확인 필요")
+                break
+
+            elif response.status_code == 429:
+                print(f"⚠️ API 요청 한도 초과 (429). {attempt + 1}/{max_retries} 재시도...")
+                time.sleep(2)
+
+            else:
+                print(f"❌ API 오류: {response.status_code}")
+                break
+
+        except Exception as e:
+            print(f"❌ Reverse geocoding 오류: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+
+    # 실패 시
+    return {
+        "full_address": "API 오류",
+        "road_address": "",
+        "area1": "오류",
+        "area2": "",
+        "area3": "",
+        "area4": "",
+        "is_valid": False,
+        "latitude": lat,
+        "longitude": lon,
+        "api_response_code": -999
+    }
+
+# ============================================================
+# [DEPRECATED] 네이버 API 역지오코딩 (참고용)
+# ============================================================
+# def reverse_geocode_naver(lat: float, lon: float, client_id: str, client_secret: str, max_retries: int = 3) -> Dict[str, Any]:
+#     """
+#     네이버 Reverse Geocoding API (기존 코드 - 참고용)
+#
+#     이 함수는 더 이상 사용되지 않습니다. 카카오 API로 마이그레이션되었습니다.
+#     참고: https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc
+#     """
+#     url = "https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc"
+#     headers = {
+#         "X-NCP-APIGW-API-KEY-ID": client_id,
+#         "X-NCP-APIGW-API-KEY": client_secret
+#     }
+#     params = {
+#         "coords": f"{lon},{lat}",
+#         "orders": "legalcode,admcode,addr,roadaddr",
+#         "output": "json"
+#     }
+#     # ... (기존 로직 생략)
 
 # ------------------------------------------------------------------
 # Summary CSV helpers
@@ -409,12 +557,42 @@ class Orchestrator:
 
         stdout = proc.stdout or ""
         stderr = proc.stderr or ""
-        coord_info, config_path = parse_make_generator_stdout(stdout)
+        _, config_path = parse_make_generator_stdout(stdout)  # coord_info는 무시
         if not config_path:
             raise RuntimeError(f"CONFIG_PATH not found in generator stdout.\n[stdout]\n{stdout}\n[stderr]\n{stderr}")
 
         coord = parse_coord_from_config_path(config_path) or to_coord_str(latitude, longitude)
         exp_id2 = parse_exp_from_config_path(config_path) or exp_id
+
+        # 역지오코딩 직접 수행 (카카오 API)
+        coord_info = None
+        kakao_api_key = (extra_args or {}).get("kakao_api_key")
+        if kakao_api_key:
+            try:
+                coord_info = reverse_geocode_kakao(latitude, longitude, kakao_api_key)
+                print(f"✅ 역지오코딩 성공: {coord_info.get('full_address', '')}")
+            except Exception as e:
+                print(f"⚠️ 역지오코딩 실패: {e}")
+                coord_info = {
+                    "full_address": "역지오코딩 실패",
+                    "road_address": "",
+                    "area1": "", "area2": "", "area3": "", "area4": "",
+                    "is_valid": False,
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "api_response_code": -999
+                }
+        else:
+            print("⚠️ 카카오 API 키 없음. 역지오코딩 생략")
+            coord_info = {
+                "full_address": "",
+                "road_address": "",
+                "area1": "", "area2": "", "area3": "", "area4": "",
+                "is_valid": False,
+                "latitude": latitude,
+                "longitude": longitude,
+                "api_response_code": -999
+            }
 
         # Summary path (main + legacy) — robust
         summary_main, summary_legacy = _summary_paths_pair(self.base_path, exp_id2)

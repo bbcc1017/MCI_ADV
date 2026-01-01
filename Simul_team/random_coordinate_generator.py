@@ -236,121 +236,128 @@ class CoordinateGenerator:
             coordinates.append((round(lat, 6), round(lon, 6)))
         return coordinates
     
-    def reverse_geocode(self, lat: float, lon: float, max_retries: int = 3) -> Dict:
-        """
-        좌표를 주소로 변환 (Naver Reverse Geocoding API)
-        향상된 주소 정보 반환
-        """
-        url = "https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc"
-        headers = {
-            "X-NCP-APIGW-API-KEY-ID": self.client_id,
-            "X-NCP-APIGW-API-KEY": self.client_secret
-        }
-        params = {
-            "coords": f"{lon},{lat}",
-            "orders": "legalcode,admcode,addr,roadaddr",
-            "output": "json"
-        }
-        
-        for attempt in range(max_retries):
-            try:
-                response = requests.get(url, headers=headers, params=params, timeout=10)
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    if data.get("status", {}).get("code") == 0:
-                        results = data.get("results", [])
-                        if results:
-                            addr_info = results[0]
-                            region = addr_info.get("region", {})
-                            
-                            # 주소 구성 (상세화)
-                            area1 = region.get("area1", {}).get("name", "")  # 시/도
-                            area2 = region.get("area2", {}).get("name", "")  # 시/군/구
-                            area3 = region.get("area3", {}).get("name", "")  # 읍/면/동
-                            area4 = region.get("area4", {}).get("name", "")  # 리
-                            
-                            # 지번 주소
-                            land_info = addr_info.get("land", {})
-                            land_number1 = land_info.get("number1", "")
-                            land_number2 = land_info.get("number2", "")
-                            land_addr = f"{land_number1}" + (f"-{land_number2}" if land_number2 else "")
-                            
-                            # 도로명 주소 찾기 (개선됨)
-                            road_addr = ""
-                            road_name = ""
-                            road_number = ""
-                            
-                            for result in results:
-                                if result.get("name") == "roadaddr":
-                                    road_land = result.get("land", {})
-                                    road_name = road_land.get("name", "")
-                                    road_num1 = road_land.get("number1", "")
-                                    road_num2 = road_land.get("number2", "")
-                                    road_number = f"{road_num1}" + (f"-{road_num2}" if road_num2 else "")
-                                    road_addr = f"{road_name} {road_number}".strip()
-                                    break
-                            
-                            # 완전한 주소 구성
-                            full_jibun = f"{area1} {area2} {area3} {area4} {land_addr}".strip()
-                            full_road = f"{area1} {area2} {area3} {road_addr}".strip() if road_addr else ""
-                            
-                            return {
-                                "full_address": full_jibun,
-                                "road_address": full_road,
-                                "area1": area1,  # 시도
-                                "area2": area2,  # 시군구
-                                "area3": area3,  # 읍면동
-                                "area4": area4,  # 리
-                                "land_number": land_addr,
-                                "road_name": road_name,
-                                "road_number": road_number,
-                                "is_valid": True,
-                                "coordinates": f"({lat}, {lon})",
-                                "api_response_code": 0
-                            }
-                    
-                    # 주소를 찾을 수 없는 경우 (해상 등)
-                    return {
-                        "full_address": "주소 정보 없음",
-                        "road_address": "",
-                        "area1": "해상/미상",
-                        "area2": "",
-                        "area3": "",
-                        "area4": "",
-                        "land_number": "",
-                        "road_name": "",
-                        "road_number": "",
-                        "is_valid": False,
-                        "coordinates": f"({lat}, {lon})",
-                        "api_response_code": data.get("status", {}).get("code", -1)
-                    }
-                    
-                elif response.status_code == 429:
-                    print(f"⚠️ API 요청 한도 초과. {attempt + 1}/{max_retries} 재시도...")
-                    time.sleep(2)
-                else:
-                    print(f"❌ API 오류: {response.status_code}")
-                    
-            except Exception as e:
-                print(f"❌ Reverse geocoding 오류: {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-        
-        return {
-            "full_address": "API 오류",
-            "road_address": "",
-            "area1": "오류",
-            "area2": "",
-            "area3": "",
-            "area4": "",
-            "land_number": "",
-            "road_name": "",
-            "road_number": "",
-            "is_valid": False,
-            "coordinates": f"({lat}, {lon})",
-            "api_response_code": -999
-        }
+    # ============================================================
+    # [DEPRECATED] 네이버 API 역지오코딩 (참고용)
+    # ============================================================
+    # def reverse_geocode(self, lat: float, lon: float, max_retries: int = 3) -> Dict:
+    #     """
+    #     좌표를 주소로 변환 (Naver Reverse Geocoding API)
+    #
+    #     이 함수는 더 이상 사용되지 않습니다. 역지오코딩은 orchestrator.py에서
+    #     카카오 API를 사용하여 수행됩니다.
+    #
+    #     참고: https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc
+    #     """
+    #     url = "https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc"
+    #     headers = {
+    #         "X-NCP-APIGW-API-KEY-ID": self.client_id,
+    #         "X-NCP-APIGW-API-KEY": self.client_secret
+    #     }
+    #     params = {
+    #         "coords": f"{lon},{lat}",
+    #         "orders": "legalcode,admcode,addr,roadaddr",
+    #         "output": "json"
+    #     }
+    #
+    #     for attempt in range(max_retries):
+    #         try:
+    #             response = requests.get(url, headers=headers, params=params, timeout=10)
+    #             if response.status_code == 200:
+    #                 data = response.json()
+    #
+    #                 if data.get("status", {}).get("code") == 0:
+    #                     results = data.get("results", [])
+    #                     if results:
+    #                         addr_info = results[0]
+    #                         region = addr_info.get("region", {})
+    #
+    #                         # 주소 구성 (상세화)
+    #                         area1 = region.get("area1", {}).get("name", "")  # 시/도
+    #                         area2 = region.get("area2", {}).get("name", "")  # 시/군/구
+    #                         area3 = region.get("area3", {}).get("name", "")  # 읍/면/동
+    #                         area4 = region.get("area4", {}).get("name", "")  # 리
+    #
+    #                         # 지번 주소
+    #                         land_info = addr_info.get("land", {})
+    #                         land_number1 = land_info.get("number1", "")
+    #                         land_number2 = land_info.get("number2", "")
+    #                         land_addr = f"{land_number1}" + (f"-{land_number2}" if land_number2 else "")
+    #
+    #                         # 도로명 주소 찾기 (개선됨)
+    #                         road_addr = ""
+    #                         road_name = ""
+    #                         road_number = ""
+    #
+    #                         for result in results:
+    #                             if result.get("name") == "roadaddr":
+    #                                 road_land = result.get("land", {})
+    #                                 road_name = road_land.get("name", "")
+    #                                 road_num1 = road_land.get("number1", "")
+    #                                 road_num2 = road_land.get("number2", "")
+    #                                 road_number = f"{road_num1}" + (f"-{road_num2}" if road_num2 else "")
+    #                                 road_addr = f"{road_name} {road_number}".strip()
+    #                                 break
+    #
+    #                         # 완전한 주소 구성
+    #                         full_jibun = f"{area1} {area2} {area3} {area4} {land_addr}".strip()
+    #                         full_road = f"{area1} {area2} {area3} {road_addr}".strip() if road_addr else ""
+    #
+    #                         return {
+    #                             "full_address": full_jibun,
+    #                             "road_address": full_road,
+    #                             "area1": area1,  # 시도
+    #                             "area2": area2,  # 시군구
+    #                             "area3": area3,  # 읍면동
+    #                             "area4": area4,  # 리
+    #                             "land_number": land_addr,
+    #                             "road_name": road_name,
+    #                             "road_number": road_number,
+    #                             "is_valid": True,
+    #                             "coordinates": f"({lat}, {lon})",
+    #                             "api_response_code": 0
+    #                         }
+    #
+    #                 # 주소를 찾을 수 없는 경우 (해상 등)
+    #                 return {
+    #                     "full_address": "주소 정보 없음",
+    #                     "road_address": "",
+    #                     "area1": "해상/미상",
+    #                     "area2": "",
+    #                     "area3": "",
+    #                     "area4": "",
+    #                     "land_number": "",
+    #                     "road_name": "",
+    #                     "road_number": "",
+    #                     "is_valid": False,
+    #                     "coordinates": f"({lat}, {lon})",
+    #                     "api_response_code": data.get("status", {}).get("code", -1)
+    #                 }
+    #
+    #             elif response.status_code == 429:
+    #                 print(f"⚠️ API 요청 한도 초과. {attempt + 1}/{max_retries} 재시도...")
+    #                 time.sleep(2)
+    #             else:
+    #                 print(f"❌ API 오류: {response.status_code}")
+    #
+    #         except Exception as e:
+    #             print(f"❌ Reverse geocoding 오류: {e}")
+    #             if attempt < max_retries - 1:
+    #                 time.sleep(1)
+    #
+    #     return {
+    #         "full_address": "API 오류",
+    #         "road_address": "",
+    #         "area1": "오류",
+    #         "area2": "",
+    #         "area3": "",
+    #         "area4": "",
+    #         "land_number": "",
+    #         "road_name": "",
+    #         "road_number": "",
+    #         "is_valid": False,
+    #         "coordinates": f"({lat}, {lon})",
+    #         "api_response_code": -999
+    #     }
     
     def generate_valid_coordinate(self, mode: str = "korea_random", sido_name: str = None, 
                                  max_attempts: int = 5) -> Optional[Tuple[float, float, Dict]]:

@@ -9,7 +9,6 @@ import pandas as pd
 import numpy as np
 import requests
 from haversine import haversine
-from random_coordinate_generator import CoordinateGenerator
 # [ADD] ──────────────────────────────────────────────────────────────
 import re
 from datetime import timezone, timedelta, datetime
@@ -93,18 +92,6 @@ class ScenarioGenerator:
         # 파일 존재성 검증
         self._validate_data_files()
 
-        # 좌표 생성기 초기화 (필요시 - 역지오코딩 용도)
-        self.coord_generator = None
-        if kakao_api_key:
-            try:
-                self.coord_generator = CoordinateGenerator(
-                    client_id=None,  # 카카오 API 사용으로 변경 필요시 수정
-                    client_secret=None,
-                    shp_path=self.shp_path
-                )
-            except Exception as e:
-                print(f"⚠️ 좌표 생성기 초기화 실패: {e}")
-        
         # Patient 정보 (하드코딩)
         self.patient_config = {
             "ratio": {"Red": 0.1, "Yellow": 0.3, "Green": 0.5, "Black": 0.1},
@@ -843,56 +830,20 @@ run_setting:
         save_folder = os.path.join(self.base_path, "scenarios", self.experiment_id, folder_name)
         os.makedirs(save_folder, exist_ok=True)
 
-        # 수동 좌표도 역지오코딩 수행 (선택사항)
-        print(f"🔍 좌표 ({latitude},{longitude}) 주소 정보 조회 중...")
-        try:
-            if self.coord_generator is None:
-                # coord_generator가 없으면 간단한 정보만 저장
-                raise Exception("CoordinateGenerator not initialized")
-            addr_info = self.coord_generator.reverse_geocode(latitude, longitude)
-            if addr_info.get("is_valid", False):
-                coordinate_info = {
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "full_address": addr_info.get("full_address", ""),
-                    "road_address": addr_info.get("road_address", ""),
-                    "area1": addr_info.get("area1", ""),
-                    "area2": addr_info.get("area2", ""),
-                    "area3": addr_info.get("area3", ""),
-                    "area4": addr_info.get("area4", ""),
-                    "is_valid": True
-                }
-                print(f"COORDINATE_INFO:{json.dumps(coordinate_info, ensure_ascii=False)}")
-                print(f"  📍 좌표 생성: ({latitude}, {longitude}) - {addr_info.get('full_address','')}")
-            else:
-                coordinate_info = {
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "full_address": "",
-                    "road_address": "",
-                    "area1": "",
-                    "area2": "",
-                    "area3": "",
-                    "area4": "",
-                    "is_valid": False
-                }
-                print(f"COORDINATE_INFO:{json.dumps(coordinate_info, ensure_ascii=False)}")
-                print(f"  📍 좌표 생성: ({latitude}, {longitude}) - API 호출 실패")
-        except Exception as e:
-            print(f"⚠️ 역지오코딩 실패: {e}")
-            coordinate_info = {
-                "latitude": latitude,
-                "longitude": longitude,
-                "full_address": "API 호출 실패",
-                "road_address": "",
-                "area1": "",
-                "area2": "",
-                "area3": "",
-                "area4": "",
-                "is_valid": False
-            }
-            print(f"COORDINATE_INFO:{json.dumps(coordinate_info, ensure_ascii=False)}")
-            print(f"  📍 좌표 생성: ({latitude}, {longitude}) - API 호출 실패")
+        # 역지오코딩은 orchestrator.py에서 수행하므로 간단한 정보만 출력
+        coordinate_info = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "full_address": "",
+            "road_address": "",
+            "area1": "",
+            "area2": "",
+            "area3": "",
+            "area4": "",
+            "is_valid": False
+        }
+        print(f"COORDINATE_INFO:{json.dumps(coordinate_info, ensure_ascii=False)}")
+        print(f"  📍 좌표: ({latitude}, {longitude}) - 역지오코딩은 orchestrator에서 수행")
 
         # 생성 파이프라인
         self.make_amb_info(latitude, longitude, incident_size, save_folder)
