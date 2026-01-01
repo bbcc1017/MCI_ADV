@@ -1,0 +1,24 @@
+# Core (dashboard)
+streamlit>=1.34
+streamlit-folium
+folium
+pandas
+numpy
+openpyxl
+altair
+PyYAML
+requests
+haversine
+
+# Stats / analysis (used in the dashboard’s analysis tabs)
+scipy
+statsmodels
+pingouin
+scikit-posthocs
+
+# RL / simulation env
+gymnasium
+
+# (Optional) Geo stack (include only if you actually use shapefiles / geospatial ops in your run)
+geopandas
+shapely

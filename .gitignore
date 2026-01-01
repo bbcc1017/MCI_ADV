@@ -251,6 +251,9 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# claude code 
+.claude
+
 # End of https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,python,windows
 ##############################################################################################
 
