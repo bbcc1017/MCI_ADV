@@ -39,6 +39,27 @@ def parse_env_kv(text: str):
         env[k.strip()] = v.strip()
     return env
 
+def get_kakao_key_from_secrets():
+    """Streamlit Cloud Secrets(TOML) / 환경변수에서 카카오 키를 읽어옴"""
+    # 1) Streamlit Secrets (권장)
+    try:
+        # 최우선: TOP-LEVEL 키
+        for k in ("KAKAO_REST_API_KEY", "KAKAO_API_KEY", "KAKAO_KEY"):
+            if k in st.secrets:
+                return str(st.secrets[k]).strip()
+
+        # 섹션 방식도 지원: [kakao] rest_api_key="..."
+        if "kakao" in st.secrets:
+            sec = st.secrets["kakao"]
+            for k in ("rest_api_key", "api_key", "key"):
+                if k in sec:
+                    return str(sec[k]).strip()
+    except Exception:
+        pass
+
+    # 2) 환경변수 fallback (원하면 쓸 수 있게)
+    return (os.getenv("KAKAO_REST_API_KEY") or os.getenv("KAKAO_API_KEY") or "").strip()
+
 # ─────────────────────────────────────────────────────────────────
 # Session State 초기화
 # ─────────────────────────────────────────────────────────────────
@@ -123,9 +144,22 @@ st.markdown("#### 🔑 카카오 REST API 키")
 
 # session_state 초기화
 if "kakao_api_key" not in st.session_state:
-    st.session_state.kakao_api_key = ""
+    if IS_CLOUD:
+        st.session_state.kakao_api_key = get_kakao_key_from_secrets() or ""
+    else:
+        st.session_state.kakao_api_key = ""
+else:
+    # Cloud에서는 Secrets 값이 있으면 항상 그 값으로 동기화
+    if IS_CLOUD:
+        sec = get_kakao_key_from_secrets()
+        if sec and st.session_state.kakao_api_key != sec:
+            st.session_state.kakao_api_key = sec
+
 
 col_key, col_save = st.columns([3, 1])
+
+cloud_secret_key = get_kakao_key_from_secrets() if IS_CLOUD else ""
+has_cloud_key = bool(cloud_secret_key)
 
 with col_key:
     api_key_input = st.text_input(
@@ -134,18 +168,26 @@ with col_key:
         type="password",
         placeholder="MCI 앱의 REST API 키 (모빌리티 + 로컬 서비스 활성화 필요)",
         help="시나리오 생성 및 좌표 검색에 사용",
-        key="api_key_input"
+        key="api_key_input",
+        disabled=IS_CLOUD and has_cloud_key,   # ✅ Cloud+Secrets면 입력 잠금
     )
+    if IS_CLOUD and has_cloud_key:
+        st.caption("☁️ Cloud Secrets에서 API 키를 자동으로 불러왔습니다.")
+
 
 with col_save:
     st.write("")  # 정렬용
     st.write("")  # 정렬용
-    if st.button("✅ 저장", key="save_api_key"):
+
+    # ✅ 로컬은 기존 그대로 "저장" 사용
+    # ✅ Cloud는 Secrets가 없을 때만 수동 입력 허용(예외 케이스)
+    if ((not IS_CLOUD) or (IS_CLOUD and not has_cloud_key)) and st.button("✅ 저장", key="save_api_key"):
         if api_key_input and api_key_input.strip():
             st.session_state.kakao_api_key = api_key_input.strip()
             st.success("✅ API 키가 저장되었습니다!")
         else:
             st.error("⚠️ API 키를 입력하세요!")
+
 
 # 상태 표시
 if st.session_state.kakao_api_key:
