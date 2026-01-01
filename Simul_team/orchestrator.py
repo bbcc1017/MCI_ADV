@@ -496,11 +496,12 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
 # ------------------------------------------------------------------
 # Orchestrator
 # ------------------------------------------------------------------
+import sys
 
 class Orchestrator:
     def __init__(self, base_path: str, python_cmd: Optional[str] = None):
         self.base_path = os.path.abspath(base_path)
-        self.python_cmd = python_cmd or "python"
+        self.python_cmd = python_cmd or sys.executable
         self.paths = {
             "make_script": os.path.join(self.base_path, "make_csv_yaml_dynamic.py"),
             "main_py":     os.path.join(self.base_path, "main.py"),
