@@ -60,6 +60,91 @@ def get_kakao_key_from_secrets():
     # 2) 환경변수 fallback (원하면 쓸 수 있게)
     return (os.getenv("KAKAO_REST_API_KEY") or os.getenv("KAKAO_API_KEY") or "").strip()
 
+def normalize_search_result(doc, search_type):
+    """Normalize API response to unified format for both keyword and address searches"""
+    if search_type == "키워드 검색":
+        return {
+            "place_name": doc.get("place_name", ""),
+            "address_name": doc.get("address_name", ""),
+            "x": float(doc["x"]),
+            "y": float(doc["y"]),
+            "search_type": "keyword"
+        }
+    else:  # 주소 검색
+        # Prefer building name for display
+        building_name = ""
+        if "road_address" in doc and doc["road_address"]:
+            building_name = doc["road_address"].get("building_name", "")
+
+        display_name = building_name if building_name else doc.get("address_name", "")
+
+        return {
+            "place_name": f"{display_name} (주소검색)",
+            "address_name": doc.get("address_name", ""),
+            "x": float(doc["x"]),
+            "y": float(doc["y"]),
+            "search_type": "address"
+        }
+
+
+def perform_address_search(search_query, api_key):
+    """
+    Perform address search using Kakao Local API
+    API Doc: https://developers.kakao.com/docs/latest/ko/local/dev-guide#address-coord
+
+    Returns: (success: bool, documents: list, error_msg: str, status_code: int)
+    """
+    try:
+        url = "https://dapi.kakao.com/v2/local/search/address.json"
+        headers = {"Authorization": f"KakaoAK {api_key.strip()}"}
+
+        st.caption(f"🔍 디버깅: API 요청 URL = {url}")
+        st.caption(f"🔍 디버깅: 검색어 = {search_query}")
+
+        params = {
+            "query": search_query,
+            "analyze_type": "similar",  # Allow partial matches
+            "size": 10
+        }
+
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        st.caption(f"🔍 디버깅: 응답 상태 코드 = {response.status_code}")
+
+        if response.status_code == 200:
+            data = response.json()
+            documents = data.get("documents", [])
+            st.caption(f"🔍 디버깅: 결과 개수 = {len(documents)}")
+
+            # Normalize results to match keyword search format
+            normalized = [normalize_search_result(doc, "주소 검색") for doc in documents]
+            return (True, normalized, "", 200)
+
+        elif response.status_code == 401:
+            return (False, [], "API 키 인증 실패 (401 Unauthorized)", 401)
+
+        elif response.status_code == 403:
+            return (False, [], "접근 거부됨 (403 Forbidden)", 403)
+
+        else:
+            try:
+                error_data = response.json()
+                error_msg = str(error_data)
+            except:
+                error_msg = response.text
+            return (False, [], f"API 오류 (상태 코드: {response.status_code})", response.status_code)
+
+    except requests.exceptions.Timeout:
+        return (False, [], "요청 시간 초과. 네트워크 연결을 확인하세요.", -1)
+
+    except requests.exceptions.RequestException as e:
+        error_msg = f"검색 실패: {e}"
+        if hasattr(e, 'response') and e.response is not None:
+            error_msg += f" (상태 코드: {e.response.status_code})"
+        return (False, [], error_msg, -1)
+
+    except Exception as e:
+        return (False, [], f"예상치 못한 오류: {e}", -1)
+
 # ─────────────────────────────────────────────────────────────────
 # Session State 초기화
 # ─────────────────────────────────────────────────────────────────
@@ -255,7 +340,25 @@ with col_time2:
 st.markdown("---")
 st.markdown("### 2️⃣ 좌표 검색하기")
 
+# Search type selector
+search_type = st.radio(
+    "검색 방식 선택",
+    ["키워드 검색", "주소 검색"],
+    horizontal=True,
+    key="search_type_radio",
+    help="키워드: 장소명으로 검색 (예: 인천공항) | 주소: 도로명/지번주소로 검색"
+)
+
 # session_state 초기화
+if "search_type" not in st.session_state:
+    st.session_state.search_type = "키워드 검색"
+
+# Clear results when switching search types
+if st.session_state.search_type != search_type:
+    st.session_state.search_type = search_type
+    st.session_state.search_results = []
+    st.session_state.selected_place_index = -1
+
 if "search_results" not in st.session_state:
     st.session_state.search_results = []
 if "selected_lat" not in st.session_state:
@@ -269,10 +372,21 @@ if "selected_place_index" not in st.session_state:
 
 col_search, col_search_btn = st.columns([3, 1])
 with col_search:
+    # Dynamic placeholder and help text based on search type
+    if search_type == "키워드 검색":
+        placeholder = "예: 인천공항, 서울역, 강남역"
+        help_text = "카카오 API로 장소를 검색합니다"
+        label = "🔍 장소 검색"
+    else:
+        placeholder = "예: 서울특별시 강남구 테헤란로 152"
+        help_text = "카카오 API로 주소를 검색합니다 (도로명주소, 지번주소 모두 가능)"
+        label = "🔍 주소 검색"
+
     search_keyword = st.text_input(
-        "🔍 장소 검색",
-        placeholder="예: 인천공항, 서울역, 강남역",
-        help="카카오 API로 장소를 검색합니다"
+        label,
+        placeholder=placeholder,
+        help=help_text,
+        key="search_input"
     )
 with col_search_btn:
     st.write("")  # 정렬용
@@ -285,86 +399,124 @@ if search_button and search_keyword:
     if not kakao_api_key or not kakao_api_key.strip():
         st.error("⚠️ 먼저 카카오 REST API 키를 입력하고 '✅ 저장' 버튼을 클릭하세요!")
     else:
-        try:
-            # 카카오 로컬 API - 키워드 검색
-            # 공식 문서: https://developers.kakao.com/docs/latest/ko/local/dev-guide#search-by-keyword
-            url = "https://dapi.kakao.com/v2/local/search/keyword.json"
+        # Route to appropriate search based on selected type
+        if search_type == "키워드 검색":
+            # ─────────────────────────────────────────────────────────────────
+            # 키워드 검색
+            # ─────────────────────────────────────────────────────────────────
+            try:
+                # 카카오 로컬 API - 키워드 검색
+                # 공식 문서: https://developers.kakao.com/docs/latest/ko/local/dev-guide#search-by-keyword
+                url = "https://dapi.kakao.com/v2/local/search/keyword.json"
 
-            # 헤더: Authorization: KakaoAK {REST_API_KEY}
-            headers = {
-                "Authorization": f"KakaoAK {kakao_api_key.strip()}"
-            }
+                # 헤더: Authorization: KakaoAK {REST_API_KEY}
+                headers = {
+                    "Authorization": f"KakaoAK {kakao_api_key.strip()}"
+                }
 
-            # 디버깅: 요청 정보 출력
-            st.caption(f"🔍 디버깅: API 요청 URL = {url}")
-            st.caption(f"🔍 디버깅: 헤더 = Authorization: KakaoAK {kakao_api_key[:4]}...{kakao_api_key[-4:]}")
-            st.caption(f"🔍 디버깅: 검색어 = {search_keyword}")
+                # 디버깅: 요청 정보 출력
+                st.caption(f"🔍 디버깅: API 요청 URL = {url}")
+                st.caption(f"🔍 디버깅: 헤더 = Authorization: KakaoAK {kakao_api_key[:4]}...{kakao_api_key[-4:]}")
+                st.caption(f"🔍 디버깅: 검색어 = {search_keyword}")
 
-            params = {
-                "query": search_keyword,
-                "size": 10  # 최대 10개 결과
-            }
+                params = {
+                    "query": search_keyword,
+                    "size": 10  # 최대 10개 결과
+                }
 
-            # API 요청
-            response = requests.get(url, headers=headers, params=params, timeout=10)
+                # API 요청
+                response = requests.get(url, headers=headers, params=params, timeout=10)
 
-            # 상태 코드 디버깅
-            st.caption(f"🔍 디버깅: 응답 상태 코드 = {response.status_code}")
+                # 상태 코드 디버깅
+                st.caption(f"🔍 디버깅: 응답 상태 코드 = {response.status_code}")
 
-            # 응답 확인
-            if response.status_code == 200:
-                data = response.json()
-                documents = data.get("documents", [])
+                # 응답 확인
+                if response.status_code == 200:
+                    data = response.json()
+                    documents = data.get("documents", [])
 
-                st.caption(f"🔍 디버깅: 응답 데이터 키 = {list(data.keys())}")
-                st.caption(f"🔍 디버깅: 결과 개수 = {len(documents)}")
+                    st.caption(f"🔍 디버깅: 응답 데이터 키 = {list(data.keys())}")
+                    st.caption(f"🔍 디버깅: 결과 개수 = {len(documents)}")
 
+                    if documents:
+                        # Normalize keyword results
+                        normalized = [normalize_search_result(doc, "키워드 검색") for doc in documents]
+                        st.session_state.search_results = normalized
+                        st.success(f"✅ {len(documents)}개 장소를 찾았습니다!")
+                    else:
+                        st.warning("⚠️ 검색 결과가 없습니다.")
+                        st.session_state.search_results = []
+                elif response.status_code == 401:
+                    st.error("❌ API 키 인증 실패 (401 Unauthorized)")
+                    st.caption("REST API 키가 올바른지 확인하세요.")
+                    try:
+                        error_data = response.json()
+                        st.code(error_data, language="json")
+                    except:
+                        st.code(response.text)
+                elif response.status_code == 403:
+                    st.error("❌ 접근 거부됨 (403 Forbidden)")
+                    st.caption("플랫폼 설정 및 API 키 권한을 확인하세요.")
+                    try:
+                        error_data = response.json()
+                        st.code(error_data, language="json")
+                    except:
+                        st.code(response.text)
+                else:
+                    st.error(f"❌ API 오류 (상태 코드: {response.status_code})")
+                    try:
+                        error_data = response.json()
+                        st.code(error_data, language="json")
+                    except:
+                        st.code(response.text)
+
+            except requests.exceptions.Timeout:
+                st.error("❌ 요청 시간 초과. 네트워크 연결을 확인하세요.")
+            except requests.exceptions.RequestException as e:
+                st.error(f"❌ 검색 실패: {e}")
+                if hasattr(e, 'response') and e.response is not None:
+                    st.caption(f"상태 코드: {e.response.status_code}")
+                    try:
+                        st.code(e.response.json(), language="json")
+                    except:
+                        st.code(e.response.text)
+            except Exception as e:
+                st.error(f"❌ 예상치 못한 오류: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
+        else:  # 주소 검색
+            # ─────────────────────────────────────────────────────────────────
+            # 주소 검색
+            # ─────────────────────────────────────────────────────────────────
+            success, documents, error_msg, status_code = perform_address_search(search_keyword, kakao_api_key)
+
+            if success:
                 if documents:
                     st.session_state.search_results = documents
-                    st.success(f"✅ {len(documents)}개 장소를 찾았습니다!")
+                    st.success(f"✅ {len(documents)}개 주소를 찾았습니다!")
                 else:
-                    st.warning("⚠️ 검색 결과가 없습니다.")
+                    st.warning("⚠️ 검색 결과가 없습니다. 주소를 확인해주세요.")
+                    st.info("""💡 **주소 검색 팁:**
+- 도로명주소: `서울특별시 강남구 테헤란로 152`
+- 지번주소: `서울특별시 강남구 역삼동 737`
+- 간단하게: `강남구 테헤란로 152` (시도명 생략 가능)
+                    """)
                     st.session_state.search_results = []
-            elif response.status_code == 401:
-                st.error("❌ API 키 인증 실패 (401 Unauthorized)")
-                st.caption("REST API 키가 올바른지 확인하세요.")
-                try:
-                    error_data = response.json()
-                    st.code(error_data, language="json")
-                except:
-                    st.code(response.text)
-            elif response.status_code == 403:
-                st.error("❌ 접근 거부됨 (403 Forbidden)")
-                st.caption("플랫폼 설정 및 API 키 권한을 확인하세요.")
-                try:
-                    error_data = response.json()
-                    st.code(error_data, language="json")
-                except:
-                    st.code(response.text)
             else:
-                st.error(f"❌ API 오류 (상태 코드: {response.status_code})")
-                try:
-                    error_data = response.json()
-                    st.code(error_data, language="json")
-                except:
-                    st.code(response.text)
+                # Display error based on status code
+                if status_code == 401:
+                    st.error(f"❌ {error_msg}")
+                    st.caption("REST API 키가 올바른지 확인하세요.")
+                elif status_code == 403:
+                    st.error(f"❌ {error_msg}")
+                    st.caption("플랫폼 설정 및 API 키 권한을 확인하세요.")
+                else:
+                    st.error(f"❌ {error_msg}")
 
-        except requests.exceptions.Timeout:
-            st.error("❌ 요청 시간 초과. 네트워크 연결을 확인하세요.")
-        except requests.exceptions.RequestException as e:
-            st.error(f"❌ 검색 실패: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                st.caption(f"상태 코드: {e.response.status_code}")
-                try:
-                    st.code(e.response.json(), language="json")
-                except:
-                    st.code(e.response.text)
-        except Exception as e:
-            st.error(f"❌ 예상치 못한 오류: {e}")
-            import traceback
-            st.code(traceback.format_exc())
-
+# ─────────────────────────────────────────────────────────────────
 # 검색 결과 표시
+# ─────────────────────────────────────────────────────────────────
 if st.session_state.search_results:
     st.markdown("#### 검색 결과")
 
