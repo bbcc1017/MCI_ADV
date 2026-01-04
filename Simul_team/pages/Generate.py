@@ -7,7 +7,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import folium
-from streamlit_folium import folium_static
+from streamlit_folium import st_folium
 
 KST = timezone(timedelta(hours=9))
 
@@ -560,7 +560,7 @@ if st.session_state.search_results:
         ).add_to(m)
 
     # 지도 표시
-    folium_static(m, width=700, height=400)
+    st_folium(m, width=700, height=400, returned_objects=[])
 
     # 결과 테이블
     st.markdown("**장소 목록 (클릭하여 선택)**")

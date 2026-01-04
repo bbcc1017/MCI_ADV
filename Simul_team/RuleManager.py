@@ -46,6 +46,7 @@ class Rule:
         self.hos_num = en_properties['hospital']['hos_num']
         self.tier1_idx = en_properties['hospital']['hos_tier1_idx'] # 기존과 tier1, tier2 정의 바뀐 것 주의
         self.tier2_idx = en_properties['hospital']['hos_tier2_idx'] # 기존과 tier1, tier2 정의 바뀐 것 주의
+        self.helipad_idx = en_properties['hospital'].get('hos_helipad_idx', np.array([]))
 
         self.hos_max_send = en_properties['hospital']['hos_max_send'] # 최대 보낼 수 있는 환자수 (목표치)
 
@@ -197,6 +198,9 @@ class Universal_Rule(Rule):
             if self.hos_select == "RedOnly":
                 if action[0] == 0: # Red selected
                     for i in self.tier1_idx:
+                        # ★ 헬기장 체크 추가 (UAV 선택 시)
+                        if action[2] == 1 and i not in self.helipad_idx:
+                            continue
                         if self.hos_max_send[i] > self.obs['h_states'][i,-1]: # max_send > n_occupied
                             action[1] = i + 1
                             break
@@ -204,12 +208,18 @@ class Universal_Rule(Rule):
                     for i in range(self.hos_num):
                         if i in self.tier1_idx:
                             continue
+                        # ★ 헬기장 체크 추가 (UAV 선택 시)
+                        if action[2] == 1 and i not in self.helipad_idx:
+                            continue
                         if self.hos_max_send[i] > self.obs['h_states'][i,-1]: # max_send > n_occupied
                             action[1] = i + 1
                             break
             elif self.hos_select == "YellowHalf":
                 if action[0] == 0:  # Red selected
                     for i in self.tier1_idx:
+                        # ★ 헬기장 체크 추가 (UAV 선택 시)
+                        if action[2] == 1 and i not in self.helipad_idx:
+                            continue
                         if self.hos_max_send[i] > self.obs['h_states'][i,-1]: # max_send > n_occupied
                             action[1] = i + 1
                             break
@@ -218,12 +228,18 @@ class Universal_Rule(Rule):
                     r = self.rng.random()
                     if r > 0.5: # Send to tier2
                         for i in self.tier1_idx:
+                            # ★ 헬기장 체크 추가 (UAV 선택 시)
+                            if action[2] == 1 and i not in self.helipad_idx:
+                                continue
                             if self.hos_max_send[i] > self.obs['h_states'][i,-1]: # max_send > n_occupied
                                 action[1] = i + 1
                                 break
                     else: # Send to tier1
                         for i in range(self.hos_num):
                             if i in self.tier1_idx:
+                                continue
+                            # ★ 헬기장 체크 추가 (UAV 선택 시)
+                            if action[2] == 1 and i not in self.helipad_idx:
                                 continue
                             if self.hos_max_send[i] > self.obs['h_states'][i,-1]: # max_send > n_occupied
                                 action[1] = i + 1

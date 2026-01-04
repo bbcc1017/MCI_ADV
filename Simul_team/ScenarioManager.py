@@ -120,6 +120,13 @@ class ScenarioManager():
         reg_prop['hos_closest_first_fromH'] = reg_prop['hos_tier1_idx'][np.argmin(HtoH_road[:,reg_prop['hos_tier1_idx']], axis=1)]
         reg_prop['hos_closest_second_fromH'] = reg_prop['hos_tier2_idx'][np.argmin(HtoH_road[:, reg_prop['hos_tier2_idx']], axis=1)]
 
+        # 헬기장 병원 인덱스 추출
+        if '헬기장 여부' in hos_info.columns:
+            reg_prop['hos_helipad_idx'] = hos_info.index[hos_info['헬기장 여부'] == 1].to_numpy()
+        else:
+            print("  ⚠️ hospital_info에 '헬기장 여부' 컬럼이 없습니다. 헬기장 인덱스를 빈 배열로 설정합니다.")
+            reg_prop['hos_helipad_idx'] = np.array([])
+
         return reg_prop
 
     def setup_ambulance(self, cfg_amb):

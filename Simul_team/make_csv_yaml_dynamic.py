@@ -360,8 +360,16 @@ class ScenarioGenerator:
         
         print(f"  ✅ 구급차 정보 생성 완료")
 
-    def make_hospital_info(self, latitude, longitude, incident_size, save_folder):
-        """병원 정보 생성 (기존 로직 유지 + 최소 조건 추가 보장)"""
+    def make_hospital_info(self, latitude, longitude, incident_size, save_folder, uav_size=0):
+        """병원 정보 생성 (기존 로직 유지 + 최소 조건 추가 보장)
+
+        Args:
+            latitude: 사고지점 위도
+            longitude: 사고지점 경도
+            incident_size: 환자 수
+            save_folder: 저장 폴더
+            uav_size: UAV 대수 (헬기장 병원 최소 보장에 사용)
+        """
         print(f"  🏥 병원 정보 생성 중...")
         
         # ---------- (0) 데이터 로드 ----------
@@ -377,6 +385,12 @@ class ScenarioGenerator:
             if c not in df_full.columns:
                 raise KeyError(f"필수 컬럼 누락: {c}")
         df = df_full[cols_needed].copy()
+
+        # ★ 헬기장 여부 컬럼 추가 (있으면 포함, 없으면 0으로 채움)
+        if "헬기장 여부" in df_full.columns:
+            df["헬기장 여부"] = df_full["헬기장 여부"].fillna(0).astype(int)
+        else:
+            df["헬기장 여부"] = 0  # 헬기장 정보 없으면 모두 0
 
         # ---------- (1) 유클리드 거리 계산 ----------
         coords = list(zip(df["y좌표"], df["x좌표"]))  # (lat, lon)
@@ -462,17 +476,53 @@ class ScenarioGenerator:
             candidates = df_sorted[(df_sorted["is_tier1"] == 0) & (~df_sorted.index.isin(df_selected.index))]
             if not candidates.empty:
                 df_selected = pd.concat([df_selected, candidates.head(1)])
-        
+
+        # ================================================================= #
+        # 규칙 4: 헬기장 병원 최소 보장 (UAV 대수 이상)
+        if "헬기장 여부" in df_selected.columns:
+            # UAV 대수 확인 (파라미터에서)
+            uav_n = int(max(0, uav_size))
+
+            if uav_n > 0:
+                helipad_hospitals = df_selected[df_selected["헬기장 여부"] == 1]
+                num_helipad = len(helipad_hospitals)
+
+                # UAV 대수만큼 헬기장 병원이 없으면 추가
+                num_to_ensure_helipad = uav_n - num_helipad
+
+                if num_to_ensure_helipad > 0:
+                    print(f"  INFO: 헬기장 병원이 {num_helipad}개인데 UAV는 {uav_n}대. 최소 {uav_n}개 헬기장 병원 확보를 위해 '{num_to_ensure_helipad}개' 추가합니다.")
+
+                    # 전체 병원 목록에서 헬기장 있는 병원 중 아직 선택되지 않은 것 찾기
+                    candidates_helipad = df_sorted[
+                        (df_sorted["헬기장 여부"] == 1) &
+                        (~df_sorted.index.isin(df_selected.index))
+                    ]
+
+                    if not candidates_helipad.empty:
+                        # 필요한 만큼 헬기장 병원 추가
+                        hospitals_to_add = candidates_helipad.head(num_to_ensure_helipad)
+                        df_selected = pd.concat([df_selected, hospitals_to_add])
+                        added_names = ", ".join(hospitals_to_add['요양기관명'].values)
+                        print(f"    → 추가된 헬기장 병원: {added_names}")
+                    else:
+                        print(f"  ⚠️ 경고: 전체 데이터에 헬기장 병원이 {num_helipad}개밖에 없습니다. UAV {uav_n}대 운용이 불가능합니다.")
+                else:
+                    print(f"  ✓ 헬기장 병원 {num_helipad}개 (UAV {uav_n}대 운용 가능)")
+            else:
+                print("  INFO: UAV 대수가 0이므로 헬기장 병원 보장 로직을 건너뜁니다.")
+        else:
+            print("  ⚠️ '헬기장 여부' 컬럼이 원본 데이터에 없습니다. 헬기장 보장 로직을 건너뜁니다.")
+
         df_euc = df_selected.sort_values("euclidean_distance").reset_index(drop=True).copy()
         print(f" 최종 생성된 병원: {len(df_euc)}곳 (상급: {df_euc['is_tier1'].sum()}곳, 종합 등: {len(df_euc) - df_euc['is_tier1'].sum()}곳)")
 
-        # ---------- (6) EUC 파일 저장 ----------
-        dist_euc_df = pd.DataFrame({"distance": df_euc["euclidean_distance"]})
-        dist_euc_path = os.path.join(save_folder, "distance_Hos2Site_euc.csv")
-        dist_euc_df.to_csv(dist_euc_path, index=True, index_label="Index", encoding="utf-8-sig")
-        
-        euc_info = df_euc[["operating_rooms", "capa", "종별코드", "요양기관명"]].copy()
-        euc_info.columns = ["수술실수", "병상수", "종별코드", "요양기관명"]
+        # ---------- (6) EUC 파일은 나중에 road 순서로 저장 (인덱스 일치 보장) ----------
+        # ★ CRITICAL: distance_Hos2Site_euc.csv는 road 순서를 따라야 h_states와 인덱스가 일치
+        # ★ 따라서 이 시점에서는 euc_info만 저장하고, distance는 road 재정렬 후 저장합니다.
+
+        euc_info = df_euc[["operating_rooms", "capa", "종별코드", "요양기관명", "헬기장 여부"]].copy()
+        euc_info.columns = ["수술실수", "병상수", "종별코드", "요양기관명", "헬기장 여부"]
         euc_info_path = os.path.join(save_folder, "hospital_info_euc.csv")
         euc_info.to_csv(euc_info_path, index=True, index_label="Index", encoding="utf-8-sig")
         
@@ -506,28 +556,34 @@ class ScenarioGenerator:
         })
         dist_road_path = os.path.join(save_folder, "distance_Hos2Site_road.csv")
         dist_road_df.to_csv(dist_road_path, index=True, index_label="Index", encoding="utf-8-sig")
-        
-        road_info = df_road[["operating_rooms", "capa", "종별코드", "요양기관명"]].copy()
-        road_info.columns = ["수술실수", "병상수", "종별코드", "요양기관명"]
+
+        # ★ CRITICAL FIX: distance_Hos2Site_euc.csv를 road 순서로 저장 (인덱스 일치 보장)
+        # df_road는 road_duration 기준으로 정렬되어 있으므로, h_states와 동일한 인덱스 순서를 가집니다.
+        # euclidean_distance 값은 유지하되, 순서만 road 기준으로 변경합니다.
+        dist_euc_df = pd.DataFrame({"distance": df_road["euclidean_distance"]})
+        dist_euc_path = os.path.join(save_folder, "distance_Hos2Site_euc.csv")
+        dist_euc_df.to_csv(dist_euc_path, index=True, index_label="Index", encoding="utf-8-sig")
+
+        road_info = df_road[["operating_rooms", "capa", "종별코드", "요양기관명", "헬기장 여부"]].copy()
+        road_info.columns = ["수술실수", "병상수", "종별코드", "요양기관명", "헬기장 여부"]
         road_info_path = os.path.join(save_folder, "hospital_info_road.csv")
         road_info.to_csv(road_info_path, index=True, index_label="Index", encoding="utf-8-sig")
 
-        print(f"  ✅ 병원 정보 생성 완료")
+        print(f"  ✅ 병원 정보 생성 완료 (distance_Hos2Site_euc.csv는 road 순서로 저장됨)")
 
 
     
     def make_uav_info(self, latitude, longitude, incident_size, uav_size, save_folder):
-        """UAV 정보 생성 - 헬기장 병원 기반
-        - 엑셀 전체 데이터에서 "헬기장 여부"=1인 병원만 필터링
+        """UAV 정보 생성 - hospital_info_road.csv 기반 (★핵심 변경★)
+        - hospital_info_road.csv에서 "헬기장 여부"=1인 병원만 필터링
         - 사고지점 기준 거리 계산 후 가장 가까운 N개 헬기장 병원 선정
         - 각 병원당 최대 1개 UAV 배정
+        - ★ uav_info 병원 = hospital_info의 부분집합 보장 (인덱스 일치)
         - CSV 구조: Index, init_distance, 수술실수, 병상수, 종별코드, 요양기관명
         """
-        print(f"  🚁 UAV 정보 생성 중 (헬기장 병원 사용)...")
+        print(f"  🚁 UAV 정보 생성 중 (hospital_info_road.csv 기반)...")
 
         import os
-        import math
-        import numpy as np
         import pandas as pd
         from haversine import haversine
 
@@ -540,69 +596,80 @@ class ScenarioGenerator:
             print("⚠️ UAV 대수가 0입니다. UAV 정보 생성 생략.")
             return
 
-        # 1) 엑셀 전체 데이터 로드
+        # 1) ★ hospital_info_road.csv 로드 (기존 엑셀 대신!)
+        hospital_info_path = os.path.join(save_folder, "hospital_info_road.csv")
+        if not os.path.exists(hospital_info_path):
+            print(f"❌ {hospital_info_path} 파일이 없습니다.")
+            print("   make_hospital_info()를 먼저 실행해주세요.")
+            raise FileNotFoundError(f"❌ {hospital_info_path} 파일이 없습니다.")
+
         try:
-            df_full = pd.read_excel(self.hospital_data_path, engine="openpyxl")
+            df_hospital_pool = pd.read_csv(hospital_info_path, encoding="utf-8-sig")
         except Exception as e:
-            print(f"❌ 병원 데이터 로드 실패: {e}")
+            print(f"❌ hospital_info_road.csv 로드 실패: {e}")
             return
 
         # 2) "헬기장 여부" 컬럼 확인 (필수)
-        if "헬기장 여부" not in df_full.columns:
-            print("❌ '헬기장 여부' 컬럼이 엑셀 결합 데이터.xlsx에 없습니다.")
-            print("   UAV 정보 생성을 중단합니다.")
-            raise ValueError("❌ '헬기장 여부' 컬럼이 엑셀에 없습니다.")
+        if "헬기장 여부" not in df_hospital_pool.columns:
+            print("❌ '헬기장 여부' 컬럼이 hospital_info_road.csv에 없습니다.")
+            print("   make_hospital_info()에서 헬기장 컬럼 추가 로직을 확인해주세요.")
+            raise KeyError("❌ hospital_info_road.csv에 '헬기장 여부' 컬럼이 없습니다.")
 
-        # 3) 헬기장 병원만 필터링
-        df_helipad = df_full[df_full["헬기장 여부"] == 1].copy()
+        # 3) hospital_info 내에서 헬기장 병원만 필터링
+        df_helipad_in_pool = df_hospital_pool[df_hospital_pool["헬기장 여부"] == 1].copy()
 
-        if df_helipad.empty:
-            print("❌ 헬기장이 있는 병원이 없습니다. 엑셀 데이터를 확인해주세요.")
-            raise ValueError("❌ 헬기장이 있는 병원이 없습니다.")
+        if df_helipad_in_pool.empty:
+            print("❌ hospital_info_road.csv에 헬기장이 있는 병원이 없습니다.")
+            print("   make_hospital_info()의 헬기장 보장 로직을 확인해주세요.")
+            raise ValueError("❌ hospital_info에 헬기장이 있는 병원이 없습니다.")
 
-        # 4) 사고지점-병원 유클리드 거리 계산
-        df_helipad["distance"] = df_helipad.apply(
+        # 4) 헬기장 병원 개수 검증 (UAV 대수와 비교)
+        if len(df_helipad_in_pool) < uav_n:
+            print(f"❌ hospital_info에 헬기장 병원이 {len(df_helipad_in_pool)}개밖에 없어 UAV {uav_n}대를 배치할 수 없습니다.")
+            print(f"   make_hospital_info()의 헬기장 보장 로직을 확인하거나 UAV 대수를 줄여주세요.")
+            raise ValueError(
+                f"❌ hospital_info에 헬기장 병원이 {len(df_helipad_in_pool)}개밖에 없어 "
+                f"UAV {uav_n}대를 배치할 수 없습니다."
+            )
+
+        # 5) 사고지점-병원 유클리드 거리 계산 (hospital_info에는 좌표가 없으므로 원본 Excel에서 가져와야 함)
+        # ★ hospital_info_road.csv에 이미 거리 정보가 있을 수 있지만, 안전하게 원본에서 좌표를 가져옴
+        try:
+            df_full_excel = pd.read_excel(self.hospital_data_path, engine="openpyxl")
+        except Exception as e:
+            print(f"❌ 원본 Excel 데이터 로드 실패: {e}")
+            return
+
+        # 병원명 기준으로 좌표 매칭
+        df_helipad_in_pool = df_helipad_in_pool.merge(
+            df_full_excel[["요양기관명", "x좌표", "y좌표"]],
+            on="요양기관명",
+            how="left"
+        )
+
+        # 좌표가 없는 병원 체크
+        if df_helipad_in_pool[["x좌표", "y좌표"]].isnull().any().any():
+            missing_hospitals = df_helipad_in_pool[df_helipad_in_pool[["x좌표", "y좌표"]].isnull().any(axis=1)]["요양기관명"].tolist()
+            print(f"⚠️ 경고: 다음 병원의 좌표 정보가 없습니다: {missing_hospitals}")
+            df_helipad_in_pool = df_helipad_in_pool.dropna(subset=["x좌표", "y좌표"])
+
+        df_helipad_in_pool["distance"] = df_helipad_in_pool.apply(
             lambda row: haversine((row["y좌표"], row["x좌표"]), (latitude, longitude)),
             axis=1
         )
 
-        # 5) 거리순 정렬
-        df_helipad = df_helipad.sort_values("distance").reset_index(drop=True)
+        # 6) 거리순 정렬 (가까운 헬기장 병원부터)
+        df_helipad_in_pool = df_helipad_in_pool.sort_values("distance").reset_index(drop=True)
 
-        # 6) 상위 N개 선정 (각 병원 최대 1개)
-        if uav_n > len(df_helipad):
-            print(f"❌ UAV {uav_n}대 > 헬기장 병원 {len(df_helipad)}곳")
-            print(f"   UAV 대수를 {len(df_helipad)}개 이하로 설정해주세요.")
-            raise ValueError(f"❌ UAV {uav_n}대 > 헬기장 병원 {len(df_helipad)}곳")
+        # 7) 상위 N개 선정 (각 병원 최대 1개 UAV)
+        df_selected = df_helipad_in_pool.head(uav_n).copy()
 
-        df_selected = df_helipad.head(uav_n).copy()
-
-        # 7) 수술실수 계산 (종별코드별 고정값)
-        conditions = [df_selected['종별코드'] == 1, df_selected['종별코드'] == 11]
-        values = [4, 3]
-        df_selected['operating_rooms'] = np.select(conditions, values, default=2)
-
-        # 8) 병상수 계산 (가동률 적용)
-        util_by_tier = getattr(self, "util_by_tier", {1: 0.656, 11: 0.461, "etc": 0.461})
-
-        def _get_util(code):
-            try:
-                icode = int(code)
-                return util_by_tier.get(icode, util_by_tier.get("etc", 0.461))
-            except Exception:
-                return util_by_tier.get("etc", 0.461)
-
-        df_selected["util"] = df_selected["종별코드"].apply(_get_util)
-        df_selected["capa"] = (df_selected["응급실병상수"] * (1 - df_selected["util"])).apply(
-            lambda x: int(max(0, math.floor(x)))
-        )
-
-        # 9) 확장된 CSV 저장
+        # 8) CSV 저장 (hospital_info와 동일한 병원 사용, 인덱스 일치 보장)
         result_df = pd.DataFrame({
             "Index": range(len(df_selected)),
             "init_distance": df_selected["distance"].round(3),
-            "수술실수": df_selected["operating_rooms"],
-            "병상수": df_selected["capa"],
+            "수술실수": df_selected["수술실수"],
+            "병상수": df_selected["병상수"],
             "종별코드": df_selected["종별코드"],
             "요양기관명": df_selected["요양기관명"]
         })
@@ -612,6 +679,7 @@ class ScenarioGenerator:
 
         print(f"  ✅ UAV 정보 생성 완료: {len(result_df)}개 UAV")
         print(f"     헬기장 병원: {', '.join(df_selected['요양기관명'].head(3).tolist())}{'...' if len(df_selected) > 3 else ''}")
+        print(f"     ★ hospital_info의 부분집합으로 생성됨 (인덱스 일치 보장)")
 
 
 
@@ -646,30 +714,32 @@ class ScenarioGenerator:
             print(f"❌ 병원 데이터 로드 실패: {e}")
             return
 
-        # Euclidean
+        # Euclidean (★ CRITICAL FIX: road 순서 기준으로 생성)
         try:
-            file_euc = os.path.join(save_folder, "hospital_info_euc.csv")
-            df_euc = pd.read_csv(file_euc, encoding="utf-8-sig")
-            names_euc = df_euc["요양기관명"].tolist()
-            coords_euc = []
-            for name in names_euc:
+            # ★ hospital_info_euc.csv 대신 hospital_info_road.csv 사용 (인덱스 일치 보장)
+            file_road = os.path.join(save_folder, "hospital_info_road.csv")
+            df_road_hos = pd.read_csv(file_road, encoding="utf-8-sig")
+            names_road = df_road_hos["요양기관명"].tolist()
+            coords_road = []
+            for name in names_road:
                 row = df_full[df_full["요양기관명"] == name]
                 if not row.empty:
-                    coords_euc.append((row.iloc[0]["y좌표"], row.iloc[0]["x좌표"]))
+                    coords_road.append((row.iloc[0]["y좌표"], row.iloc[0]["x좌표"]))
                 else:
-                    coords_euc.append((0, 0))
-            N = len(coords_euc)
+                    coords_road.append((0, 0))
+            N = len(coords_road)
             matrix = np.zeros((N, N))
             for i in range(N):
                 for j in range(i, N):
                     if i == j:
                         dist = 0
                     else:
-                        dist = haversine(coords_euc[i], coords_euc[j])
+                        dist = haversine(coords_road[i], coords_road[j])
                     matrix[i][j] = dist
                     matrix[j][i] = dist
             save_path_euc = os.path.join(save_folder, "distance_Hos2Hos_euc.csv")
             pd.DataFrame(matrix).to_csv(save_path_euc, index=True, encoding="utf-8-sig")
+            print(f"  ✅ 병원간 유클리드 거리 행렬 생성 완료 (road 순서 기준)")
         except Exception as e:
             print(f"❌ 유클리드 거리 계산 실패: {e}")
 
@@ -847,7 +917,7 @@ run_setting:
 
         # 생성 파이프라인
         self.make_amb_info(latitude, longitude, incident_size, save_folder)
-        self.make_hospital_info(latitude, longitude, incident_size, save_folder)
+        self.make_hospital_info(latitude, longitude, incident_size, save_folder, uav_size)
         self.make_uav_info(latitude, longitude, incident_size, uav_size, save_folder)
         self.make_patient_info(save_folder)
         self.make_distance_Hos2Hos(save_folder)

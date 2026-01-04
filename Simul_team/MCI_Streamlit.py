@@ -1045,7 +1045,7 @@ def get_total_samples_from_yaml(yaml_path: Optional[str]) -> int:
 # ------------------------------
 # 페이지 공통 설정 + CSS(멀티셀렉트 ellipsis 완화)
 # ------------------------------
-st.set_page_config(page_title="MCI Streamlit (기존 시나리오 대시보드)", page_icon="📊", layout="wide")
+st.set_page_config(page_title="MCI Streamlit", page_icon="📊", layout="wide")
 
 
 with st.sidebar:
