@@ -514,6 +514,64 @@ class ScenarioGenerator:
         else:
             print("  ⚠️ '헬기장 여부' 컬럼이 원본 데이터에 없습니다. 헬기장 보장 로직을 건너뜁니다.")
 
+        # ================================================================= #
+        # 규칙 5: UAV 이송을 위한 교집합 병원 보장 (헬기장+Tier)
+        if "헬기장 여부" in df_selected.columns:
+            uav_n = int(max(0, uav_size))
+
+            if uav_n > 0:
+                # 5-1: Red UAV 이송용 헬기장+Tier1 병원 최소 1개 보장
+                helipad_tier1_hospitals = df_selected[
+                    (df_selected["헬기장 여부"] == 1) &
+                    (df_selected["is_tier1"] == 1)
+                ]
+
+                if len(helipad_tier1_hospitals) == 0:
+                    print("  INFO: Red UAV 이송용 헬기장+Tier1 병원이 없음. 추가 중...")
+                    candidates = df_sorted[
+                        (df_sorted["헬기장 여부"] == 1) &
+                        (df_sorted["is_tier1"] == 1) &
+                        (~df_sorted.index.isin(df_selected.index))
+                    ]
+
+                    if not candidates.empty:
+                        hospital_to_add = candidates.head(1)
+                        df_selected = pd.concat([df_selected, hospital_to_add])
+                        added_name = hospital_to_add['요양기관명'].values[0]
+                        print(f"    → 추가됨: {added_name}")
+                    else:
+                        print("  ⚠️ 경고: 전체 데이터에 헬기장+Tier1 병원 없음. Red UAV 이송 불가!")
+                else:
+                    print(f"  ✓ 헬기장+Tier1 병원 {len(helipad_tier1_hospitals)}개 (Red UAV 이송 가능)")
+
+                # 5-2: Yellow UAV 이송용 헬기장+Tier2 병원 최소 1개 보장
+                helipad_tier2_hospitals = df_selected[
+                    (df_selected["헬기장 여부"] == 1) &
+                    (df_selected["is_tier1"] == 0)
+                ]
+
+                if len(helipad_tier2_hospitals) == 0:
+                    print("  INFO: Yellow UAV 이송용 헬기장+Tier2 병원이 없음. 추가 중...")
+                    candidates = df_sorted[
+                        (df_sorted["헬기장 여부"] == 1) &
+                        (df_sorted["is_tier1"] == 0) &
+                        (~df_sorted.index.isin(df_selected.index))
+                    ]
+
+                    if not candidates.empty:
+                        hospital_to_add = candidates.head(1)
+                        df_selected = pd.concat([df_selected, hospital_to_add])
+                        added_name = hospital_to_add['요양기관명'].values[0]
+                        print(f"    → 추가됨: {added_name}")
+                    else:
+                        print("  ⚠️ 경고: 전체 데이터에 헬기장+Tier2 병원 없음. Yellow UAV 이송 불가!")
+                else:
+                    print(f"  ✓ 헬기장+Tier2 병원 {len(helipad_tier2_hospitals)}개 (Yellow UAV 이송 가능)")
+            else:
+                print("  INFO: UAV 대수가 0이므로 헬기장+Tier 교집합 보장 로직을 건너뜁니다.")
+        else:
+            print("  ⚠️ '헬기장 여부' 컬럼이 원본 데이터에 없습니다. 헬기장+Tier 교집합 보장 로직을 건너뜁니다.")
+
         df_euc = df_selected.sort_values("euclidean_distance").reset_index(drop=True).copy()
         print(f" 최종 생성된 병원: {len(df_euc)}곳 (상급: {df_euc['is_tier1'].sum()}곳, 종합 등: {len(df_euc) - df_euc['is_tier1'].sum()}곳)")
 

@@ -227,7 +227,9 @@ class Universal_Rule(Rule):
                     # Get random number from environment for seed control
                     r = self.rng.random()
                     if r > 0.5: # Send to tier2
-                        for i in self.tier1_idx:
+                        for i in range(self.hos_num):
+                            if i in self.tier1_idx:  # Tier1 skip → Tier2만 사용
+                                continue
                             # ★ 헬기장 체크 추가 (UAV 선택 시)
                             if action[2] == 1 and i not in self.helipad_idx:
                                 continue
@@ -235,9 +237,7 @@ class Universal_Rule(Rule):
                                 action[1] = i + 1
                                 break
                     else: # Send to tier1
-                        for i in range(self.hos_num):
-                            if i in self.tier1_idx:
-                                continue
+                        for i in self.tier1_idx:  # Tier1만 사용
                             # ★ 헬기장 체크 추가 (UAV 선택 시)
                             if action[2] == 1 and i not in self.helipad_idx:
                                 continue
