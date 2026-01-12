@@ -1750,13 +1750,19 @@ with tabs[0]:
         draw_route_from_json(m, obj, highlight=False)
 
     # ─ AMB S→H 라인/마커 ─
-    # 이름 → JSON route 매핑 (병원명으로 연결)
+    # 이름/Index → JSON route 매핑 (병원명으로 연결)
     h2s_map = {}
+    h2s_idx_map = {}
     for obj in h2s_all:  # 전체 탐색
         meta = obj.get("meta", {})
         nm = str(meta.get("name","")).strip()
         if nm:
             h2s_map[nm] = obj
+        try:
+            idx = int(meta.get("source_index"))
+            h2s_idx_map[idx] = obj
+        except Exception:
+            pass
 
     # ✔ hospital_info_road 순서/선택 + distance_Hos2Site_road 거리 표출
     for _, row in s2h_df.iterrows():
@@ -1764,22 +1770,30 @@ with tabs[0]:
         if i not in st.session_state.amb_s2h_sel_idx:
             continue
         name = str(row["병원"]).strip()
-        obj  = h2s_map.get(name)
+        obj  = h2s_idx_map.get(i) or h2s_map.get(name)
         if obj is None:
             continue
 
         # 좌표/메타는 엑셀에서 보강
         latlon = None; phone = addr = None
         code   = row.get("종별코드", None)
+        # 1) route meta 좌표(이름 중복시 Index 우선)
+        meta = obj.get("meta", {}) if isinstance(obj, dict) else {}
+        hosp_meta = meta.get("hospital")
+        if isinstance(hosp_meta, (list, tuple)) and len(hosp_meta) == 2:
+            latlon = (float(hosp_meta[1]), float(hosp_meta[0]))
+
+        # 2) 엑셀: 주소/전화 보강, 좌표는 없을 때만 보정
         if hosp_xl is not None and "요양기관명" in hosp_xl.columns:
             rx = hosp_xl[hosp_xl["요양기관명"] == name]
             if not rx.empty:
                 phone = rx.iloc[0].get("전화번호", None)
                 addr  = rx.iloc[0].get("주소", None)
-                y = rx.iloc[0].get("y좌표", rx.iloc[0].get("y", None))
-                x = rx.iloc[0].get("x좌표", rx.iloc[0].get("x", None))
-                if pd.notna(y) and pd.notna(x):
-                    latlon = (float(y), float(x))
+                if latlon is None:
+                    y = rx.iloc[0].get("y좌표", rx.iloc[0].get("y", None))
+                    x = rx.iloc[0].get("x좌표", rx.iloc[0].get("x", None))
+                    if pd.notna(y) and pd.notna(x):
+                        latlon = (float(y), float(x))
 
             # (기존) 좌표/메타 얻는 부분은 그대로 두고,
             #       추가로 hinfo_df에서 병상수/수술실수, JSON에서 소요시간을 읽어 붙임

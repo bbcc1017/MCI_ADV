@@ -25,3 +25,6 @@ pingouin==0.5.5
 
 # Simulation/RL env (imported by MCIEnvironment_gymnasium.py)
 gymnasium==1.0.0
+
+# Simulation results comparison by 3D plot
+plotly==6.5.1
