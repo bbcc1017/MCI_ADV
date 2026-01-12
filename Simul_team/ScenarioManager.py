@@ -189,6 +189,20 @@ class ScenarioManager():
             try:
                 uav_info = pd.read_csv(cfg_uav['dispatch_distance_info'])
                 reg_prop['uav_num'] = len(uav_info)
+
+                # UAV 대수가 0이면 빈 배열로 초기화하고 조기 반환
+                if reg_prop['uav_num'] == 0:
+                    print("  UAV 대수가 0입니다. 기본 파라미터로 초기화합니다.")
+                    reg_prop['uav_dispatch_d'] = np.array([], dtype='float32')
+                    reg_prop['uav_v'] = cfg_uav['velocity']
+                    reg_prop['uav_handover_time'] = cfg_uav['handover_time']
+                    # 빈 파라미터로 초기화
+                    reg_prop['uav_response_t'] = (np.array([]), np.array([]), np.array([]))
+                    reg_prop['uav_HtoS_t'] = (np.array([]), np.array([]), np.array([]))
+                    reg_prop['uav_HtoH_t'] = (np.array([]), np.array([]), np.array([]))
+                    reg_prop['uav_maxD_HtoH'] = 0
+                    return reg_prop
+                                    
                 reg_prop['uav_dispatch_d'] = uav_info['init_distance'].to_numpy(dtype='float32')
                 reg_prop['uav_v'] = cfg_uav['velocity']
                 reg_prop['uav_handover_time'] = cfg_uav['handover_time']

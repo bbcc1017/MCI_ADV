@@ -821,6 +821,8 @@ default_preset = [{
 preset_df = pd.DataFrame(st.session_state.batch_presets)
 if preset_df.empty:
     preset_df = pd.DataFrame(default_preset)
+if isinstance(st.session_state.get("preset_editor"), pd.DataFrame):
+    preset_df = st.session_state.preset_editor
 preset_edited = st.data_editor(
     preset_df,
     num_rows="dynamic",
@@ -844,6 +846,8 @@ preset_edited = st.data_editor(
     },
     key="preset_editor"
 )
+if isinstance(st.session_state.get("preset_editor"), pd.DataFrame):
+    preset_edited = st.session_state.preset_editor
 presets_clean = preset_edited.dropna(how="all").to_dict(orient="records")
 st.session_state.batch_presets = presets_clean if presets_clean else default_preset
 preset_names = [p.get("name", "") for p in st.session_state.batch_presets]
@@ -865,6 +869,8 @@ if st.session_state.batch_coord_rows:
 else:
     coord_df = pd.DataFrame(columns=coord_columns)
 coord_df = coord_df.reindex(columns=coord_columns)
+if isinstance(st.session_state.get("batch_coord_editor_v2"), pd.DataFrame):
+    coord_df = st.session_state.batch_coord_editor_v2
 coord_edited = st.data_editor(
     coord_df,
     num_rows="dynamic",
@@ -893,6 +899,8 @@ coord_edited = st.data_editor(
     },
     key="batch_coord_editor_v2"
 )
+if isinstance(st.session_state.get("batch_coord_editor_v2"), pd.DataFrame):
+    coord_edited = st.session_state.batch_coord_editor_v2
 st.session_state.batch_coord_rows = coord_edited.dropna(how="all").to_dict(orient="records")
 
 # 실행 설정

@@ -652,6 +652,11 @@ class ScenarioGenerator:
             uav_n = 0
         if uav_n <= 0:
             print("⚠️ UAV 대수가 0입니다. UAV 정보 생성 생략.")
+            # 생략안하고 UAV=0대일 때 실험을 위한 빈 CSV 파일 생성 (헤더만 포함)
+            empty_df = pd.DataFrame(columns=["Index", "init_distance", "수술실수", "병상수", "종별코드", "요양기관명"])
+            save_path = os.path.join(save_folder, "uav_info.csv")
+            empty_df.to_csv(save_path, index=False, encoding="utf-8-sig")
+            print(f"  빈 UAV 정보 파일 생성 완료: {save_path}")
             return
 
         # 1) ★ hospital_info_road.csv 로드 (기존 엑셀 대신!)
@@ -921,7 +926,7 @@ event_info_path: "event_info.json"
 rule_info:
   isFullFactorial: True
   priority_rule: ["START", "ReSTART"]
-  hos_select_rule: ["RedOnly", "YellowHalf"]
+  hos_select_rule: ["RedOnly", "YellowNearest"] # hos_select_rule: ["RedOnly", "YellowHalf"]
   red_mode_rule: ["OnlyUAV", "Both_UAVFirst", "Both_AMBFirst", "OnlyAMB"]
   yellow_mode_rule: ["OnlyUAV", "Both_UAVFirst", "Both_AMBFirst", "OnlyAMB"]
 
