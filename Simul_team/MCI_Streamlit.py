@@ -20,7 +20,7 @@
 #      · statsmodels 있으면 OLS+Type-II ANOVA, 잔차 정규성(Shapiro)·QQ 스캐터·잔차 히스토그램 제공
 # 5) Data Tables: 편집 대상 셀렉터에 파일명만 노출(경로 숨김), "안전센터와 소방서.csv"는 편집 목록에서 제외
 # -------------------------------------------------------------------------------------------------
-import os, re, json, shutil, subprocess, math
+import os, re, json, shutil, subprocess, math, ast
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Tuple, Optional, Union
@@ -569,11 +569,13 @@ RED_POLICY = ["RedOnly", "YellowHalf"]
 ACTIONS = ["OnlyUAV","Both_UAVFirst","Both_AMBFirst","OnlyAMB"]
 
 RULE_HEADER_RE = re.compile(r"^(START|ReSTART)\s*,\s*(.+?)\s*$")
-TUPLE_LINE_RE = re.compile(r"^\(\s*([-\d\.]+)\s*,\s*(\d+)\s*,\s*'([A-Za-z_]+)'\s*,\s*\(([^)]*)\)\s*\)\s*$")
+TUPLE_LINE_RE = re.compile(r"^\(\s*([^,]+)\s*,\s*(\d+)\s*,\s*'([A-Za-z_]+)'\s*,\s*\(([^)]*)\)\s*\)\s*$")
 ACTION_RE = re.compile(r"^Action:\s*\[([^\]]+)\]")
 
 # Iteration 라인 파싱 (예: "Iter : 3" 또는 "Iteration: 3")
 ITER_RE = re.compile(r'^\s*(?:Iter(?:ation)?\s*[:=]\s*)(\d+)\b', re.I)
+NP_SCALAR_RE = re.compile(r"^np\.(?:float|int)\d+\((.+)\)$")
+NP_WRAP_RE = re.compile(r"np\.(?:float|int)\d+\(\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s*\)")
 
 
 EV_ARG_PARSERS = {
@@ -592,6 +594,65 @@ ACTION_TOOLTIP_MD = (
     "- `action[1] = destination` → 0=현장대기, 1…N → 병원 index+1\n"
     "- `action[2] = mode` → 0=AMB(구급차), 1=UAV"
 )
+
+def _strip_np_scalar(token: str) -> str:
+    s = token.strip()
+    m = NP_SCALAR_RE.match(s)
+    return m.group(1).strip() if m else s
+
+def _coerce_float(token: str) -> Optional[float]:
+    if token is None:
+        return None
+    s = _strip_np_scalar(token)
+    if not s:
+        return None
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+def _coerce_int(token: str) -> Optional[int]:
+    if token is None:
+        return None
+    s = _strip_np_scalar(token)
+    if not s:
+        return None
+    try:
+        v = float(s)
+    except Exception:
+        return None
+    return int(v) if v.is_integer() else None
+
+def _parse_event_tuple_line(line: str) -> Optional[Tuple[float, int, str, List[Union[int, float]]]]:
+    if not line or line[0] != "(" or line[-1] != ")":
+        return None
+    clean = NP_WRAP_RE.sub(r"\1", line)
+    try:
+        t, eid, ev, args = ast.literal_eval(clean)
+    except Exception:
+        return None
+    if not isinstance(ev, str):
+        return None
+    try:
+        t_val = float(t)
+        eid_val = int(eid)
+    except Exception:
+        return None
+    if isinstance(args, (list, tuple)):
+        args_list = list(args)
+    else:
+        args_list = [args] if args is not None else []
+    parsed_args: List[Union[int, float]] = []
+    for a in args_list:
+        ival = _coerce_int(str(a))
+        if ival is None:
+            fval = _coerce_float(str(a))
+            if fval is None:
+                continue
+            parsed_args.append(fval)
+        else:
+            parsed_args.append(ival)
+    return t_val, eid_val, ev, parsed_args
 
 
 def _read_text_any(path: str) -> str:
@@ -636,23 +697,60 @@ def parse_log_blocks(log_text: str) -> List[Dict]:
         if ma:
             try:
                 parts = [x.strip() for x in ma.group(1).split(',')]
-                vec = [int(x) for x in parts if x != '']
-                cur["actions"].append(vec)
+                vec = []
+                for part in parts:
+                    if not part:
+                        continue
+                    ival = _coerce_int(part)
+                    if ival is None:
+                        fval = _coerce_float(part)
+                        if fval is None:
+                            continue
+                        vec.append(fval)
+                    else:
+                        vec.append(ival)
+                if vec:
+                    cur["actions"].append(vec)
             except Exception:
                 pass
             continue
 
-        mt = TUPLE_LINE_RE.match(s)
-        if mt:
-            t = float(mt.group(1)); eid = int(mt.group(2)); ev = mt.group(3)
-            args = [x.strip() for x in mt.group(4).split(',') if x.strip() != '']
-            try:
-                args = [int(a) for a in args]
-            except Exception:
-                pass
+        parsed = _parse_event_tuple_line(s)
+        if parsed:
+            t, eid, ev, args = parsed
             rec = {"t": t, "eid": eid, "ev": ev, "p": None, "a": None, "u": None, "h": None}
             if ev in EV_ARG_PARSERS:
-                rec.update(EV_ARG_PARSERS[ev](args))
+                try:
+                    rec.update(EV_ARG_PARSERS[ev](args))
+                except Exception:
+                    pass
+            cur["events"].append(rec)
+            continue
+
+        mt = TUPLE_LINE_RE.match(s)
+        if mt:
+            t = _coerce_float(mt.group(1))
+            if t is None:
+                continue
+            eid = int(mt.group(2))
+            ev = mt.group(3)
+            args_raw = [x.strip() for x in mt.group(4).split(',') if x.strip() != '']
+            args = []
+            for a in args_raw:
+                ival = _coerce_int(a)
+                if ival is None:
+                    fval = _coerce_float(a)
+                    if fval is None:
+                        continue
+                    args.append(fval)
+                else:
+                    args.append(ival)
+            rec = {"t": t, "eid": eid, "ev": ev, "p": None, "a": None, "u": None, "h": None}
+            if ev in EV_ARG_PARSERS:
+                try:
+                    rec.update(EV_ARG_PARSERS[ev](args))
+                except Exception:
+                    pass
             cur["events"].append(rec)
             continue
 
