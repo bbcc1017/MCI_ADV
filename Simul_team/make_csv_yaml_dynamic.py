@@ -298,7 +298,7 @@ class ScenarioGenerator:
             print(f"  💥 좌표 생성 오류: {e}")
             return None
 
-    def make_amb_info(self, latitude, longitude, incident_size, save_folder):
+    def make_amb_info(self, latitude, longitude, incident_size, amb_size, save_folder):
         """구급차 정보 생성"""
         print(f"  🚑 구급차 정보 생성 중...")
         try:
@@ -312,7 +312,8 @@ class ScenarioGenerator:
         df["euclidean_distance"] = euc_distances
 
         # EUC 저장
-        df_sorted_euc = df.sort_values("euclidean_distance").head(incident_size).copy()
+        # df_sorted_euc = df.sort_values("euclidean_distance").head(incident_size).copy()
+        df_sorted_euc = df.sort_values("euclidean_distance").head(amb_size).copy()
         df_sorted_euc = df_sorted_euc.rename(columns={
             "euclidean_distance": "init_distance",
             "기관명": "안전센터/소방서이름"
@@ -347,7 +348,8 @@ class ScenarioGenerator:
         df_candidates["road_duration"] = road_durations
 
         # ROAD 저장 (duration 기준으로 정렬 후 상위 incident_size개 선택)
-        df_sorted_road = df_candidates.sort_values("road_duration").head(incident_size).copy()
+        # df_sorted_road = df_candidates.sort_values("road_duration").head(incident_size).copy()
+        df_sorted_road = df_candidates.sort_values("road_duration").head(amb_size).copy()
         df_sorted_road = df_sorted_road.rename(columns={
             "road_distance": "init_distance",
             "road_duration": "duration",
@@ -979,7 +981,7 @@ run_setting:
         print(f"  📍 좌표: ({latitude}, {longitude}) - 역지오코딩은 orchestrator에서 수행")
 
         # 생성 파이프라인
-        self.make_amb_info(latitude, longitude, incident_size, save_folder)
+        self.make_amb_info(latitude, longitude, incident_size, amb_size, save_folder)
         self.make_hospital_info(latitude, longitude, incident_size, save_folder, uav_size)
         self.make_uav_info(latitude, longitude, incident_size, uav_size, save_folder)
         self.make_patient_info(save_folder)

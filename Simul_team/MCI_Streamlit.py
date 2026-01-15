@@ -565,7 +565,7 @@ def get_patient_count(base_path: str, exp_id: str, coord: str) -> Optional[int]:
 # Logs (실행 로그 탐색 + 파싱)
 # ------------------------------
 PHASES = ["START", "ReSTART"]
-RED_POLICY = ["RedOnly", "YellowHalf"]
+RED_POLICY = ["RedOnly", "YellowNearest"]
 ACTIONS = ["OnlyUAV","Both_UAVFirst","Both_AMBFirst","OnlyAMB"]
 
 RULE_HEADER_RE = re.compile(r"^(START|ReSTART)\s*,\s*(.+?)\s*$")
@@ -2040,43 +2040,165 @@ def gen_scenario_keys() -> pd.DataFrame:
 
 
 def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    STAT 파일을 RAW 기준으로 재정렬
+    ✅ 누락된 시나리오도 처리 (UAV=0 케이스 대응)
+    """
+    
+    # 1. STAT 파일 읽기 - 룰 이름을 키로 사용
+    stat_dict = {}  # {rule_name: [(mean, std, ci) for each metric]}
+    
     with open(stat_path, "r", encoding="utf-8") as f:
         lines = [ln.strip() for ln in f if ln.strip()]
-    triples = []
-    for ln in lines:
-        nums = re.findall(r"[-+]?\d*\.\d+|\d+", ln)
-        if len(nums) >= 3:
-            triples.append(tuple(float(x) for x in nums[:3]))
-    if len(triples) % 64 != 0:
-        st.warning(f"Stat 라인 수가 64의 배수가 아님: {len(triples)}")
-    n_blocks = len(triples) // 64
-    if n_blocks < 1:
+    
+    st.caption(f"📊 STAT 파일 총 {len(lines)}줄")
+    
+    # 예상 라인 수 확인
+    expected = 320  # 64 × 5
+    if len(lines) != expected:
+        st.warning(f"⚠️ STAT 라인 수 불일치: {len(lines)}줄 (예상: {expected}줄)")
+        st.caption(f"→ {expected - len(lines)}개 시나리오가 누락되었을 수 있습니다")
+    
+    # 2. 각 줄을 파싱하여 딕셔너리에 저장
+    for line in lines:
+        parts = line.split()
+        
+        if len(parts) < 3:
+            continue
+        
+        try:
+            mean = float(parts[-3])
+            std = float(parts[-2])
+            ci = float(parts[-1])
+            
+            # 룰 이름 추출
+            rule_name = " ".join(parts[:-3]).strip()
+            
+            # 룰별로 메트릭 저장 (순서대로 5개: Reward, Time, PDR, Reward_woG, PDR_woG)
+            if rule_name not in stat_dict:
+                stat_dict[rule_name] = []
+            
+            stat_dict[rule_name].append((mean, std, ci))
+            
+        except ValueError:
+            continue
+    
+    # 3. RAW 파일에서 정확한 룰 순서 가져오기
+    raw_path = stat_path.replace("_stat.txt", ".txt")
+    
+    if not os.path.exists(raw_path):
+        st.error("❌ RAW 파일을 찾을 수 없습니다!")
         return pd.DataFrame(), pd.DataFrame()
-    keys = gen_scenario_keys()
-    wide = keys.copy()
+    
+    dfraw = parse_raw_results(raw_path)
+    reward_data = dfraw[dfraw["metric"] == "Reward"]
+    
+    # RAW의 룰 순서 (실제 실행된 순서)
+    rule_order = reward_data[reward_data["run"] == 1]["rule"].tolist()
+    
+    st.info(f"✅ RAW 파일: {len(rule_order)}개 시나리오 확인")
+    
+    # 4. RAW 순서대로 STAT 데이터 매칭
+    result_rows = []
+    missing_count = 0
+    
+    for idx, rule in enumerate(rule_order):
+        row = {
+            "ScenarioIdx": idx,
+        }
+        
+        # Phase, RedPolicy 등 파싱
+        match = re.match(
+            r'(START|ReSTART),\s*(RedOnly|YellowNearest),\s*Red\s+(\w+),\s*Yellow\s+(\w+)', 
+            rule
+        )
+        if match:
+            row["Phase"] = match.group(1)
+            row["RedPolicy"] = match.group(2)
+            row["RedAction"] = match.group(3)
+            row["YellowAction"] = match.group(4)
+        
+        # STAT에서 해당 룰 찾기
+        if rule in stat_dict:
+            stats = stat_dict[rule]
+            
+            # ✅ 기존 컬럼 이름 형식 유지: M1_mean, M2_mean, ...
+            for m_idx in range(5):
+                if m_idx < len(stats):
+                    mean, std, ci = stats[m_idx]
+                    row[f"M{m_idx+1}_mean"] = mean
+                    row[f"M{m_idx+1}_std"] = std
+                    row[f"M{m_idx+1}_ci"] = ci
+                else:
+                    row[f"M{m_idx+1}_mean"] = np.nan
+                    row[f"M{m_idx+1}_std"] = np.nan
+                    row[f"M{m_idx+1}_ci"] = np.nan
+        else:
+            # STAT에 없는 룰 → RAW에서 직접 계산
+            st.warning(f"⚠️ STAT에 없음: {rule}")
+            missing_count += 1
+            
+            # RAW 데이터에서 직접 통계 계산
+            metric_names = ["Reward", "Time", "PDR", "Reward_woG", "PDR_woG"]
+            
+            for m_idx, metric in enumerate(metric_names):
+                metric_data = dfraw[(dfraw["metric"] == metric) & (dfraw["rule"] == rule)]
+                
+                if not metric_data.empty:
+                    values = metric_data["value"].values
+                    mean = np.mean(values)
+                    std = np.std(values, ddof=1) if len(values) > 1 else 0
+                    
+                    # 95% CI 계산
+                    if len(values) > 1:
+                        from scipy.stats import t
+                        se = std / np.sqrt(len(values))
+                        ci = t.interval(0.95, len(values)-1, loc=mean, scale=se)
+                        ci_half = (ci[1] - ci[0]) / 2
+                    else:
+                        ci_half = 0
+                    
+                    row[f"M{m_idx+1}_mean"] = mean
+                    row[f"M{m_idx+1}_std"] = std
+                    row[f"M{m_idx+1}_ci"] = ci_half
+                else:
+                    row[f"M{m_idx+1}_mean"] = np.nan
+                    row[f"M{m_idx+1}_std"] = np.nan
+                    row[f"M{m_idx+1}_ci"] = np.nan
+        
+        result_rows.append(row)
+    
+    if missing_count > 0:
+        st.warning(f"⚠️ {missing_count}개 시나리오를 RAW에서 직접 계산했습니다")
+    
+    wide = pd.DataFrame(result_rows)
+    
+
+    
+    # ✅ long 형식도 생성 (기존 코드 호환성)
     long_rows = []
-    for b in range(min(5, n_blocks)):
-        metric = f"M{b+1}"
-        block = triples[b*64:(b+1)*64]
-        means = [t[0] for t in block]; stds  = [t[1] for t in block]; cis   = [t[2] for t in block]
-        wide[f"{metric}_mean"] = means; wide[f"{metric}_std"]  = stds; wide[f"{metric}_ci"]   = cis
-        for i in range(len(block)):
+    metric_names = ["Reward", "Time", "PDR", "Reward_woG", "PDR_woG"]
+    
+    for _, row in wide.iterrows():
+        for m_idx, metric in enumerate(metric_names):
             long_rows.append({
-                "ScenarioIdx": i,
-                "Metric": metric,
-                "mean": means[i],
-                "std": stds[i],
-                "ci": cis[i],
-                "Phase": keys.iloc[i]["Phase"],
-                "RedPolicy": keys.iloc[i]["RedPolicy"],
-                "RedAction": keys.iloc[i]["RedAction"],
-                "YellowAction": keys.iloc[i]["YellowAction"],
+                "ScenarioIdx": row["ScenarioIdx"],
+                "Metric": f"M{m_idx+1}",
+                "mean": row.get(f"M{m_idx+1}_mean", np.nan),
+                "std": row.get(f"M{m_idx+1}_std", np.nan),
+                "ci": row.get(f"M{m_idx+1}_ci", np.nan),
+                "Phase": row.get("Phase", ""),
+                "RedPolicy": row.get("RedPolicy", ""),
+                "RedAction": row.get("RedAction", ""),
+                "YellowAction": row.get("YellowAction", ""),
             })
+    
     long_df = pd.DataFrame(long_rows)
+    
     return wide, long_df
 
 # Raw 결과 파싱 (Rule×Sample 스택)
-RAW_RE = re.compile(r'^(START|ReSTART),\s*(RedOnly|YellowHalf),\s*Red\s+([A-Za-z_]+),\s*Yellow\s+([A-Za-z_]+)')
+RAW_RE = re.compile(r'^(START|ReSTART),\s*(RedOnly|YellowNearest),\s*Red\s+([A-Za-z_]+),\s*Yellow\s+([A-Za-z_]+)')
 
 
 

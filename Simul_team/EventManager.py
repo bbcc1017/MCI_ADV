@@ -1,5 +1,6 @@
 import heapq
 import numpy as np
+
 class EventManager():
     def __init__(self, ev_info, en_manager, rng=None):
         self.ev_info = ev_info
