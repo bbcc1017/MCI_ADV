@@ -421,8 +421,8 @@ class ScenarioGenerator:
         df["util"] = df["종별코드"].apply(_get_util)
         df["capa"] = (df["응급실병상수"] * (1 - df["util"])).apply(lambda x: int(max(0, math.floor(x))))
         # 수술실 수 종별코드별 고정
-        conditions = [df['종별코드'] == 1, df['종별코드'] == 11]; values = [4, 3]
-        df['operating_rooms'] = np.select(conditions, values, default=2)
+        conditions = [df['종별코드'] == 1, df['종별코드'] == 11]; values = [3, 2]
+        df['operating_rooms'] = np.select(conditions, values, default=1)
         df["eff"] = df["operating_rooms"] + df["capa"]
         df["is_tier1"] = (df["종별코드"].astype(str).astype(float).astype(int) == 1).astype(int)
         
