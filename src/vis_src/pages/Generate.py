@@ -2,6 +2,7 @@
 # 새 시나리오 생성 전용 독립 페이지
 # -------------------------------------------------------------------------------------------------
 import os, re, yaml, shutil
+import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import streamlit as st
@@ -9,6 +10,30 @@ import pandas as pd
 import requests
 import folium
 from streamlit_folium import st_folium
+
+
+def _detect_repo_root() -> Path:
+    here = Path(__file__).resolve().parent
+    for parent in (here, *here.parents):
+        if (parent / "src" / "sce_src" / "orchestrator.py").is_file():
+            return parent
+    return here
+
+
+def _detect_cloud_base_path() -> str:
+    for cand in ("/mount/src/mci_adv", "/mount/src/mci_adv/Simul_team"):
+        p = Path(cand)
+        if p.is_dir() and (p / "scenarios").is_dir():
+            return cand
+    return ""
+
+
+REPO_ROOT = _detect_repo_root()
+ORCHESTRATOR_DIR = REPO_ROOT / "src" / "sce_src"
+if ORCHESTRATOR_DIR.is_dir():
+    orch_path = str(ORCHESTRATOR_DIR)
+    if orch_path not in sys.path:
+        sys.path.insert(0, orch_path)
 
 KST = timezone(timedelta(hours=9))
 
@@ -149,11 +174,12 @@ def perform_address_search(search_query, api_key):
 # ─────────────────────────────────────────────────────────────────
 # Session State 초기화
 # ─────────────────────────────────────────────────────────────────
-CLOUD_BASE_PATH = "/mount/src/mci_adv/Simul_team"
-IS_CLOUD = os.path.isdir(CLOUD_BASE_PATH)
+CLOUD_BASE_PATH = _detect_cloud_base_path()
+IS_CLOUD = bool(CLOUD_BASE_PATH)
+DEFAULT_LOCAL_BASE_PATH = str(REPO_ROOT) if (REPO_ROOT / "scenarios").is_dir() else ""
 
 if "generate_base_path" not in st.session_state:
-    st.session_state.generate_base_path = CLOUD_BASE_PATH if IS_CLOUD else ""
+    st.session_state.generate_base_path = CLOUD_BASE_PATH if IS_CLOUD else DEFAULT_LOCAL_BASE_PATH
 else:
     # Cloud에서는 항상 고정 (사용자가 바꿔도 즉시 원복)
     if IS_CLOUD and st.session_state.generate_base_path != CLOUD_BASE_PATH:
@@ -261,7 +287,7 @@ with col_path:
     generate_bp_input = st.text_input(
         "🗂️ 프로젝트 경로 (base_path)",
         value=st.session_state.generate_base_path,
-        placeholder="예: C:\\Users\\사용자명\\MCI_ADV\\Simul_team",
+        placeholder="예: C:\\Users\\사용자명\\MCI_ADV",
         help="scenarios 폴더가 있는 프로젝트 루트 경로를 입력하세요",
         disabled=IS_CLOUD,
     )
@@ -295,7 +321,7 @@ st.success(f"✅ 유효한 경로: `{bp}`")
 try:
     from orchestrator import Orchestrator
 except Exception as e:
-    st.error("❌ orchestrator.py를 프로젝트 루트에 두세요.")
+    st.error("❌ `src/sce_src/orchestrator.py`를 찾지 못했습니다.")
     st.exception(e)
     st.stop()
 

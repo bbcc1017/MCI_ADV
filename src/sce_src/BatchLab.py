@@ -7,6 +7,7 @@ import os
 import re
 import json
 import math
+import sys
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from itertools import product
@@ -19,10 +20,34 @@ import requests
 import folium
 from streamlit_folium import st_folium
 
+
+def _detect_repo_root() -> Path:
+    here = Path(__file__).resolve().parent
+    for parent in (here, *here.parents):
+        if (parent / "src" / "sce_src" / "orchestrator.py").is_file():
+            return parent
+    return here
+
+
+def _detect_cloud_base_path() -> str:
+    for cand in ("/mount/src/mci_adv", "/mount/src/mci_adv/Simul_team"):
+        p = Path(cand)
+        if p.is_dir() and (p / "scenarios").is_dir():
+            return cand
+    return ""
+
+
+REPO_ROOT = _detect_repo_root()
+ORCHESTRATOR_DIR = REPO_ROOT / "src" / "sce_src"
+if ORCHESTRATOR_DIR.is_dir():
+    orch_path = str(ORCHESTRATOR_DIR)
+    if orch_path not in sys.path:
+        sys.path.insert(0, orch_path)
+
 try:
     from orchestrator import Orchestrator
 except Exception as e:  # pragma: no cover
-    st.error("orchestrator.py could not be imported. Check the repo state.")
+    st.error("Failed to import Orchestrator. Check `src/sce_src/orchestrator.py`.")
     st.exception(e)
     st.stop()
 
@@ -31,8 +56,9 @@ except Exception as e:  # pragma: no cover
 # Constants and helpers
 # -------------------------------------------------
 KST = timezone(timedelta(hours=9))
-CLOUD_BASE_PATH = "/mount/src/mci_adv/Simul_team"
-IS_CLOUD = Path(CLOUD_BASE_PATH).exists()
+CLOUD_BASE_PATH = _detect_cloud_base_path()
+IS_CLOUD = bool(CLOUD_BASE_PATH)
+DEFAULT_LOCAL_BASE_PATH = str(REPO_ROOT) if (REPO_ROOT / "scenarios").is_dir() else ""
 
 RAW_BLOCK_NAMES = ["Reward", "Time", "PDR", "Reward_woG", "PDR_woG"]
 _RAW_FLOAT = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
@@ -246,7 +272,7 @@ st.caption("Run multiple coords/parameter sets in batch, then compare results si
 # Session state defaults
 # -------------------------------------------------
 if "batch_base_path" not in st.session_state:
-    st.session_state.batch_base_path = CLOUD_BASE_PATH if IS_CLOUD else ""
+    st.session_state.batch_base_path = CLOUD_BASE_PATH if IS_CLOUD else DEFAULT_LOCAL_BASE_PATH
 if "batch_env_txt" not in st.session_state:
     st.session_state.batch_env_txt = ""
 if "batch_coords" not in st.session_state:
@@ -272,9 +298,9 @@ st.markdown("### 1) Base path & runtime env")
 col_bp, col_env = st.columns([2, 1])
 with col_bp:
     bp_input = st.text_input(
-        "base_path (Simul_team root)",
+        "base_path (MCI_ADV root)",
         value=st.session_state.batch_base_path,
-        placeholder="e.g., C:\\Users\\USER\\MCI_ADV\\Simul_team",
+        placeholder="e.g., C:\\Users\\USER\\MCI_ADV",
         disabled=IS_CLOUD,
     )
     if st.button("Use this base_path", key="set_base_path"):

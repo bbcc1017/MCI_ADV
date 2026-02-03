@@ -67,10 +67,16 @@ class ScenarioGenerator:
         # 프로젝트 경로 절대화
         self.base_path = os.path.abspath(base_path)
 
-        # experiment_id 생성: exp_YYYYMMDDHHMM_dep_YYYYMMDDHHMM 형식
+        # experiment_id 생성: exp_<id>_dep_<YYYYMMDDHHMM> 형식
         # 이미 "exp_" 접두사가 있으면 제거 (중복 방지)
         if experiment_id:
-            base_exp_id = experiment_id.replace("exp_", "").replace("_", "")
+            base_exp_id = str(experiment_id).strip()
+            if base_exp_id.startswith("exp_"):
+                base_exp_id = base_exp_id[4:]
+            # 공백만 언더스코어로 정규화하고, 기존 언더스코어는 유지
+            base_exp_id = re.sub(r"\s+", "_", base_exp_id).strip("_")
+            if not base_exp_id:
+                base_exp_id = datetime.now().strftime("%Y%m%d%H%M")
         else:
             base_exp_id = datetime.now().strftime("%Y%m%d%H%M")
 
@@ -87,7 +93,6 @@ class ScenarioGenerator:
         self.scenarios_path = os.path.join(self.base_path, "scenarios")
         self.fire_data_path = os.path.join(self.scenarios_path, "안전센터와 소방서.csv")
         self.hospital_data_path = os.path.join(self.scenarios_path, "엑셀 결합 데이터.xlsx")
-        self.shp_path = os.path.join(self.scenarios_path, "ctprvn.shp")
         
         # 파일 존재성 검증
         self._validate_data_files()
@@ -130,8 +135,7 @@ class ScenarioGenerator:
         """필수 데이터 파일들의 존재성 검증"""
         required_files = [
             (self.fire_data_path, "소방서 데이터"),
-            (self.hospital_data_path, "병원 데이터"),
-            (self.shp_path, "시도 경계 SHP 파일")
+            (self.hospital_data_path, "병원 데이터")
         ]
         missing_files = []
         for file_path, description in required_files:
@@ -307,6 +311,18 @@ class ScenarioGenerator:
             print(f"❌ 소방서 데이터 로드 실패: {e}")
             return
         
+        # '수량' 기반으로 센터 행 복제 (구급차 개체 수 반영)
+        # ------------------------------------------------------------
+        if "수량" in df.columns:
+            df["수량"] = pd.to_numeric(df["수량"], errors="coerce").fillna(1).astype(int)
+            df.loc[df["수량"] < 1, "수량"] = 1
+        else:
+            df["수량"] = 1
+        df["보유대수"] = df["수량"]
+
+        # 센터를 수량만큼 복제
+        df = df.loc[df.index.repeat(df["수량"])].copy()
+        # ------------------------------------------------------------
         coords = list(zip(df["y좌표"], df["x좌표"]))
         euc_distances = [haversine(coord, (latitude, longitude)) for coord in coords]
         df["euclidean_distance"] = euc_distances
@@ -319,7 +335,7 @@ class ScenarioGenerator:
             "기관명": "안전센터/소방서이름"
         })
         df_sorted_euc = df_sorted_euc.reset_index(drop=True)
-        df_sorted_euc = df_sorted_euc[["init_distance", "안전센터/소방서이름"]]
+        df_sorted_euc = df_sorted_euc[["init_distance", "안전센터/소방서이름", "보유대수"]]
         euc_save_path = os.path.join(save_folder, "amb_info_euc.csv")
         df_sorted_euc.to_csv(euc_save_path, index=True, index_label="Index", encoding="utf-8-sig")
         
@@ -332,14 +348,28 @@ class ScenarioGenerator:
         road_distances = []
         road_durations = []
 
+        # for j, (_, row) in enumerate(df_candidates.iterrows()):
+        #     coord = (row["y좌표"], row["x좌표"])  # (lat, lon) of center
+        #     dist_km, duration_min = self.get_road_distance_kakao(
+        #         start=coord, end=(latitude, longitude),  # center → site
+        #         save_json_dir=routes_dir, route_type="center2site",
+        #         source_index=j, name=row.get("기관명", f"center_{j}"),
+        #         start_label="center", goal_label="site"
+        #     )
+        cache = {}  # key: (center_lat, center_lon) -> (dist_km, duration_min)
         for j, (_, row) in enumerate(df_candidates.iterrows()):
-            coord = (row["y좌표"], row["x좌표"])  # (lat, lon) of center
-            dist_km, duration_min = self.get_road_distance_kakao(
-                start=coord, end=(latitude, longitude),  # center → site
-                save_json_dir=routes_dir, route_type="center2site",
-                source_index=j, name=row.get("기관명", f"center_{j}"),
-                start_label="center", goal_label="site"
-            )
+            coord = (row["y좌표"], row["x좌표"])  # (lat, lon)
+            key = coord
+            if key in cache:
+                dist_km, duration_min = cache[key]
+            else:
+                dist_km, duration_min = self.get_road_distance_kakao(
+                    start=coord, end=(latitude, longitude),  # center → site
+                    save_json_dir=routes_dir, route_type="center2site",
+                    source_index=j, name=row.get("기관명", f"center_{j}"),
+                    start_label="center", goal_label="site"
+                )
+                cache[key] = (dist_km, duration_min)
             road_distances.append(dist_km)
             road_durations.append(duration_min)
             time.sleep(0.05)
@@ -356,7 +386,7 @@ class ScenarioGenerator:
             "기관명": "안전센터/소방서이름"
         })
         df_sorted_road = df_sorted_road.reset_index(drop=True)
-        df_sorted_road = df_sorted_road[["init_distance", "duration", "안전센터/소방서이름"]]
+        df_sorted_road = df_sorted_road[["init_distance", "duration", "안전센터/소방서이름", "보유대수"]]
         road_save_path = os.path.join(save_folder, "amb_info_road.csv")
         df_sorted_road.to_csv(road_save_path, index=True, index_label="Index", encoding="utf-8-sig")
         
@@ -731,7 +761,8 @@ class ScenarioGenerator:
 
         # 8) CSV 저장 (hospital_info와 동일한 병원 사용, 인덱스 일치 보장)
         result_df = pd.DataFrame({
-            "Index": range(len(df_selected)),
+            "uav_id": range(len(df_selected)),                 # UAV 번호 (0..)
+            "hospital_idx": df_selected["Index"].astype(int),
             "init_distance": df_selected["distance"].round(3),
             "수술실수": df_selected["수술실수"],
             "병상수": df_selected["병상수"],
@@ -923,7 +954,7 @@ entity_info:
     handover_time: {uav_handover_time} # unit: minutes
     is_use_time: False # UAV는 항상 유클리드 거리 기반
 
-event_info_path: "event_info.json"
+event_info_path: "./src/sim_src/event_info.json"
 
 rule_info:
   isFullFactorial: True

@@ -11,6 +11,7 @@ import time
 import shutil
 import subprocess
 import requests
+from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, Union
 from datetime import datetime, timezone, timedelta
 
@@ -498,13 +499,48 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
 # ------------------------------------------------------------------
 import sys
 
+def _pick_first_file(*candidates: Union[str, Path]) -> str:
+    for cand in candidates:
+        if not cand:
+            continue
+        p = Path(cand)
+        if p.is_file():
+            return str(p)
+    # Fallback: first candidate string for useful error messages.
+    return str(candidates[0]) if candidates else ""
+
+
+def _resolve_runtime_paths(base_path: str) -> Dict[str, str]:
+    root = Path(base_path).resolve()
+    this_file = Path(__file__).resolve()
+    this_sce_dir = this_file.parent
+    this_src_dir = this_sce_dir.parent
+
+    make_script = _pick_first_file(
+        root / "src" / "sce_src" / "make_csv_yaml_dynamic.py",
+        root / "make_csv_yaml_dynamic.py",
+        this_sce_dir / "make_csv_yaml_dynamic.py",
+    )
+    main_py = _pick_first_file(
+        root / "src" / "sim_src" / "main.py",
+        root / "main.py",
+        this_src_dir / "sim_src" / "main.py",
+    )
+
+    return {
+        "make_script": make_script,
+        "main_py": main_py,
+    }
+
+
 class Orchestrator:
     def __init__(self, base_path: str, python_cmd: Optional[str] = None):
         self.base_path = os.path.abspath(base_path)
         self.python_cmd = python_cmd or sys.executable
+        runtime_paths = _resolve_runtime_paths(self.base_path)
         self.paths = {
-            "make_script": os.path.join(self.base_path, "make_csv_yaml_dynamic.py"),
-            "main_py":     os.path.join(self.base_path, "main.py"),
+            "make_script": runtime_paths["make_script"],
+            "main_py": runtime_paths["main_py"],
             "scenarios":   os.path.join(self.base_path, "scenarios"),
             "results":     os.path.join(self.base_path, "results"),
             "logs":        os.path.join(self.base_path, "experiment_logs"),

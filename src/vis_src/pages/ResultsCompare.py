@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import timedelta, timezone
 import math
 import re
+import sys
 
 import pandas as pd
 import numpy as np
@@ -15,9 +16,34 @@ import altair as alt
 import plotly.graph_objects as go
 import plotly.colors as pc
 
+
+def _detect_repo_root() -> Path:
+    here = Path(__file__).resolve().parent
+    for parent in (here, *here.parents):
+        if (parent / "src" / "sce_src" / "orchestrator.py").is_file():
+            return parent
+    return here
+
+
+def _detect_cloud_base_path() -> str:
+    for cand in ("/mount/src/mci_adv", "/mount/src/mci_adv/Simul_team"):
+        p = Path(cand)
+        if p.is_dir() and (p / "scenarios").is_dir():
+            return cand
+    return ""
+
+
+REPO_ROOT = _detect_repo_root()
+ORCHESTRATOR_DIR = REPO_ROOT / "src" / "sce_src"
+if ORCHESTRATOR_DIR.is_dir():
+    orch_path = str(ORCHESTRATOR_DIR)
+    if orch_path not in sys.path:
+        sys.path.insert(0, orch_path)
+
 KST = timezone(timedelta(hours=9))
-CLOUD_BASE_PATH = "/mount/src/mci_adv/Simul_team"
-IS_CLOUD = Path(CLOUD_BASE_PATH).exists()
+CLOUD_BASE_PATH = _detect_cloud_base_path()
+IS_CLOUD = bool(CLOUD_BASE_PATH)
+DEFAULT_LOCAL_BASE_PATH = str(REPO_ROOT) if (REPO_ROOT / "scenarios").is_dir() else ""
 
 RAW_BLOCK_NAMES = ["Reward", "Time", "PDR", "Reward_woG", "PDR_woG"]
 RAW_FLOAT = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
@@ -215,14 +241,14 @@ st.caption("PDR is shown as percent; PDR/Time axes are reversed so lower is bett
 
 # base_path
 if "base_path_compare" not in st.session_state:
-    st.session_state.base_path_compare = CLOUD_BASE_PATH if IS_CLOUD else ""
+    st.session_state.base_path_compare = CLOUD_BASE_PATH if IS_CLOUD else DEFAULT_LOCAL_BASE_PATH
 
 col_bp, = st.columns(1)
 with col_bp:
     bp_input = st.text_input(
-        "base_path (Simul_team 루트)",
+        "base_path (MCI_ADV 루트)",
         value=st.session_state.base_path_compare,
-        placeholder="예: C:\\Users\\USER\\MCI_ADV\\Simul_team",
+        placeholder="예: C:\\Users\\USER\\MCI_ADV",
         disabled=IS_CLOUD,
     )
     if st.button("적용", key="btn_set_bp"):

@@ -20,7 +20,7 @@
 #      · statsmodels 있으면 OLS+Type-II ANOVA, 잔차 정규성(Shapiro)·QQ 스캐터·잔차 히스토그램 제공
 # 5) Data Tables: 편집 대상 셀렉터에 파일명만 노출(경로 숨김), "안전센터와 소방서.csv"는 편집 목록에서 제외
 # -------------------------------------------------------------------------------------------------
-import os, re, json, shutil, subprocess, math, ast
+import os, re, json, shutil, subprocess, math, ast, sys
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Tuple, Optional, Union
@@ -38,6 +38,30 @@ import yaml
 import warnings
 from scipy.integrate import IntegrationWarning
 warnings.filterwarnings("ignore", category=IntegrationWarning)
+
+
+def _detect_repo_root() -> Path:
+    here = Path(__file__).resolve().parent
+    for parent in (here, *here.parents):
+        if (parent / "src" / "sce_src" / "orchestrator.py").is_file():
+            return parent
+    return here
+
+
+def _detect_cloud_base_path() -> str:
+    for cand in ("/mount/src/mci_adv", "/mount/src/mci_adv/Simul_team"):
+        p = Path(cand)
+        if p.is_dir() and (p / "scenarios").is_dir():
+            return cand
+    return ""
+
+
+REPO_ROOT = _detect_repo_root()
+ORCHESTRATOR_DIR = REPO_ROOT / "src" / "sce_src"
+if ORCHESTRATOR_DIR.is_dir():
+    orch_path = str(ORCHESTRATOR_DIR)
+    if orch_path not in sys.path:
+        sys.path.insert(0, orch_path)
 
 # (선택) 통계 패키지
 try:
@@ -59,11 +83,12 @@ KST = timezone(timedelta(hours=9))
 # ------------------------------
 # Session defaults
 # ------------------------------
-CLOUD_BASE_PATH = "/mount/src/mci_adv/Simul_team"
-IS_CLOUD = Path(CLOUD_BASE_PATH).exists()
+CLOUD_BASE_PATH = _detect_cloud_base_path()
+IS_CLOUD = bool(CLOUD_BASE_PATH)
+DEFAULT_LOCAL_BASE_PATH = str(REPO_ROOT) if (REPO_ROOT / "scenarios").is_dir() else ""
 
 if "base_path" not in st.session_state:
-    st.session_state.base_path = CLOUD_BASE_PATH if IS_CLOUD else ""
+    st.session_state.base_path = CLOUD_BASE_PATH if IS_CLOUD else DEFAULT_LOCAL_BASE_PATH
 else:
     # Cloud에서는 항상 고정 (사용자가 바꿔도 즉시 원복)
     if IS_CLOUD and st.session_state.base_path != CLOUD_BASE_PATH:
@@ -1316,14 +1341,14 @@ with tabs[1]:
         if total_samples > 0:
             st.caption(f"🔍 감지된 시뮬레이션 반복 횟수: {total_samples}회 (summary CSV의 가장 최신 시도 기준)")
 
-        # total_samples 기반 조건부 로딩 (50회 이상은 버튼도 비활성화)
-        if total_samples >= 50:
-            st.warning(f"⚠️ 시뮬레이션 반복 횟수({total_samples}회)가 50회 이상이어서 로그 뷰어를 비활성화합니다.")
+        # total_samples 기반 조건부 로딩 (101회 이상은 버튼도 비활성화)
+        if total_samples >= 101:
+            st.warning(f"⚠️ 시뮬레이션 반복 횟수({total_samples}회)가 101회 이상이어서 로그 뷰어를 비활성화합니다.")
             st.info(f"📁 로그 파일을 직접 확인하세요: `experiment_logs/{coord}_*.txt`")
-            st.caption(f"💡 대시보드 성능 최적화를 위해 50회 이상의 로그는 원본 폴더에서 직접 확인해주세요.")
+            st.caption(f"💡 대시보드 성능 최적화를 위해 101회 이상의 로그는 원본 폴더에서 직접 확인해주세요.")
 
             # 버튼 비활성화 상태로 표시
-            st.button("📂 로그 파일 로드하기", key="load_logs_btn_disabled", disabled=True, help="50회 이상은 로그 뷰어가 비활성화됩니다")
+            st.button("📂 로그 파일 로드하기", key="load_logs_btn_disabled", disabled=True, help="101회 이상은 로그 뷰어가 비활성화됩니다")
             logs = None
         else:
             # 성능 최적화: 버튼 클릭 시에만 로그 로드 (다른 탭 로딩 속도 개선)
@@ -1502,6 +1527,9 @@ with tabs[0]:
                 "init_distance":"거리(km)",
             }
             cols = ["인덱스","안전센터/소방서","거리(km)"]
+            if "보유대수" in ambinfo_df.columns:
+                rename_dict["보유대수"] = "보유대수"
+                cols.append("보유대수")
             if "duration" in ambinfo_df.columns:
                 rename_dict["duration"] = "시간(분)"
                 cols.append("시간(분)")
@@ -1512,6 +1540,8 @@ with tabs[0]:
             c2s_df["거리(km)"] = pd.to_numeric(c2s_df["거리(km)"], errors="coerce").fillna(0.0).round(2)
             if "시간(분)" in c2s_df.columns:
                 c2s_df["시간(분)"] = pd.to_numeric(c2s_df["시간(분)"], errors="coerce").fillna(0.0).round(1)
+            if "보유대수" in c2s_df.columns:
+                c2s_df["보유대수"] = pd.to_numeric(c2s_df["보유대수"], errors="coerce").fillna(1).astype(int)
             # 안전센터/소방서는 문자열로 확실히 변환
             c2s_df["안전센터/소방서"] = c2s_df["안전센터/소방서"].astype(str)
         else:
@@ -1519,7 +1549,7 @@ with tabs[0]:
                 "인덱스": pd.Series(dtype='int'),
                 "안전센터/소방서": pd.Series(dtype='str'),
                 "거리(km)": pd.Series(dtype='float'),
-                "시간(분)": pd.Series(dtype='float')
+                "시간(분)": pd.Series(dtype='float'),
             })
 
         # 기본 선택 상태
@@ -1540,6 +1570,8 @@ with tabs[0]:
         show_cols = ["표시","인덱스","안전센터/소방서","거리(km)"]
         if "시간(분)" in c2s_df_show.columns:
             show_cols.append("시간(분)")
+        if "보유대수" in c2s_df_show.columns:
+            show_cols.insert(3, "보유대수")
         c2s_df_show = c2s_df_show[show_cols].reset_index(drop=True)
 
         col_cfg = {
@@ -1550,7 +1582,8 @@ with tabs[0]:
         }
         if "시간(분)" in c2s_df_show.columns:
             col_cfg["시간(분)"] = st.column_config.NumberColumn("시간(분)", disabled=True, format="%.1f")
-
+        if "보유대수" in c2s_df_show.columns:
+            col_cfg["보유대수"] = st.column_config.NumberColumn("보유대수", disabled=True)
         edited_c2s = st.data_editor(
             c2s_df_show,
             width='stretch',
@@ -1832,6 +1865,9 @@ with tabs[0]:
         extra = []
         if addr: extra.append(f"주소: {addr}")       # ① 주소
         if tel:  extra.append(f"전화: {tel}")        # ② 전화
+        qty = row.get("보유대수", None)
+        if qty is not None and pd.notna(qty):
+            extra.append(f"보유대수: {int(qty)}대")
         # ③ 거리 (우선 CSV, 없으면 JSON)
         dk = float(dist_csv) if dist_csv is not None else (float(dist_json) if dist_json is not None else None)
         if dk is not None:
@@ -1868,7 +1904,8 @@ with tabs[0]:
         if i not in st.session_state.amb_s2h_sel_idx:
             continue
         name = str(row["병원"]).strip()
-        obj  = h2s_idx_map.get(i) or h2s_map.get(name)
+        euc_idx = int(row.get("euc_idx", i))
+        obj = h2s_idx_map.get(euc_idx) or h2s_map.get(name)
         if obj is None:
             continue
 
@@ -2985,7 +3022,7 @@ with tabs[4]:
     # Rerun 탭 전용 base_path 입력
     # ─────────────────────────────────────────────────────────────────
     if "rerun_base_path" not in st.session_state:
-        st.session_state.rerun_base_path = CLOUD_BASE_PATH if IS_CLOUD else ""
+        st.session_state.rerun_base_path = CLOUD_BASE_PATH if IS_CLOUD else DEFAULT_LOCAL_BASE_PATH
     else:
         if IS_CLOUD and st.session_state.rerun_base_path != CLOUD_BASE_PATH:
             st.session_state.rerun_base_path = CLOUD_BASE_PATH
@@ -2999,7 +3036,7 @@ with tabs[4]:
         rerun_bp_input = st.text_input(
             "🗂️ 프로젝트 경로 (base_path)",
             value=st.session_state.rerun_base_path,
-            placeholder="예: C:\\Users\\사용자명\\MCI_ADV\\Simul_team",
+            placeholder="예: C:\\Users\\사용자명\\MCI_ADV",
             help="scenarios 폴더가 있는 프로젝트 루트 경로를 입력하세요",
             key="rerun_bp_input",
             disabled=IS_CLOUD,
@@ -3034,7 +3071,7 @@ with tabs[4]:
     try:
         from orchestrator import Orchestrator
     except Exception as e:
-        st.error("❌ orchestrator.py를 프로젝트 루트에 두세요.")
+        st.error("❌ `src/sce_src/orchestrator.py`를 찾지 못했습니다.")
         st.exception(e)
         st.stop()
 
@@ -3295,4 +3332,3 @@ with tabs[4]:
         except Exception as e_yaml_rerun:
             st.error(f"❌ YAML 파일 읽기 실패: {e_yaml_rerun}")
             st.exception(e_yaml_rerun)
-
