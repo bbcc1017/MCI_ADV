@@ -10,6 +10,8 @@ import json
 import time
 import shutil
 import subprocess
+import requests
+from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, Union
 from datetime import datetime, timezone, timedelta
 
@@ -89,6 +91,153 @@ def parse_make_generator_stdout(stdout_text: str):
     return coord_info, config_path
 
 # ------------------------------------------------------------------
+# Reverse Geocoding (Kakao API)
+# ------------------------------------------------------------------
+
+def reverse_geocode_kakao(lat: float, lon: float, api_key: str, max_retries: int = 3) -> Dict[str, Any]:
+    """
+    카카오 로컬 API를 사용한 좌표 → 주소 변환 (역지오코딩)
+
+    Args:
+        lat: 위도
+        lon: 경도
+        api_key: 카카오 REST API 키
+        max_retries: 최대 재시도 횟수
+
+    Returns:
+        {
+            "full_address": "지번 주소",
+            "road_address": "도로명 주소",
+            "area1": "시도",
+            "area2": "시군구",
+            "area3": "읍면동",
+            "area4": "리",
+            "is_valid": True/False,
+            "latitude": lat,
+            "longitude": lon,
+            "api_response_code": 0 (성공) or -999 (실패)
+        }
+    """
+    url = "https://dapi.kakao.com/v2/local/geo/coord2address.json"
+    headers = {
+        "Authorization": f"KakaoAK {api_key}"
+    }
+    params = {
+        "x": str(lon),  # 경도
+        "y": str(lat),  # 위도
+        "input_coord": "WGS84"
+    }
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+                documents = data.get("documents", [])
+
+                if documents and len(documents) > 0:
+                    doc = documents[0]
+
+                    # 지번 주소
+                    address = doc.get("address", {})
+                    area1 = address.get("region_1depth_name", "")  # 시도
+                    area2 = address.get("region_2depth_name", "")  # 구
+                    area3 = address.get("region_3depth_name", "")  # 동
+                    area4 = address.get("region_3depth_h_name", "")  # 리 (법정동 기준)
+
+                    # 지번 주소 조합
+                    full_address = address.get("address_name", "")
+
+                    # 도로명 주소
+                    road_address_obj = doc.get("road_address")
+                    road_address = ""
+                    if road_address_obj:
+                        road_address = road_address_obj.get("address_name", "")
+                    else:
+                        print(f"  ℹ️ 도로명주소 없음 (지번주소만 존재): {full_address}")
+
+                    return {
+                        "full_address": full_address,
+                        "road_address": road_address,
+                        "area1": area1,
+                        "area2": area2,
+                        "area3": area3,
+                        "area4": area4,
+                        "is_valid": True,
+                        "latitude": lat,
+                        "longitude": lon,
+                        "api_response_code": 0
+                    }
+
+                # 주소 정보 없음 (해상, 산악 등)
+                return {
+                    "full_address": "주소 정보 없음",
+                    "road_address": "",
+                    "area1": "해상/미상",
+                    "area2": "",
+                    "area3": "",
+                    "area4": "",
+                    "is_valid": False,
+                    "latitude": lat,
+                    "longitude": lon,
+                    "api_response_code": -1
+                }
+
+            elif response.status_code == 401:
+                print(f"❌ 카카오 API 인증 실패 (401): API 키 확인 필요")
+                break
+
+            elif response.status_code == 429:
+                print(f"⚠️ API 요청 한도 초과 (429). {attempt + 1}/{max_retries} 재시도...")
+                time.sleep(2)
+
+            else:
+                print(f"❌ API 오류: {response.status_code}")
+                break
+
+        except Exception as e:
+            print(f"❌ Reverse geocoding 오류: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+
+    # 실패 시
+    return {
+        "full_address": "API 오류",
+        "road_address": "",
+        "area1": "오류",
+        "area2": "",
+        "area3": "",
+        "area4": "",
+        "is_valid": False,
+        "latitude": lat,
+        "longitude": lon,
+        "api_response_code": -999
+    }
+
+# ============================================================
+# [DEPRECATED] 네이버 API 역지오코딩 (참고용)
+# ============================================================
+# def reverse_geocode_naver(lat: float, lon: float, client_id: str, client_secret: str, max_retries: int = 3) -> Dict[str, Any]:
+#     """
+#     네이버 Reverse Geocoding API (기존 코드 - 참고용)
+#
+#     이 함수는 더 이상 사용되지 않습니다. 카카오 API로 마이그레이션되었습니다.
+#     참고: https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc
+#     """
+#     url = "https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc"
+#     headers = {
+#         "X-NCP-APIGW-API-KEY-ID": client_id,
+#         "X-NCP-APIGW-API-KEY": client_secret
+#     }
+#     params = {
+#         "coords": f"{lon},{lat}",
+#         "orders": "legalcode,admcode,addr,roadaddr",
+#         "output": "json"
+#     }
+#     # ... (기존 로직 생략)
+
+# ------------------------------------------------------------------
 # Summary CSV helpers
 # ------------------------------------------------------------------
 
@@ -97,8 +246,20 @@ SUMMARY_COLS = [
     "위도","경도","주소","도로명주소",
     "시나리오생성_시작","시나리오생성_소요(초)",
     "시뮬레이션_시작","시뮬레이션_소요(초)","실험_완료시간","좌표별_총소요(초)","성공여부","로그파일",
-    "환자수","max_send_coeff","구급차수","UAV수","구급차속도","UAV속도","시뮬레이션반복","랜덤시드",
+    "환자수","max_send_coeff","구급차수","UAV수","구급차속도","UAV속도","구급차인계시간","UAV인계시간","API_duration사용","duration_coeff","시뮬레이션반복","랜덤시드",
 ]
+# (추가) 안정적인 dtype 스키마
+SUMMARY_DTYPES = {
+    "실험ID":"object","좌표":"object","시도번호":"Int64","비고":"object",
+    "위도":"float64","경도":"float64","주소":"object","도로명주소":"object",
+    "시나리오생성_시작":"object","시나리오생성_소요(초)":"float64",
+    "시뮬레이션_시작":"object","시뮬레이션_소요(초)":"float64",
+    "실험_완료시간":"object","좌표별_총소요(초)":"float64",
+    "성공여부":"object","로그파일":"object",
+    "환자수":"Int64","max_send_coeff":"object","구급차수":"Int64","UAV수":"Int64",
+    "구급차속도":"float64","UAV속도":"float64","구급차인계시간":"float64","UAV인계시간":"float64","API_duration사용":"object","duration_coeff":"float64","시뮬레이션반복":"Int64","랜덤시드":"Int64",
+}
+
 
 def _summary_paths(base_path: str, exp_id: str):
     """(NOTE) Some older copies might have returned a single string or 3 items.
@@ -142,14 +303,28 @@ def _load_summary_df(path_main: str, path_legacy: str):
             for enc in ("utf-8-sig","cp949","utf-8"):
                 try:
                     df = pd.read_csv(pth, encoding=enc)
+                    # 누락 컬럼 보충 + 순서 정렬
                     for c in SUMMARY_COLS:
                         if c not in df.columns:
-                            df[c] = None
-                    return df[SUMMARY_COLS]
+                            df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
+                    df = df.reindex(columns=SUMMARY_COLS)
+                    # dtype 강제(일괄 → 실패시 컬럼 단위 보정)
+                    try:
+                        df = df.astype(SUMMARY_DTYPES)
+                    except Exception:
+                        for col, dt in SUMMARY_DTYPES.items():
+                            try:
+                                df[col] = df[col].astype(dt)
+                            except Exception:
+                                df[col] = df[col].astype("object")
+                    return df
                 except Exception:
                     continue
     import pandas as _pd
-    return _pd.DataFrame(columns=SUMMARY_COLS)
+    # 빈 DF도 dtype 보장
+    empty = {c: _pd.Series(dtype=SUMMARY_DTYPES.get(c, "object")) for c in SUMMARY_COLS}
+    return _pd.DataFrame(empty)
+
 
 def _save_summary(path_main: str, df):
     ensure_dir(os.path.dirname(path_main))
@@ -172,13 +347,29 @@ def upsert_summary_row_dual(base_path: str, row: Dict[str,Any]):
 
     df = _load_summary_df(path_main, path_legacy)
     key = (row.get("실험ID"), row.get("좌표"))
-    mask = (df["실험ID"]==key[0]) & (df["좌표"]==key[1]) & (df["시도번호"].isna() | (df["시도번호"]==0))
-    if mask.any():
-        for k, v in row.items():
-            df.loc[mask, k] = v
+
+    # 시도번호 자동 계산: 같은 실험ID + 좌표 조합의 최대 시도번호 + 1
+    existing = df[(df["실험ID"]==key[0]) & (df["좌표"]==key[1])]
+    if not existing.empty:
+        max_trial = existing["시도번호"].max()
+        next_trial = 1 if pd.isna(max_trial) else int(max_trial) + 1
     else:
-        import pandas as _pd
-        df = _pd.concat([df, _pd.DataFrame([row], columns=SUMMARY_COLS)], ignore_index=True)
+        next_trial = 1
+
+    # 시도번호가 명시되지 않았으면 자동 할당
+    if "시도번호" not in row or row.get("시도번호") is None or row.get("시도번호") == 0:
+        row["시도번호"] = next_trial
+
+    # 항상 새로운 행으로 추가 (업데이트 하지 않음)
+    for c in SUMMARY_COLS:
+        if c not in df.columns:
+            df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
+    df = df.reindex(columns=SUMMARY_COLS)
+
+    next_idx = len(df)
+    for k, v in row.items():
+        df.loc[next_idx, k] = v
+
     _save_summary(path_main, df)
 
 # ------------------------------------------------------------------
@@ -201,6 +392,10 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
         "UAV수": None,
         "구급차속도": None,
         "UAV속도": None,
+        "구급차인계시간": None,
+        "UAV인계시간": None,
+        "API_duration사용": None,
+        "duration_coeff": None,
         "시뮬레이션반복": None,
         "랜덤시드": None,
         "max_send_coeff": None,
@@ -216,10 +411,26 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
     uav = ent.get("uav", {}) or {}
     hosp = ent.get("hospital", {}) or {}
 
-    # incident_size / speeds
+    # incident_size / speeds / handover_time / is_use_time / duration_coeff
     meta["환자수"] = patient.get("incident_size")
     meta["구급차속도"] = amb.get("velocity")
     meta["UAV속도"] = uav.get("velocity")
+    meta["구급차인계시간"] = amb.get("handover_time")
+    meta["UAV인계시간"] = uav.get("handover_time")
+
+    # API duration 사용 여부 (True/False를 문자열로 저장)
+    is_use_time_val = amb.get("is_use_time")
+    if is_use_time_val is not None:
+        meta["API_duration사용"] = str(is_use_time_val)
+    else:
+        meta["API_duration사용"] = None
+
+    # duration_coeff (API duration 시간가중치)
+    duration_coeff_val = amb.get("duration_coeff")
+    if duration_coeff_val is not None:
+        meta["duration_coeff"] = float(duration_coeff_val)
+    else:
+        meta["duration_coeff"] = 1.0  # 기본값
 
     # max_send_coeff (리스트/문자열 모두 처리)
     msc = hosp.get("max_send_coeff")
@@ -259,7 +470,24 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
         pass
     try:
         if uav_csv and os.path.isfile(uav_csv) and pd is not None:
-            meta["UAV수"] = len(pd.read_csv(uav_csv, encoding="utf-8-sig"))
+            # UAV 대수: 전체 UAV CSV 행 수를 상급종합병원 수로 나눔
+            uav_df = pd.read_csv(uav_csv, encoding="utf-8-sig")
+            total_uav_count = len(uav_df)
+
+            # 상급종합병원 수 계산 (hospital_info에서 종별코드=1)
+            hosp_info_csv = _resolve(hosp.get("info_path"))
+            if hosp_info_csv and os.path.isfile(hosp_info_csv):
+                hosp_df = pd.read_csv(hosp_info_csv, encoding="utf-8-sig")
+                if "종별코드" in hosp_df.columns:
+                    tertiary_hospital_count = (hosp_df["종별코드"] == 1).sum()
+                    if tertiary_hospital_count > 0:
+                        meta["UAV수"] = total_uav_count // tertiary_hospital_count
+                    else:
+                        meta["UAV수"] = total_uav_count
+                else:
+                    meta["UAV수"] = total_uav_count
+            else:
+                meta["UAV수"] = total_uav_count
     except Exception:
         pass
 
@@ -269,14 +497,50 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
 # ------------------------------------------------------------------
 # Orchestrator
 # ------------------------------------------------------------------
+import sys
+
+def _pick_first_file(*candidates: Union[str, Path]) -> str:
+    for cand in candidates:
+        if not cand:
+            continue
+        p = Path(cand)
+        if p.is_file():
+            return str(p)
+    # Fallback: first candidate string for useful error messages.
+    return str(candidates[0]) if candidates else ""
+
+
+def _resolve_runtime_paths(base_path: str) -> Dict[str, str]:
+    root = Path(base_path).resolve()
+    this_file = Path(__file__).resolve()
+    this_sce_dir = this_file.parent
+    this_src_dir = this_sce_dir.parent
+
+    make_script = _pick_first_file(
+        root / "src" / "sce_src" / "make_csv_yaml_dynamic.py",
+        root / "make_csv_yaml_dynamic.py",
+        this_sce_dir / "make_csv_yaml_dynamic.py",
+    )
+    main_py = _pick_first_file(
+        root / "src" / "sim_src" / "main.py",
+        root / "main.py",
+        this_src_dir / "sim_src" / "main.py",
+    )
+
+    return {
+        "make_script": make_script,
+        "main_py": main_py,
+    }
+
 
 class Orchestrator:
     def __init__(self, base_path: str, python_cmd: Optional[str] = None):
         self.base_path = os.path.abspath(base_path)
-        self.python_cmd = python_cmd or "python"
+        self.python_cmd = python_cmd or sys.executable
+        runtime_paths = _resolve_runtime_paths(self.base_path)
         self.paths = {
-            "make_script": os.path.join(self.base_path, "make_csv_yaml_dynamic.py"),
-            "main_py":     os.path.join(self.base_path, "main.py"),
+            "make_script": runtime_paths["make_script"],
+            "main_py": runtime_paths["main_py"],
             "scenarios":   os.path.join(self.base_path, "scenarios"),
             "results":     os.path.join(self.base_path, "results"),
             "logs":        os.path.join(self.base_path, "experiment_logs"),
@@ -293,7 +557,8 @@ class Orchestrator:
 
         if not exists_file(self.paths["make_script"]):
             raise FileNotFoundError(f"make_csv_yaml_dynamic.py not found: {self.paths['make_script']}")
-        exp_id = exp_id or ("exp_" + datetime.now(KST).strftime("%Y%m%d_%H%M%S"))
+        # exp_YYYYMMDDHHMM 형식 (언더스코어 제거)
+        exp_id = exp_id or ("exp_" + datetime.now(KST).strftime("%Y%m%d%H%M"))
 
         cmd = [
             self.python_cmd, "-X", "utf8", self.paths["make_script"],
@@ -329,12 +594,42 @@ class Orchestrator:
 
         stdout = proc.stdout or ""
         stderr = proc.stderr or ""
-        coord_info, config_path = parse_make_generator_stdout(stdout)
+        _, config_path = parse_make_generator_stdout(stdout)  # coord_info는 무시
         if not config_path:
             raise RuntimeError(f"CONFIG_PATH not found in generator stdout.\n[stdout]\n{stdout}\n[stderr]\n{stderr}")
 
         coord = parse_coord_from_config_path(config_path) or to_coord_str(latitude, longitude)
         exp_id2 = parse_exp_from_config_path(config_path) or exp_id
+
+        # 역지오코딩 직접 수행 (카카오 API)
+        coord_info = None
+        kakao_api_key = (extra_args or {}).get("kakao_api_key")
+        if kakao_api_key:
+            try:
+                coord_info = reverse_geocode_kakao(latitude, longitude, kakao_api_key)
+                print(f"✅ 역지오코딩 성공: {coord_info.get('full_address', '')}")
+            except Exception as e:
+                print(f"⚠️ 역지오코딩 실패: {e}")
+                coord_info = {
+                    "full_address": "역지오코딩 실패",
+                    "road_address": "",
+                    "area1": "", "area2": "", "area3": "", "area4": "",
+                    "is_valid": False,
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "api_response_code": -999
+                }
+        else:
+            print("⚠️ 카카오 API 키 없음. 역지오코딩 생략")
+            coord_info = {
+                "full_address": "",
+                "road_address": "",
+                "area1": "", "area2": "", "area3": "", "area4": "",
+                "is_valid": False,
+                "latitude": latitude,
+                "longitude": longitude,
+                "api_response_code": -999
+            }
 
         # Summary path (main + legacy) — robust
         summary_main, summary_legacy = _summary_paths_pair(self.base_path, exp_id2)
@@ -380,6 +675,10 @@ class Orchestrator:
             "UAV수": meta.get("UAV수"),
             "구급차속도": meta.get("구급차속도"),
             "UAV속도": meta.get("UAV속도"),
+            "구급차인계시간": meta.get("구급차인계시간"),
+            "UAV인계시간": meta.get("UAV인계시간"),
+            "API_duration사용": meta.get("API_duration사용"),
+            "duration_coeff": meta.get("duration_coeff"),
             "시뮬레이션반복": meta.get("시뮬레이션반복"),
             "랜덤시드": meta.get("랜덤시드"),
         })
@@ -450,6 +749,9 @@ class Orchestrator:
             mask_pair = (df["실험ID"]==exp_id2) & (df["좌표"]==coord2)
 
             def _base_fields_for_pair() -> Dict[str,Any]:
+                # 항상 YAML에서 최신 파라미터를 읽어옴 (재실행 시 수정된 파라미터 반영)
+                meta = extract_params_from_yaml(config_path)
+
                 if mask_pair.any():
                     d0 = df[mask_pair].sort_index().iloc[0].to_dict()
                     return {
@@ -458,17 +760,21 @@ class Orchestrator:
                         "주소": d0.get("주소"), "도로명주소": d0.get("도로명주소"),
                         "시나리오생성_시작": d0.get("시나리오생성_시작"),
                         "시나리오생성_소요(초)": d0.get("시나리오생성_소요(초)"),
-                        "환자수": d0.get("환자수"),
-                        "max_send_coeff": d0.get("max_send_coeff"),
-                        "구급차수": d0.get("구급차수"),
-                        "UAV수": d0.get("UAV수"),
-                        "구급차속도": d0.get("구급차속도"),
-                        "UAV속도": d0.get("UAV속도"),
-                        "시뮬레이션반복": d0.get("시뮬레이션반복"),
-                        "랜덤시드": d0.get("랜덤시드"),
+                        # YAML에서 읽은 최신 파라미터 사용 (수정된 값 반영)
+                        "환자수": meta.get("환자수"),
+                        "max_send_coeff": meta.get("max_send_coeff"),
+                        "구급차수": meta.get("구급차수"),
+                        "UAV수": meta.get("UAV수"),
+                        "구급차속도": meta.get("구급차속도"),
+                        "UAV속도": meta.get("UAV속도"),
+                        "구급차인계시간": meta.get("구급차인계시간"),
+                        "UAV인계시간": meta.get("UAV인계시간"),
+                        "API_duration사용": meta.get("API_duration사용"),
+                        "duration_coeff": meta.get("duration_coeff"),
+                        "시뮬레이션반복": meta.get("시뮬레이션반복"),
+                        "랜덤시드": meta.get("랜덤시드"),
                     }
                 else:
-                    meta = extract_params_from_yaml(config_path)
                     return {
                         "실험ID": exp_id2, "좌표": coord2,
                         "위도": None, "경도": None, "주소": "", "도로명주소": "",
@@ -479,12 +785,20 @@ class Orchestrator:
                         "UAV수": meta.get("UAV수"),
                         "구급차속도": meta.get("구급차속도"),
                         "UAV속도": meta.get("UAV속도"),
+                        "구급차인계시간": meta.get("구급차인계시간"),
+                        "UAV인계시간": meta.get("UAV인계시간"),
+                        "API_duration사용": meta.get("API_duration사용"),
+                        "duration_coeff": meta.get("duration_coeff"),
                         "시뮬레이션반복": meta.get("시뮬레이션반복"),
                         "랜덤시드": meta.get("랜덤시드"),
                     }
 
+            # 항상 새로운 행으로 추가 (재실험시에도 시도번호 증가)
             mask_first = mask_pair & (df["시도번호"].fillna(0)==0)
             if mask_first.any():
+                # 첫 실행: 시도번호 0을 1로 업데이트
+                # YAML에서 최신 파라미터를 읽어서 업데이트 (수정된 값 반영)
+                meta_first = extract_params_from_yaml(config_path)
                 df.loc[mask_first, "시도번호"] = 1
                 df.loc[mask_first, "비고"] = "1차시도 " + ("성공" if ok else "실패")
                 df.loc[mask_first, "시뮬레이션_시작"] = sim_started
@@ -497,45 +811,52 @@ class Orchestrator:
                 df.loc[mask_first, "실험_완료시간"] = now_kst_iso()
                 df.loc[mask_first, "성공여부"] = bool(ok)
                 df.loc[mask_first, "로그파일"] = log_file
+                # YAML에서 읽은 최신 파라미터 반영
+                df.loc[mask_first, "환자수"] = meta_first.get("환자수")
+                df.loc[mask_first, "max_send_coeff"] = meta_first.get("max_send_coeff")
+                df.loc[mask_first, "구급차수"] = meta_first.get("구급차수")
+                df.loc[mask_first, "UAV수"] = meta_first.get("UAV수")
+                df.loc[mask_first, "구급차속도"] = meta_first.get("구급차속도")
+                df.loc[mask_first, "UAV속도"] = meta_first.get("UAV속도")
+                df.loc[mask_first, "구급차인계시간"] = meta_first.get("구급차인계시간")
+                df.loc[mask_first, "UAV인계시간"] = meta_first.get("UAV인계시간")
+                df.loc[mask_first, "API_duration사용"] = meta_first.get("API_duration사용")
+                df.loc[mask_first, "duration_coeff"] = meta_first.get("duration_coeff")
+                df.loc[mask_first, "시뮬레이션반복"] = meta_first.get("시뮬레이션반복")
+                df.loc[mask_first, "랜덤시드"] = meta_first.get("랜덤시드")
 
             else:
+                # 재실험: 항상 새로운 행 추가 (성공 여부와 상관없이)
+                import pandas as _pd
                 prev_rows = df[mask_pair].sort_values("시도번호")
-                need_new_row = True
-                if not prev_rows.empty:
-                    last_success = bool(prev_rows.iloc[-1].get("성공여부"))
-                    if last_success:
-                        need_new_row = False
-                        mask_last = (df.index == prev_rows.index[-1])
-                        df.loc[mask_last, "시도번호"] = int(prev_rows.iloc[-1].get("시도번호") or 1)
-                        df.loc[mask_last, "비고"] = "재실행(성공)" if ok else "재실행(실패)"
-                        df.loc[mask_last, "시뮬레이션_시작"] = sim_started
-                        df.loc[mask_last, "시뮬레이션_소요(초)"] = elapsed
-                        df.loc[mask_last, "실험_완료시간"] = now_kst_iso()
-                        df.loc[mask_last, "성공여부"] = bool(ok)
-                        df.loc[mask_last, "로그파일"] = log_file
+                next_try = int(_pd.to_numeric(prev_rows["시도번호"], errors="coerce").fillna(0).max()) + 1 if not prev_rows.empty else 1
+                base = _base_fields_for_pair()
+                newrow = {
+                    **base,
+                    "시도번호": next_try,
+                    "비고": f"{next_try}차시도 " + ("성공" if ok else "실패"),
+                    "시뮬레이션_시작": sim_started,
+                    "시뮬레이션_소요(초)": elapsed,
+                    "실험_완료시간": now_kst_iso(),
+                    "좌표별_총소요(초)": None,
+                    "성공여부": bool(ok),
+                    "로그파일": log_file,
+                }
+                try:
+                    prev = float(base.get("시나리오생성_소요(초)") or 0.0)
+                except Exception:
+                    prev = 0.0
+                newrow["좌표별_총소요(초)"] = round(prev + float(elapsed), 3)
+                # concat 없이 행 단위 추가
+                for c in SUMMARY_COLS:
+                    if c not in df.columns:
+                        df[c] = pd.Series(dtype=SUMMARY_DTYPES.get(c, "object"))
+                df = df.reindex(columns=SUMMARY_COLS)
 
+                next_idx = len(df)
+                for k, v in newrow.items():
+                    df.loc[next_idx, k] = v
 
-                if need_new_row:
-                    import pandas as _pd
-                    next_try = int(_pd.to_numeric(prev_rows["시도번호"], errors="coerce").fillna(0).max()) + 1 if not prev_rows.empty else 1
-                    base = _base_fields_for_pair()
-                    newrow = {
-                        **base,
-                        "시도번호": next_try,
-                        "비고": f"{next_try}차시도 " + ("성공" if ok else "실패"),
-                        "시뮬레이션_시작": sim_started,
-                        "시뮬레이션_소요(초)": elapsed,
-                        "실험_완료시간": now_kst_iso(),
-                        "좌표별_총소요(초)": None,
-                        "성공여부": bool(ok),
-                        "로그파일": log_file,
-                    }
-                    try:
-                        prev = float(base.get("시나리오생성_소요(초)") or 0.0)
-                    except Exception:
-                        prev = 0.0
-                    newrow["좌표별_총소요(초)"] = round(prev + float(elapsed), 3)
-                    df = _pd.concat([df, _pd.DataFrame([newrow], columns=SUMMARY_COLS)], ignore_index=True)
 
             _save_summary(summary_main, df)
 

@@ -251,11 +251,18 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# vscode
+.vscode
+# claude code 
+.claude
+
 # End of https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,python,windows
 ##############################################################################################
 
 
-/Simul_team/scenarios/
-/Simul_team/experiment_logs/
-/Simul_team/results/
-/Map_team/disaster_response_project/data
+scenarios/*
+scenarios/label_map.csv
+!scenarios/안전센터와 소방서.csv
+!scenarios/*.xlsx
+experiment_logs/
+results/

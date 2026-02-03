@@ -12,7 +12,7 @@
     "decision_epoch": true
   },
   "uav_arrival_site": {
-    "entity": ["ambulance"],
+    "entity": ["uav"],
     "decision_epoch": true
   },
   "amb_arrival_hospital": {

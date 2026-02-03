@@ -1,5 +1,6 @@
 import heapq
 import numpy as np
+
 class EventManager():
     def __init__(self, ev_info, en_manager, rng=None):
         self.ev_info = ev_info
@@ -20,6 +21,7 @@ class EventManager():
         self.time = 0 # event clock 초기화
         self.status = self.en_manager.en_status # entity 상태 불러오기
         self.rescue_finish = False # 구조 완료 여부 확인
+        self.event_queue = [] # event queue 초기화
         # 사고 발생
         init_log = {}
         init_log, _ = self.ev_onset(init_log, None)
@@ -38,6 +40,21 @@ class EventManager():
         terminated = False
         while True:
             # 1. 가장 빠른 event 파악
+            if not self.event_queue:
+
+                # 이벤트가 더 이상 없으면 종료(안전 가드)
+
+                h_idle_que_occ = self.status['hospital']['h_states'].copy() if 'hospital' in self.status else None
+
+                if h_idle_que_occ is None:
+                    print(f'[EventQueueEmpty] t={self.time} h_states=None')
+                else:
+                    # numpy가 ... 로 줄이지 않도록 옵션
+                    with np.printoptions(threshold=np.inf, linewidth=200, suppress=True):
+                        print(f'[EventQueueEmpty] t={self.time}  h_states.shape={h_idle_que_occ.shape}\n{h_idle_que_occ}')
+
+                return log, True
+
             c_event = heapq.heappop(self.event_queue)  # event = (event_time, e_ID, ev_name, entity_idx)
             print(c_event)
 
@@ -326,7 +343,6 @@ class EventManager():
                 log = self.start_GB_transport(log)
                 return log, False
             else: # 미구조 환자 존재 --> 현장 대기
-                self.status['ambulance']['amb_wait'][0].append(a_idx)
                 return log, False
 
     def ev_uav_arrival_site(self, log, entity_idx):
@@ -347,7 +363,6 @@ class EventManager():
                 log = self.start_GB_transport(log)
                 return log, False
             else: # 미구조 환자 존재 --> 현장 대기
-                self.status['uav']['uav_wait'][0].append(u_idx)
                 return log, False
 
     def ev_p_care_ready(self, log, entity_idx):

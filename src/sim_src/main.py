@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser(description='Run MCI_simulation')
 parser.add_argument('--config_path', default="./config.yaml", help='configuration file(.yaml) 경로')
 args = parser.parse_args()
 
+
 class RunManager():
     def __init__(self, args):
         # 0. configuration 파일(.yaml) 경로로 YAML 파일 불러오기
