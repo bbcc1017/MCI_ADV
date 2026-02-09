@@ -1,394 +1,772 @@
-# MCI 대량 재난 사고 시뮬레이션 플랫폼
+# MCI_ADV: 대량 재난 사고 시뮬레이션 플랫폼
 
 ## 프로젝트 개요
 
-대량 재난 사고(Mass Casualty Incident) 발생 시 환자 이송 최적화를 위한 시뮬레이션 및 분석 플랫폼입니다.
+대량 재난 사고(Mass Casualty Incident) 발생 시 **환자 이송 최적화**를 위한 시뮬레이션 및 분석 플랫폼입니다.
 
-### 주요 구성
-- **시뮬레이션 엔진**: 구급차(AMB)와 드론(UAV)을 활용한 환자 이송 최적화
-- **자동화 도구**: PowerShell 기반 시나리오 일괄 생성 및 실행
-- **대시보드**: Streamlit 기반 웹 인터페이스로 경로 시각화, 통계 분석, 시나리오 관리
+### 핵심 기능
+- **시나리오 생성**: 카카오 모빌리티 API 기반 실시간/미래시간 교통정보 반영
+- **시뮬레이션 엔진**: 구급차(AMB)와 드론(UAV)을 활용한 64개 정책 조합 평가
+- **통계 분석**: Full Factorial ANOVA, 사후검정 자동 수행
+- **시각화 대시보드**: Streamlit 기반 웹 인터페이스
 
 ---
 
-## 🎯 MCI_Streamlit 대시보드
+## 목차
 
-### 주요 기능
+1. [디렉토리 구조](#디렉토리-구조)
+2. [파이프라인 개요](#파이프라인-개요)
+3. [모듈 간 Import 관계](#모듈-간-import-관계)
+4. [시뮬레이션 엔진 아키텍처](#시뮬레이션-엔진-아키텍처)
+5. [입력 파일 구조](#입력-파일-구조)
+6. [API 사용](#api-사용)
+7. [정책 조합 (64개 시나리오)](#정책-조합-64개-시나리오)
+8. [대시보드 사용법](#대시보드-사용법)
+9. [평가 지표](#평가-지표)
+10. [설치 및 실행](#설치-및-실행)
 
-#### 1. **Maps 탭** - 경로 시각화
-- 구급차/UAV 경로를 지도에 표시 (Folium 기반)
-- Light/Dark 테마 지원
-- 혼잡도별 색상 구분 (카카오 교통 정보)
-- C→S (안전센터/소방서 → 사고지점), S→H (사고지점 → 병원) 경로 개별 토글
+---
 
-#### 2. **Scenarios 탭** - 로그 분석
-- 실험 로그 파일 뷰어
-- 환자별 구조·이송·치료 타임라인 요약
-- 전체 이벤트 테이블 (시뮬레이션 세부 과정)
-- Rule/Iteration 선택 기능
+## 디렉토리 구조
 
-#### 3. **Analytics 탭** - 통계 분석
-- 64개 시나리오 자동 평가
-- ANOVA 분석 (One-way, RCBD, Full Factorial)
-- Shapiro-Wilk 정규성 검정
-- Tukey HSD, Games-Howell, Friedman 사후검정 자동 선택
-- **A그룹 교집합**: Reward, Time, PDR 모두에서 최상위 시나리오 자동 추천
-- 잔차 진단 (QQ plot, 히스토그램)
-
-#### 4. **Data Tables 탭** - 데이터 편집
-- CSV 파일 실시간 편집 (자동 백업)
-- 병원/소방서 마스터 데이터 조회
-- 수정값으로 즉시 재실행
-
-#### 5. **Rerun 탭** - 시나리오 재실행
-- 기존 YAML 파일 기반 재실행
-
-#### 6. **Generate 페이지** (독립 실행)
-- 카카오 API 기반 신규 시나리오 생성
-- 실시간/미래시간 교통정보 반영
-- 위도/경도, 환자수, 구급차수, UAV수 등 파라미터 설정
-- 생성 후 즉시 시뮬레이션 실행
-
-### 설치 및 실행
-
-#### 환경 요구사항
-- Python 3.9 이상
-- Streamlit 1.34+
-
-#### 설치
-```bash
-# Conda 환경 생성 (권장)
-conda create -n MCI python=3.9
-conda activate MCI
-
-# 필수 패키지 설치
-pip install streamlit streamlit-folium pandas numpy openpyxl altair folium pyyaml scipy statsmodels pingouin requests haversine geopandas shapely gymnasium
+```
+MCI_ADV/
+├── src/                                    # 소스 코드
+│   ├── sce_src/                           # 시나리오 생성 모듈
+│   │   ├── orchestrator.py               # 마스터 오케스트레이터
+│   │   ├── make_csv_yaml_dynamic.py      # 동적 시나리오 생성기
+│   │   └── BatchLab.py                   # 배치 처리 대시보드
+│   │
+│   ├── sim_src/                          # 시뮬레이션 엔진
+│   │   ├── main.py                       # 시뮬레이션 진입점 (RunManager)
+│   │   ├── ScenarioManager.py            # 시나리오 설정 및 개체 초기화
+│   │   ├── EntityManager.py              # 개체 상태 관리
+│   │   ├── EventManager.py               # 이벤트 큐 및 시뮬레이션 루프
+│   │   ├── RuleManager.py                # 정책 규칙 관리 (64개 조합)
+│   │   ├── MCIEnvironment_gymnasium.py   # Gymnasium 환경 래퍼
+│   │   ├── config.yaml                   # 시뮬레이션 설정 템플릿
+│   │   └── event_info.json               # 이벤트 정의 (8개 이벤트)
+│   │
+│   └── vis_src/                          # 시각화/대시보드
+│       ├── MCI_Streamlit.py              # 메인 대시보드
+│       └── pages/
+│           ├── Generate.py               # 시나리오 생성 UI
+│           └── ResultsCompare.py         # 결과 비교 페이지
+│
+├── scenarios/                             # 시나리오 데이터
+│   ├── 안전센터와 소방서.csv               # 소방서/119안전센터 마스터 (필수)
+│   ├── 엑셀 결합 데이터.xlsx               # 병원 마스터 데이터 (필수)
+│   ├── DISTANCE_MATRIX_FINAL.xlsx         # 사전 계산된 거리 행렬
+│   ├── label_map.csv                      # 실험 좌표 레이블
+│   └── exp_{YYYYMMDD_HHMMSS}_dep_{HHMM}/ # 생성된 시나리오
+│       └── (lat,lon)/                     # 좌표별 폴더
+│           ├── config_(lat,lon).yaml      # 시뮬레이션 설정
+│           ├── patient_info.csv           # 환자 중증도 분포
+│           ├── hospital_info_road.csv     # 병원 정보 (도로 거리)
+│           ├── hospital_info_euc.csv      # 병원 정보 (직선 거리)
+│           ├── amb_info_road.csv          # 구급차 출동 정보 (도로)
+│           ├── amb_info_euc.csv           # 구급차 출동 정보 (직선)
+│           ├── uav_info.csv               # UAV 출동 정보
+│           ├── distance_Hos2Hos_*.csv     # 병원-병원 거리 행렬
+│           ├── distance_Hos2Site_*.csv    # 병원-현장 거리 행렬
+│           └── routes/                    # 경로 JSON
+│               ├── center2site/           # 안전센터 → 사고지점
+│               └── hos2site/              # 사고지점 → 병원
+│
+├── results/                               # 시뮬레이션 결과
+│   └── exp_{YYYYMMDD_HHMMSS}_dep_{HHMM}/
+│       └── (lat,lon)/
+│           ├── results_(lat,lon).txt      # RAW 결과 (전체 데이터)
+│           └── results_(lat,lon)_stat.txt # 통계 요약
+│
+├── experiment_logs/                       # 실행 로그
+│   └── (lat,lon)_YYYYMMDD_HHMMSS.txt
+│
+├── requirements.txt                       # Python 패키지 의존성
+├── MCI_대시보드_관련_정보.pdf              # 대시보드 참고 문서
+└── README.md                              # 본 문서
 ```
 
-#### 실행
+---
+
+## 파이프라인 개요
+
+전체 시스템은 3단계 파이프라인으로 구성됩니다:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         1. 시나리오 생성 파이프라인                            │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  사용자 입력 (Generate.py)                                                    │
+│    ├─ 좌표 (위도, 경도)                                                       │
+│    ├─ 환자 수, 구급차 수, UAV 수                                              │
+│    ├─ 이동 속도 (AMB: 40km/h, UAV: 80km/h)                                   │
+│    └─ 카카오 API 키 + 출발 시간                                               │
+│                     ↓                                                        │
+│  Orchestrator.generate_scenario()                                            │
+│                     ↓                                                        │
+│  ScenarioGenerator (make_csv_yaml_dynamic.py)                                │
+│    ├─ 병원 마스터 데이터 로드 (엑셀 결합 데이터.xlsx)                          │
+│    ├─ 소방서 데이터 로드 (안전센터와 소방서.csv)                               │
+│    ├─ 카카오 모빌리티 API 호출 (도로 거리 + 소요 시간)                         │
+│    ├─ patient_info.csv 생성 (중증도 분포)                                     │
+│    ├─ hospital/ambulance/uav CSV 생성                                        │
+│    ├─ 거리 행렬 생성 (Hos2Hos, Hos2Site)                                      │
+│    ├─ routes/*.json 생성 (API 응답 저장)                                      │
+│    └─ config_{coord}.yaml 생성                                               │
+│                     ↓                                                        │
+│  scenarios/exp_{YYYYMMDD_HHMMSS}_dep_{HHMM}/(lat,lon)/                       │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         2. 시뮬레이션 실행 파이프라인                          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Orchestrator.run_simulation(config_path)                                    │
+│                     ↓                                                        │
+│  main.py --config_path config.yaml                                           │
+│                     ↓                                                        │
+│  RunManager 초기화                                                            │
+│    ├─ ScenarioManager: 개체 설정 로드 (환자, 병원, 구급차, UAV)                │
+│    │     ├─ EntityManager: 개체 상태 관리                                     │
+│    │     └─ EventManager: 이벤트 큐 관리                                      │
+│    ├─ RuleManager: 64개 정책 규칙 생성 (Full Factorial)                       │
+│    └─ MCIEnvironment_gymnasium: 시뮬레이션 환경 생성                          │
+│                     ↓                                                        │
+│  시뮬레이션 루프 (totalSamples × 64 rules)                                    │
+│    ├─ env.reset() → 초기 관찰값                                               │
+│    ├─ While not done:                                                        │
+│    │     ├─ EventManager.run_next() → 이벤트 처리                             │
+│    │     ├─ rule.select(observation) → 행동 선택                              │
+│    │     └─ env.step(action) → 관찰값, 보상, 종료 여부                         │
+│    └─ 결과 기록: [Reward, Time, PDR, Reward_woG, PDR_woG]                     │
+│                     ↓                                                        │
+│  results/exp_{...}/(lat,lon)/                                                │
+│    ├─ results_(lat,lon).txt       (RAW 데이터)                               │
+│    └─ results_(lat,lon)_stat.txt  (통계: 평균, 표준편차, 95% CI)              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         3. 시각화 및 분석 파이프라인                           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  MCI_Streamlit.py 대시보드                                                    │
+│    │                                                                         │
+│    ├─ Settings (사이드바)                                                     │
+│    │     ├─ 프로젝트 경로 선택                                                │
+│    │     ├─ 실험 ID 선택                                                      │
+│    │     ├─ 좌표 선택                                                         │
+│    │     └─ 미니맵 표시                                                       │
+│    │                                                                         │
+│    ├─ Scenarios 탭                                                           │
+│    │     ├─ experiment_logs 로그 뷰어                                        │
+│    │     ├─ 환자별 구조→이송→치료 타임라인                                    │
+│    │     ├─ 이벤트 테이블                                                     │
+│    │     └─ Rule/Iteration 필터                                              │
+│    │                                                                         │
+│    ├─ Maps 탭                                                                │
+│    │     ├─ Folium 지도 렌더링                                               │
+│    │     ├─ C→S 경로 (안전센터 → 사고지점): 보라 점선                         │
+│    │     ├─ S→H 경로 (사고지점 → 병원): 청록 점선                             │
+│    │     ├─ 혼잡도 색상 표시                                                  │
+│    │     └─ 경로 정보 팝업 (거리 km, 시간 min)                                │
+│    │                                                                         │
+│    ├─ Analytics 탭                                                           │
+│    │     ├─ results_.txt 파싱                                                │
+│    │     ├─ ANOVA 분석 (Full Factorial, One-way, RCBD)                       │
+│    │     ├─ 사후검정 (Tukey HSD, Games-Howell)                               │
+│    │     ├─ 잔차 진단 (Shapiro-Wilk, QQ plot)                                │
+│    │     └─ A그룹 교집합 추천                                                 │
+│    │                                                                         │
+│    ├─ Data Tables 탭                                                         │
+│    │     ├─ CSV 파일 실시간 편집                                              │
+│    │     ├─ 자동 백업                                                         │
+│    │     └─ 수정값으로 재실행                                                 │
+│    │                                                                         │
+│    ├─ Rerun 탭                                                               │
+│    │     └─ 기존 YAML 기반 시뮬레이션 재실행                                  │
+│    │                                                                         │
+│    └─ Generate 페이지 (pages/Generate.py)                                    │
+│          ├─ 카카오 API 키 입력                                                │
+│          ├─ 운행시간 모드 (실시간/미래시간)                                    │
+│          ├─ 파라미터 설정                                                     │
+│          └─ 시나리오 생성 + 즉시 실행                                         │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 모듈 간 Import 관계
+
+### 1. MCI_Streamlit.py (메인 대시보드)
+```
+MCI_Streamlit.py
+    ↓ imports
+    ├── orchestrator (src/sce_src)  ──→ Orchestrator 클래스
+    ├── pandas, numpy, yaml         ──→ 데이터 I/O
+    ├── streamlit, folium, altair   ──→ UI 렌더링
+    ├── scipy, statsmodels          ──→ 통계 분석
+    └── openpyxl                    ──→ 엑셀 파일 처리
+```
+
+### 2. main.py (시뮬레이션 진입점)
+```
+main.py
+    ↓ imports
+    ├── ScenarioManager.py
+    │     ├── EntityManager.py
+    │     └── EventManager.py
+    ├── RuleManager.py              ──→ Universal_Rule 클래스 (64개)
+    ├── MCIEnvironment_gymnasium.py ──→ gymnasium.Env
+    ├── yaml, argparse              ──→ 설정 파싱
+    └── numpy, scipy                ──→ 수치 계산
+```
+
+### 3. orchestrator.py (오케스트레이터)
+```
+orchestrator.py
+    ↓ imports
+    ├── make_csv_yaml_dynamic.py    ──→ ScenarioGenerator 클래스
+    ├── subprocess                  ──→ main.py 실행
+    ├── requests                    ──→ 카카오 API 호출
+    ├── pandas, yaml                ──→ 데이터 처리
+    └── time, datetime              ──→ 로깅
+```
+
+### 4. make_csv_yaml_dynamic.py (시나리오 생성기)
+```
+make_csv_yaml_dynamic.py
+    ↓ imports
+    ├── requests                    ──→ 카카오 모빌리티 API
+    ├── haversine                   ──→ 직선 거리 계산 (폴백)
+    ├── pandas                      ──→ Excel/CSV I/O
+    └── yaml, json                  ──→ 설정 파일 생성
+```
+
+---
+
+## 시뮬레이션 엔진 아키텍처
+
+### 클래스 계층 구조
+
+```
+RunManager (main.py)
+│
+├── config ← YAML 설정 파싱
+│
+├── ScenarioManager
+│   │
+│   ├── EntityManager
+│   │   └── en_status: dict  ← 개체 상태
+│   │       ├── patient: p_states, p_wait, p_sent
+│   │       ├── hospital: h_states (idle, queue, occupied)
+│   │       ├── ambulance: amb_states, amb_wait
+│   │       └── uav: uav_states, uav_wait
+│   │
+│   └── EventManager
+│       ├── event_queue: heapq  ← 우선순위 큐 (시간순)
+│       ├── events: onset, p_rescue, amb_arrival_site, ...
+│       └── time: 시뮬레이션 시계
+│
+├── RuleManager
+│   └── rules: List[Universal_Rule]  ← 64개 정책 조합
+│       └── 결정 요소:
+│           ├── Priority: START vs ReSTART
+│           ├── Hospital Selection: RedOnly vs YellowNearest
+│           ├── Red Action: OnlyUAV, Both_UAVFirst, Both_AMBFirst, OnlyAMB
+│           └── Yellow Action: OnlyUAV, Both_UAVFirst, Both_AMBFirst, OnlyAMB
+│
+└── MCIEnvironment_gymnasium (gym.Env)
+    ├── action_space: (patient_severity, hospital_idx, transport_mode)
+    ├── observation_space: 개체 상태
+    ├── step(): 행동 실행 → (obs, reward, done, truncated, info)
+    ├── reset(): 시나리오 초기화
+    └── Reward = Σ[Patient_i: SurvivalProb(rescue_time, severity)]
+```
+
+### 이벤트 흐름 (event_info.json)
+
+| 이벤트 | 참여 개체 | Decision Epoch | 설명 |
+|--------|----------|----------------|------|
+| `onset` | patient | No | 사고 발생, 환자 구조 이벤트 생성 |
+| `p_rescue` | patient | **Yes** | 환자 구조 완료, 이송 대기 시작 |
+| `amb_arrival_site` | ambulance | **Yes** | 구급차 현장 도착 |
+| `uav_arrival_site` | uav | **Yes** | UAV 현장 도착 |
+| `amb_arrival_hospital` | patient, ambulance, hospital | No | 구급차 병원 도착, 환자 인계 |
+| `uav_arrival_hospital` | patient, uav, hospital | No | UAV 병원 도착, 환자 인계 |
+| `p_care_ready` | patient, hospital | No | 환자 치료 준비 완료 |
+| `p_def_care` | patient, hospital | No | 환자 치료 완료 |
+
+### 시뮬레이션 루프 (EventManager.run_next)
+
+```python
+While True:
+    1. event_queue에서 가장 빠른 이벤트 팝
+    2. 시뮬레이션 시계 진행
+    3. 자원 상태 업데이트 (구급차/UAV 이동 시간)
+    4. 이벤트 핸들러 실행 (ev_onset, ev_p_rescue, ...)
+    5. decision_epoch=True 이면: 정책에 행동 요청
+    6. 종료 조건 확인 (모든 환자 치료 완료)
+    7. 계속 진행
+```
+
+### 개체 상태 구조
+
+**환자 상태**: `p_states[patient_id] = [severity_class, rescued, moving, moved, cared]`
+- severity_class: 0=Red, 1=Yellow, 2=Green, 3=Black
+- rescued: 0=미구조, 1=구조 완료
+- moving: 0=대기 중, 1=이송 중
+- moved: 0=현장, 1=병원 도착
+- cared: 0=미치료, 1=치료 시작, 2=치료 완료
+
+**병원 상태**: `h_states[hospital_id] = [n_idle, n_queue, n_occupied]`
+- n_idle: 가용 병상 수
+- n_queue: 대기 환자 수
+- n_occupied: 점유 병상 수
+
+**구급차 상태**: `amb_states[amb_id] = [destination_hospital_id, severity_carrying, time_to_arrival]`
+
+**UAV 상태**: `uav_states[uav_id] = [destination_hospital_id, severity_carrying, time_to_arrival]`
+
+---
+
+## 입력 파일 구조
+
+### 1. 마스터 데이터
+
+#### 안전센터와 소방서.csv (필수)
+```
+경로: scenarios/안전센터와 소방서.csv
+인코딩: CP949
+
+컬럼:
+- 지역명: 시도명
+- 지역번호: 지역 코드
+- 주소: 상세 주소
+- y좌표: 위도 (latitude)
+- x좌표: 경도 (longitude)
+- 전화번호: 연락처
+- 구분: 소방서/119안전센터
+- 날짜: 데이터 기준일
+- 순번: 일련번호
+- 수량: 보유 구급차 대수 (복제 기준)
+```
+
+#### 엑셀 결합 데이터.xlsx (필수)
+```
+경로: scenarios/엑셀 결합 데이터.xlsx
+인코딩: UTF-8 (openpyxl)
+
+컬럼:
+- 요양기관명: 병원명
+- 종별코드: 1=상급종합, 11=종합, 21=병원, ...
+- 응급실병상수: 응급실 병상 수
+- x좌표: 경도 (longitude)
+- y좌표: 위도 (latitude)
+- 헬기장 여부: 1=있음, 0=없음 (UAV 착륙 가능 여부)
+```
+
+### 2. 생성된 시나리오 파일
+
+#### config_(lat,lon).yaml
+```yaml
+entity_info:
+  patient:
+    incident_size: 30              # 총 환자 수
+    latitude: 37.465833            # 사고지점 위도
+    longitude: 126.443333          # 사고지점 경도
+    incident_type: null            # 사고 유형 (확장용)
+    info_path: "./patient_info.csv"
+
+  hospital:
+    load_data: True
+    info_path: "./hospital_info_road.csv"
+    dist_Hos2Hos_euc_info: "./distance_Hos2Hos_euc.csv"
+    dist_Hos2Hos_road_info: "./distance_Hos2Hos_road.csv"
+    dist_Hos2Site_euc_info: "./distance_Hos2Site_euc.csv"
+    dist_Hos2Site_road_info: "./distance_Hos2Site_road.csv"
+    max_send_coeff: [1, 1]         # max_send = a*capa + b*queue
+
+  ambulance:
+    load_data: True
+    dispatch_distance_info: "./amb_info_road.csv"
+    velocity: 40                   # km/h
+    handover_time: 0               # 환자 인계 시간 (분)
+    is_use_time: True              # API duration 사용 여부
+    duration_coeff: 1.0            # duration 가중치
+
+  uav:
+    load_data: True
+    dispatch_distance_info: "./uav_info.csv"
+    velocity: 80                   # km/h
+    handover_time: 0               # 환자 인계 시간 (분)
+
+event_info_path: "event_info.json"
+
+rule_info:
+  isFullFactorial: True            # 64개 전체 조합
+  priority_rule: ["START", "ReSTART"]
+  hos_select_rule: ["RedOnly", "YellowNearest"]
+  red_mode_rule: ["OnlyUAV", "Both_UAVFirst", "Both_AMBFirst", "OnlyAMB"]
+  yellow_mode_rule: ["OnlyUAV", "Both_UAVFirst", "Both_AMBFirst", "OnlyAMB"]
+
+run_setting:
+  totalSamples: 10                 # 반복 횟수
+  random_seed: 0                   # 랜덤 시드 (null=미고정)
+  rule_test: True
+  eval_mode: True
+  output_path: "./results"
+  exp_indicator: "(lat,lon)"       # 결과 파일 접미사
+  save_info: True
+```
+
+#### patient_info.csv
+```csv
+type,ratio,rescue_param_alpha,rescue_param_beta,treat_tier1,treat_tier2,treat_tier1_mean,treat_tier2_mean
+Red,0.1,6,5,True,False,40,INF
+Yellow,0.3,2,13,True,True,20,30
+Green,0.5,1,22,True,True,10,15
+Black,0.1,0,0,True,True,0,0
+```
+- ratio: 환자 비율 (합계=1.0)
+- rescue_param_alpha/beta: 구조 시간 베타 분포 파라미터
+- treat_tier1: 상급종합병원 치료 가능 여부
+- treat_tier2: 일반병원 치료 가능 여부
+- treat_tier1/2_mean: 치료 시간 지수분포 평균 (분)
+
+#### hospital_info_road.csv
+```csv
+Index,요양기관명,종별코드,응급실병상수,수술실수,병상수,헬기장 여부,x좌표,y좌표,distance,duration
+0,서울대학교병원,1,50,3,47,1,126.9997,37.5795,15.3,28.5
+1,연세대학교의과대학,1,45,3,42,1,126.9406,37.5622,12.1,22.3
+...
+```
+
+#### amb_info_road.csv
+```csv
+Index,init_distance,duration,안전센터/소방서이름,보유대수
+0,5.2,8.5,영등포소방서,3
+1,6.8,11.2,구로119안전센터,2
+...
+```
+
+#### uav_info.csv
+```csv
+Index,init_distance,hospital_name
+0,15.3,서울대학교병원
+1,12.1,연세대학교의과대학
+...
+```
+
+#### routes/*.json (카카오 API 응답)
+```json
+{
+  "meta": {
+    "api_provider": "kakao",
+    "route_type": "center2site",
+    "source_index": 0,
+    "name": "영등포소방서",
+    "center": [126.9123, 37.5234],
+    "site": [126.9456, 37.5567],
+    "departure_time": "202502091030",
+    "distance_km": 5.2,
+    "duration_min": 8.5,
+    "duration_sec": 510
+  },
+  "payload": {
+    "kakao_response": { ... }
+  }
+}
+```
+
+---
+
+## API 사용
+
+### 카카오 모빌리티 API
+
+#### 역지오코딩 (좌표 → 주소)
+```python
+# orchestrator.py: reverse_geocode_kakao()
+URL: https://dapi.kakao.com/v2/local/geo/coord2address.json
+Headers: {"Authorization": "KakaoAK {API_KEY}"}
+Params: {"x": lon, "y": lat, "input_coord": "WGS84"}
+
+Response:
+{
+  "full_address": "서울특별시 영등포구 여의도동",
+  "road_address": "서울특별시 영등포구 여의나루로 76",
+  "area1": "서울특별시",
+  "area2": "영등포구",
+  "area3": "여의도동",
+  "area4": ""
+}
+```
+
+#### 도로 거리 및 소요 시간
+```python
+# make_csv_yaml_dynamic.py: get_road_distance_kakao()
+URL: https://apis-navi.kakaomobility.com/v1/future/directions
+Headers: {"Authorization": "KakaoAK {API_KEY}"}
+Params: {
+  "origin": "lon,lat",
+  "destination": "lon,lat",
+  "priority": "TIME",
+  "departure_time": "YYYYMMDDHHMM"  # 미래시간 (선택)
+}
+
+Response:
+{
+  "routes": [{
+    "summary": {
+      "distance": 5200,      # 미터
+      "duration": 510,       # 초
+      "fare": {"toll": 0, "taxi": 3500}
+    }
+  }]
+}
+```
+
+#### API 키 설정 방법
+```python
+# 1. Streamlit Cloud (secrets.toml)
+[kakao]
+rest_api_key = "your_api_key"
+
+# 2. 환경 변수
+export KAKAO_REST_API_KEY="your_api_key"
+
+# 3. Generate.py UI 직접 입력
+```
+
+#### 오류 처리
+- **401 (Auth failure)**: API 키 확인 필요 → 중단
+- **429 (Rate limit)**: 2초 대기 후 재시도 (최대 3회)
+- **Timeout**: 15초 → 직선 거리(Haversine)로 폴백
+
+---
+
+## 정책 조합 (64개 시나리오)
+
+```
+2 (Priority) × 2 (Hospital Selection) × 4 (Red Action) × 4 (Yellow Action) = 64개
+```
+
+### Priority (우선순위 정책)
+| 값 | 설명 |
+|----|------|
+| START | 초기에 전체 환자 배정 계획 수립 |
+| ReSTART | 병원 도착 시마다 잔여 환자 기반 재배정 (τ값 계산) |
+
+ReSTART τ 계산:
+```
+τ = 71 - (0.5 × num_D × (θ_amb/K_amb + θ_uav/K_uav))
+- num_D: 잔여 Yellow 환자 수
+- θ: 평균 왕복 시간
+- K: 이송 수단 수
+```
+
+### Hospital Selection (병원 선택 정책)
+| 값 | 설명 |
+|----|------|
+| RedOnly | Red 환자: 상급종합병원만, Yellow: 일반병원만 |
+| YellowNearest | Red: 상급종합, Yellow: 거리순 (등급 무관) |
+
+### Red/Yellow Action (이송 수단 선택)
+| 값 | 설명 |
+|----|------|
+| OnlyUAV | UAV만 사용 (없으면 대기) |
+| OnlyAMB | 구급차만 사용 (없으면 대기) |
+| Both_UAVFirst | UAV 우선, 없으면 구급차 |
+| Both_AMBFirst | 구급차 우선, 없으면 UAV |
+
+### 시나리오 명명 규칙
+```
+{Priority}, {HosSelect}, Red {RedAction}, Yellow {YellowAction}
+
+예시:
+- START, RedOnly, Red OnlyUAV, Yellow OnlyAMB
+- ReSTART, YellowNearest, Red Both_AMBFirst, Yellow Both_UAVFirst
+```
+
+---
+
+## 대시보드 사용법
+
+### 실행 방법
 ```bash
 # 메인 대시보드
+cd src/vis_src
 streamlit run MCI_Streamlit.py
 
-# 시나리오 생성 페이지 (독립)
+# 시나리오 생성 페이지 (독립 실행)
 streamlit run pages/Generate.py
 ```
 
-### 디렉토리 구조
-```
-Simul_team/
-├── scenarios/                          # 시나리오 데이터
-│   ├── 안전센터와 소방서.csv              # 소방서/119안전센터 마스터
-│   ├── 엑셀 결합 데이터.xlsx             # 병원 마스터
-│   ├── ctprvn.shp/shx/dbf              # 시도 경계 shapefile
-│   └── exp_{YYYYMMDD_HHMMSS}_dep_{timestamp}/
-│       ├── {exp}_summary.csv           # 실험 요약
-│       └── (lat,lon)/                  # 좌표별 폴더
-│           ├── config_(lat,lon).yaml   # 시뮬레이션 설정
-│           ├── patient_info.csv        # 환자 정보
-│           ├── hospital_info_road.csv  # 병원 정보
-│           ├── amb_info_road.csv       # 구급차 출동 정보
-│           ├── uav_info.csv            # UAV 출동 정보
-│           ├── distance_*.csv          # 거리 행렬
-│           └── routes/                 # 경로 JSON
-│               ├── center2site/        # C→S 경로
-│               └── hos2site/           # S→H 경로
-├── results/                            # 시뮬레이션 결과
-│   └── exp_{YYYYMMDD_HHMMSS}_dep_{timestamp}/
-│       └── (lat,lon)/
-│           ├── results_(lat,lon).txt       # RAW 결과 (전체 데이터)
-│           └── results_(lat,lon)_stat.txt  # 통계 요약 (평균, 표준편차, 95% CI)
-├── experiment_logs/                    # 실행 로그
-│   └── (lat,lon)_{timestamp}.log
-├── MCI_Streamlit.py                    # 메인 대시보드
-├── pages/
-│   └── Generate.py                     # 시나리오 생성 페이지
-├── main.py                             # 시뮬레이션 실행 스크립트
-├── make_csv_yaml_dynamic.py            # 시나리오 생성 스크립트
-├── orchestrator.py                     # 오케스트레이션 모듈
-└── config.yaml                         # 기본 설정 템플릿
-```
-
-### 평가 지표
-- **Reward**: 생존확률 합 (클수록 좋음)
-- **Time**: 평균 환자 처리 시간 (작을수록 좋음)
-- **PDR (Preventable Death Rate)**: 예방가능사망률 (작을수록 좋음)
-- **w.o.G (without Green)**: Green 환자 제외 지표
-
-### 시나리오 구조 (64개 조합)
-```
-2 (Phase) × 2 (Policy) × 4 (Red Action) × 4 (Yellow Action) = 64개
-
-Phase:
-  - START: 초기 전체 환자 배정
-  - ReSTART: 병원 도착 시마다 재배정
-
-Policy:
-  - RedOnly: Red 환자만 먼저 배정
-  - YellowHalf: Red + Yellow 50% 배정 후 나머지
-
-Action (Red/Yellow):
-  - OnlyUAV: UAV만 사용
-  - OnlyAMB: 구급차만 사용
-  - Both_UAVFirst: UAV 우선, 부족 시 구급차
-  - Both_AMBFirst: 구급차 우선, 부족 시 UAV
-```
-
-### 사용 방법
+### 탭별 기능
 
 #### 1. Settings (사이드바)
-- 프로젝트 경로 입력
-- 실험 ID 선택 (드롭다운)
-- 좌표 선택 (드롭다운)
-- 미니맵 자동 표시
+- **프로젝트 경로**: `C:\Users\User\MCI_ADV` 입력
+- **실험 ID 선택**: `exp_YYYYMMDD_HHMM_dep_HHMM` 드롭다운
+- **좌표 선택**: `(lat,lon)` 드롭다운
+- **미니맵**: 선택된 좌표 위치 표시
 
-#### 2. Maps 탭
-- 지도 테마 선택 (Light/Dark)
-- AMB C→S, S→H 경로 개별 체크박스
-- UAV 경로 토글 (출동+이송)
-- 혼잡도 범례 표시
+#### 2. Scenarios 탭
+- 로그 파일 선택 (experiment_logs/)
+- **Rule 선택**: 64개 정책 중 선택
+- **Iteration 선택**: 반복 횟수 중 선택
+- **환자 요약표**: 구조시각 → 이송수단 → 병원 → 도착시각 → 치료완료
+- **이벤트 테이블**: 전체 시뮬레이션 이벤트 타임라인
 
-#### 3. Scenarios 탭
-- 로그 파일 선택
-- Rule/Iteration 선택
-- 환자 스토리 요약표 자동 생성
-- 전체 이벤트 타임라인 조회
+#### 3. Maps 탭
+- **테마**: Light / Dark
+- **경로 표시**:
+  - AMB C→S (안전센터 → 사고지점): 실선, 혼잡도 색상
+  - AMB S→H (사고지점 → 병원): 실선
+  - UAV 출동: 점선 (상급종합병원 → 사고지점)
+  - UAV 이송: 점선 (사고지점 → 병원)
+- **범례**: 혼잡도 색상 + AMB/UAV 속도 표시
+- **팝업**: 클릭 시 거리(km), 시간(min) 표시
 
 #### 4. Analytics 탭
-- 표시할 지표 선택 (Reward, Time, PDR 등)
-- 정렬 기준 선택 (Reward↓, PDR↑, Time↑)
-- ANOVA 설계 선택 (One-way/RCBD/Full Factorial)
-- 유의수준(alpha) 조정 (0.001~0.1)
-- A그룹 교집합 자동 추천
+- **지표 선택**: Reward, Time, PDR, Reward w.o.G, PDR w.o.G
+- **정렬 기준**: Reward↓, PDR↑, Time↑
+- **ANOVA 설계**:
+  - Full Factorial: Phase × RedPolicy × RedAction × YellowAction
+  - One-way: 단일 요인
+  - RCBD: Randomized Complete Block Design
+- **유의수준**: α = 0.001 ~ 0.1
+- **사후검정**: Tukey HSD (등분산), Games-Howell (이분산)
+- **잔차 진단**: Shapiro-Wilk 검정, QQ plot, 히스토그램
+- **A그룹 교집합**: 모든 지표에서 상위 그룹인 시나리오 추천
 
 #### 5. Data Tables 탭
-- 편집할 CSV 선택
-- 데이터 편집 후 저장 (자동 백업)
-- 수정값으로 재실행 버튼
+- CSV 파일 선택 (파일명만 표시, 경로 숨김)
+- 실시간 편집 가능 (`안전센터와 소방서.csv` 제외)
+- 저장 시 자동 백업: `*_backup_{timestamp}.csv`
+- "수정값으로 재실행" 버튼
 
-#### 6. Generate 페이지
-- 카카오 API 키 입력
-- 운행시간 모드 선택 (실시간/미래시간)
-- 파라미터 설정 (위도, 경도, 환자수, 구급차수, UAV수, 속도 등)
-- 시나리오 생성 및 즉시 실행
+#### 6. Rerun 탭
+- 기존 YAML 설정 파일 선택
+- 시뮬레이션 재실행
 
-### 참고사항
+#### 7. Generate 페이지 (pages/Generate.py)
+1. **카카오 API 키 입력**
+2. **운행시간 모드 선택**:
+   - 실시간: 현재 교통 상황 반영
+   - 미래시간: YYYYMMDDHHMM 형식 입력
+3. **파라미터 설정**:
+   - 위도/경도
+   - 환자 수 (기본: 30)
+   - 구급차 수 (기본: 30)
+   - UAV 수 (기본: 3)
+   - 구급차 속도 (기본: 40 km/h)
+   - UAV 속도 (기본: 80 km/h)
+   - 시뮬레이션 반복 (기본: 10)
+   - 랜덤 시드 (기본: 0)
+4. **생성 및 실행**: 시나리오 생성 후 자동으로 시뮬레이션 실행
 
-#### 성능
+---
+
+## 평가 지표
+
+| 지표 | 계산 방법 | 해석 |
+|------|----------|------|
+| **Reward** | Σ SurvivalProb(rescue_time, severity) | 생존확률 합계 (↑ 좋음) |
+| **Time** | 마지막 환자 치료 완료 시각 | 총 소요 시간 (↓ 좋음) |
+| **PDR** | 1 - Reward / Preventable | 예방가능사망률 (↓ 좋음) |
+| **Reward w.o.G** | Reward - Green 환자 기여분 | Green 제외 보상 (↑ 좋음) |
+| **PDR w.o.G** | 1 - (Reward - Green) / (Preventable - Green) | Green 제외 PDR (↓ 좋음) |
+
+### 생존확률 계산
+```
+SurvivalProb = f(rescue_time, severity_class)
+- Red: 시간에 민감 (빠른 이송 필수)
+- Yellow: 중간 민감도
+- Green: 시간 영향 적음
+- Black: 사망 (기여분 0)
+```
+
+---
+
+## 설치 및 실행
+
+### 환경 요구사항
+- Python 3.9 이상
+- Windows / Linux / macOS
+
+### 설치
+```bash
+# 1. Conda 환경 생성 (권장)
+conda create -n MCI python=3.9
+conda activate MCI
+
+# 2. 패키지 설치
+pip install -r requirements.txt
+
+# 또는 개별 설치
+pip install streamlit==1.50.0 pandas==2.2.2 numpy==1.26.4 \
+    folium==0.20.0 streamlit-folium==0.25.1 altair==5.5.0 \
+    plotly==6.5.1 openpyxl==3.1.2 PyYAML==6.0.2 \
+    requests==2.32.4 haversine==2.9.0 scipy==1.13.1 \
+    statsmodels==0.14.5 scikit-posthocs==0.11.4 pingouin==0.5.5 \
+    gymnasium==1.0.0
+```
+
+### 필수 파일 확인
+```
+scenarios/
+├── 안전센터와 소방서.csv  ← 필수
+└── 엑셀 결합 데이터.xlsx   ← 필수
+```
+
+### 실행
+```bash
+# 1. 대시보드 실행
+cd src/vis_src
+streamlit run MCI_Streamlit.py
+
+# 2. 시나리오 생성 페이지
+streamlit run pages/Generate.py
+
+# 3. 시뮬레이션 직접 실행 (CLI)
+cd src/sim_src
+python main.py --config_path /path/to/config.yaml
+```
+
+### Streamlit Cloud 배포
+```
+# 1. GitHub 저장소에 푸시
+# 2. Streamlit Cloud에서 연결
+# 3. secrets.toml 설정:
+[kakao]
+rest_api_key = "your_api_key"
+```
+
+---
+
+## 참고사항
+
+### 성능
 - 500회 초과 반복 시 로그 뷰어 자동 비활성화
 - 대용량 데이터 처리 시 로딩 시간 증가 가능
 
-#### API
-- 카카오 REST API 키 필요 (Generate 페이지)
-- 실시간 교통정보 반영 (Kakao API)
-- 미래시간 교통정보 지원 (YYYYMMDDHHMM 형식)
-
-#### 파일 인코딩
+### 파일 인코딩
 - 한글 파일명: CP949 인코딩 사용
 - CSV 파일: UTF-8-sig → CP949 자동 폴백
 
-#### 데이터 보호
-- CSV 편집 시 자동 백업 (`*_backup_{timestamp}.csv`)
+### 데이터 보호
+- CSV 편집 시 자동 백업 생성
 - 원본 데이터 보존
 
-#### 필수 파일
-- `scenarios/안전센터와 소방서.csv`
-- `scenarios/엑셀 결합 데이터.xlsx`
-- `scenarios/ctprvn.shp/shx/dbf`
-
----
-
-## 🔧 MCI_Experiment_Autonomation 자동화 도구 (v5.0)
-
-### 사전준비
-
-1. MCI conda 가상환경 설치
-
-2. (MCI) 활성상태에서 패키지 설치
-```bash
-pip install pandas numpy requests haversine pyyaml geopandas shapely gymnasium scipy openpyxl streamlit streamlit-folium altair folium statsmodels pingouin
-```
-
-3. scenarios 폴더 안에 필수 파일 존재 확인
-   - 안전센터와 소방서.csv
-   - 엑셀 결합 데이터.xlsx
-   - ctprvn.shp, ctprvn.shx, ctprvn.dbf
-
-4. 프로젝트 폴더에 시뮬레이션 관련 파일들 존재 확인
-
-5. 네이버 API 키 준비 (레거시, 카카오 API 권장)
-
-### 실행순서
-
-1. **사전준비 완료 후** `MCI_Experiment_Autonomation_v5.0.ps1` 더블클릭
-
-2. **[📁 프로젝트 경로 설정]**
-   - 엔터 입력 시 현재 디렉토리로 인식
-   - `C:\Users\사용자명` 위치 권장
-
-3. **[🐍 Conda 환경 탐지]**
-   - "MCI 환경을 사용하시겠습니까?" → `y(Y)` 입력 시 자동 활성화
-   - `n(N)` 입력 시 가상환경 리스트에서 선택
-
-4. **[🔑 Naver API 키 설정]**
-   - Client ID/Client Secret 순차 입력
-   - 환경변수에 자동 저장
-
-5. **[📦 Python 패키지 확인]**
-   - 필수 패키지 자동 검사
-   - 누락 시 피드백 제공
-
-6. **[🎯 시뮬레이션 개수 설정]**
-   - 생성할 시뮬레이션 개수 입력 (최대 10개)
-   - 단일 좌표 파라미터 수정 실험 시 1개씩 실행 권장
-
-7. **[⚙️ 고급 옵션]**
-
-   **queue_policy**: 병원 대기열 설정
-   - 기본값: 0
-   - 옵션: `capa/2`, `capa/3`, `capa/4`, `0.5`, `0.333` 등
-   - 소수점 버림 처리
-
-   **util_by_tier**: 병상 가용률 설정
-   - 사용 가능 병상수 = 전체 병상수 × (1 - util)
-   - 기본값: `1:0.656, 11:0.461, etc:0.461`
-   - 종별코드별 적용 (1=상급종합, 11=종합, 기타=일반)
-
-   **buffer_ratio**: 병원 후보군 확장 비율
-   - 기본값: 1.5
-   - 도심/인프라 좋은 지역: 비율 낮춤
-   - 농촌/산간 지역: 비율 높임
-   - ※ AMB 후보군은 `make_csv_yaml_dynamic.py` 내 `multiplier=2` 사용
-
-   **patient_info 파라미터**
-   - Red 비율 (기본: 0.1)
-   - Yellow 비율 (기본: 0.3)
-   - Green 비율 (기본: 0.5)
-   - Black 비율 (기본: 0.1)
-
-   **hospital.max_send_coeff (a, b)**
-   - 공식: `eff = a × capa + b × queue_capa`
-   - 예시: `1,1` 또는 `1.5,1`
-
-8. **[📋 디폴트 파라미터 설정]**
-   - `y`: 기존 디폴트 파라미터로 일괄 생성
-   - `n`: 개별 파라미터 수정 모드 진입
-
-9. **[⚙️ 시뮬레이션 #N 설정]**
-
-   **🎯 좌표 생성 모드**
-
-   **🎲 대한민국 전국 완전랜덤**
-   - shapefile 폴리곤 경계 내에서 uniform 분포로 추출
-   - 해상 제외
-
-   **🏙️ 특정 시도 선택**
-   - 시도 단위 경계 기반 랜덤 추출
-   - 선택 가능 지역:
-     ```
-     [1] 서울특별시      [2] 부산광역시
-     [3] 대구광역시      [4] 인천광역시
-     [5] 광주광역시      [6] 대전광역시
-     [7] 울산광역시      [8] 세종특별자치시
-     [9] 경기도          [10] 충청북도
-     [11] 충청남도       [12] 전라북도
-     [13] 전라남도       [14] 경상북도
-     [15] 경상남도       [16] 제주특별자치도
-     [17] 강원특별자치도
-     ```
-
-   **📍 수동 좌표 입력**
-   - 위도, 경도 직접 입력
-   - 범위: 위도 33.1~38.6, 경도 124.6~131.0
-
-   **파라미터 수정**
-   ```
-   환자 수 [30]:
-   구급차 수 [30]:
-   UAV 수 [3]:
-   구급차 속도 [40]:
-   UAV 속도 [80]:
-   시뮬레이션 반복 [10]:
-   랜덤 시드 [0]:
-   ```
-
-   **[시뮬레이션 #1 설정 완료]**
-   ```
-   (예시)
-   🎯 모드: 대구광역시 지역
-   ⚙️ 환자: 30, 구급차: 30, UAV: 3
-   ```
-
-10. **[📋 실험 설정 최종 검토]**
-    - 예상 소요시간 표시
-    - 시뮬레이션 번호별 파라미터 요약
-    - 네이버 API 예상 호출량
-    - ★매우 신중하게 검토 필요
-
-11. **시나리오 생성 및 실행**
-    - `y` 입력 시 시나리오 생성 후 시뮬레이션 자동 실행
-    - 완료 시 성공/실패 개수 및 상세 로그 출력
-
-### 실행결과 파일
-
-#### 실험 ID
-- 형식: `exp_YYYYMMDD_HHMMSS_dep_{timestamp}`
-- 시뮬레이션 개수 확정 시 자동 생성
-
-#### scenarios 폴더
-- `{exp}_summary.csv`: 실험 요약
-- 컬럼:
-  ```
-  실험ID 순번, 생성모드, 생성유형, 좌표정보, 실제위도, 실제경도,
-  주소, 도로명주소, 시도, 시군구, 읍면동, 리,
-  시나리오생성_시작, 시나리오생성_소요(초),
-  시뮬레이션_시작, 시뮬레이션_소요(초),
-  실험_완료시간, 좌표별_총소요(초), 성공여부, 로그파일,
-  환자수, max_send_coeff, 구급차수, UAV수,
-  구급차속도, UAV속도, 시뮬레이션반복, 랜덤시드
-  ```
-
-#### results 폴더
-- `results_(lat,lon).txt`: RAW 결과 (전체 데이터)
-- `results_(lat,lon)_stat.txt`: 통계 요약
-- 각 Rule 조합별 Reward, Time, PDR 평균, 표준편차, 95% 신뢰구간
-- w.o.G (without Green) 지표 포함
-
-#### experiment_logs 폴더
-- `(lat,lon)_{timestamp}.log`: 시뮬레이션 실행 로그
-- 터미널 출력 텍스트 기록
-
----
-
-## 기술 스택
-
-### 핵심 프레임워크
-- **Streamlit**: 대시보드 프레임워워크
-- **Folium**: 인터랙티브 지도 시각화
-- **Gymnasium**: 강화학습 환경
-
-### 데이터 처리
-- **pandas**: 데이터프레임 처리
-- **numpy**: 수치 계산
-- **openpyxl**: 엑셀 파일 처리
-
-### 시각화
-- **Altair**: 차트 생성
-- **streamlit-folium**: Streamlit + Folium 통합
-
-### 통계 분석
-- **statsmodels**: OLS 회귀, ANOVA
-- **scipy**: Shapiro-Wilk, Friedman, t-test
-- **pingouin**: Games-Howell 사후검정
-
-### 지리 데이터
-- **geopandas**: 지리 데이터 처리
-- **shapely**: 폴리곤 처리
-- **haversine**: 거리 계산
-
-### API/네트워크
-- **requests**: HTTP 요청 (Kakao/Naver API)
-- **pyyaml**: YAML 파일 파싱
+### 확장 포인트
+- `event_info.json`: 새로운 이벤트 타입 추가
+- `RuleManager.py`: 새로운 정책 규칙 추가
+- `make_csv_yaml_dynamic.py`: 새로운 데이터 소스 연동
 
 ---
 
