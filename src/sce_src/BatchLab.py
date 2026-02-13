@@ -457,8 +457,8 @@ st.markdown("### 4) Parameter presets")
 p1, p2, p3 = st.columns(3)
 with p1:
     incident_size = st.number_input("incident_size", min_value=1, value=30, step=1)
-    amb_size = st.number_input("amb_size", min_value=1, value=30, step=1)
-    uav_size = st.number_input("uav_size", min_value=0, value=3, step=1)
+    amb_count = st.number_input("amb_count", min_value=1, value=30, step=1)
+    uav_count = st.number_input("uav_count", min_value=0, value=3, step=1)
     buffer_ratio = st.number_input("buffer_ratio", min_value=1.0, value=1.5, step=0.1, format="%.2f")
 with p2:
     amb_velocity = st.number_input("ambulance velocity (km/h)", min_value=1, value=40, step=1)
@@ -476,8 +476,8 @@ if st.button("Add preset"):
         {
             "name": preset_name or f"preset-{len(st.session_state.batch_params)+1}",
             "incident_size": int(incident_size),
-            "amb_size": int(amb_size),
-            "uav_size": int(uav_size),
+            "amb_count": int(amb_count),
+            "uav_count": int(uav_count),
             "amb_velocity": int(amb_velocity),
             "uav_velocity": int(uav_velocity),
             "amb_handover_time": float(amb_handover_time),
@@ -562,8 +562,8 @@ if st.button("Run batch now", type="primary"):
                     latitude=coord["lat"],
                     longitude=coord["lon"],
                     incident_size=preset["incident_size"],
-                    amb_size=preset["amb_size"],
-                    uav_size=preset["uav_size"],
+                    amb_count=preset["amb_count"],
+                    uav_count=preset["uav_count"],
                     amb_velocity=preset["amb_velocity"],
                     uav_velocity=preset["uav_velocity"],
                     total_samples=preset["total_samples"],

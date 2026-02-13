@@ -302,7 +302,7 @@ class ScenarioGenerator:
             print(f"  💥 좌표 생성 오류: {e}")
             return None
 
-    def make_amb_info(self, latitude, longitude, incident_size, amb_size, save_folder):
+    def make_amb_info(self, latitude, longitude, incident_size, amb_count, save_folder):
         """구급차 정보 생성"""
         print(f"  🚑 구급차 정보 생성 중...")
         try:
@@ -329,7 +329,7 @@ class ScenarioGenerator:
 
         # EUC 저장
         # df_sorted_euc = df.sort_values("euclidean_distance").head(incident_size).copy()
-        df_sorted_euc = df.sort_values("euclidean_distance").head(amb_size).copy()
+        df_sorted_euc = df.sort_values("euclidean_distance").head(amb_count).copy()
         df_sorted_euc = df_sorted_euc.rename(columns={
             "euclidean_distance": "init_distance",
             "기관명": "안전센터/소방서이름"
@@ -379,7 +379,7 @@ class ScenarioGenerator:
 
         # ROAD 저장 (duration 기준으로 정렬 후 상위 incident_size개 선택)
         # df_sorted_road = df_candidates.sort_values("road_duration").head(incident_size).copy()
-        df_sorted_road = df_candidates.sort_values("road_duration").head(amb_size).copy()
+        df_sorted_road = df_candidates.sort_values("road_duration").head(amb_count).copy()
         df_sorted_road = df_sorted_road.rename(columns={
             "road_distance": "init_distance",
             "road_duration": "duration",
@@ -392,7 +392,7 @@ class ScenarioGenerator:
         
         print(f"  ✅ 구급차 정보 생성 완료")
 
-    def make_hospital_info(self, latitude, longitude, incident_size, save_folder, uav_size=0):
+    def make_hospital_info(self, latitude, longitude, incident_size, save_folder, uav_count=0):
         """병원 정보 생성 (기존 로직 유지 + 최소 조건 추가 보장)
 
         Args:
@@ -400,7 +400,7 @@ class ScenarioGenerator:
             longitude: 사고지점 경도
             incident_size: 환자 수
             save_folder: 저장 폴더
-            uav_size: UAV 대수 (헬기장 병원 최소 보장에 사용)
+            uav_count: UAV 대수 (헬기장 병원 최소 보장에 사용)
         """
         print(f"  🏥 병원 정보 생성 중...")
         
@@ -513,7 +513,7 @@ class ScenarioGenerator:
         # 규칙 4: 헬기장 병원 최소 보장 (UAV 대수 이상)
         if "헬기장 여부" in df_selected.columns:
             # UAV 대수 확인 (파라미터에서)
-            uav_n = int(max(0, uav_size))
+            uav_n = int(max(0, uav_count))
 
             if uav_n > 0:
                 helipad_hospitals = df_selected[df_selected["헬기장 여부"] == 1]
@@ -549,7 +549,7 @@ class ScenarioGenerator:
         # ================================================================= #
         # 규칙 5: UAV 이송을 위한 교집합 병원 보장 (헬기장+Tier)
         if "헬기장 여부" in df_selected.columns:
-            uav_n = int(max(0, uav_size))
+            uav_n = int(max(0, uav_count))
 
             if uav_n > 0:
                 # 5-1: Red UAV 이송용 헬기장+Tier1 병원 최소 1개 보장
@@ -663,7 +663,7 @@ class ScenarioGenerator:
 
 
     
-    def make_uav_info(self, latitude, longitude, incident_size, uav_size, save_folder):
+    def make_uav_info(self, latitude, longitude, incident_size, uav_count, save_folder):
         """UAV 정보 생성 - hospital_info_road.csv 기반 (★핵심 변경★)
         - hospital_info_road.csv에서 "헬기장 여부"=1인 병원만 필터링
         - 사고지점 기준 거리 계산 후 가장 가까운 N개 헬기장 병원 선정
@@ -679,7 +679,7 @@ class ScenarioGenerator:
 
         # 0) 파라미터 정리
         try:
-            uav_n = int(max(0, int(uav_size)))
+            uav_n = int(max(0, int(uav_count)))
         except Exception:
             uav_n = 0
         if uav_n <= 0:
@@ -978,8 +978,8 @@ run_setting:
         print(f"CONFIG_PATH:{absolute_config_path}")
         return absolute_config_path
 
-    def generate_scenario(self, latitude, longitude, incident_size, amb_size,
-                          uav_size, amb_velocity, uav_velocity,
+    def generate_scenario(self, latitude, longitude, incident_size, amb_count,
+                          uav_count, amb_velocity, uav_velocity,
                           total_samples, random_seed, is_use_time=True,
                           amb_handover_time=0, uav_handover_time=0, duration_coeff=1.0):
         """
@@ -1012,9 +1012,9 @@ run_setting:
         print(f"  📍 좌표: ({latitude}, {longitude}) - 역지오코딩은 orchestrator에서 수행")
 
         # 생성 파이프라인
-        self.make_amb_info(latitude, longitude, incident_size, amb_size, save_folder)
-        self.make_hospital_info(latitude, longitude, incident_size, save_folder, uav_size)
-        self.make_uav_info(latitude, longitude, incident_size, uav_size, save_folder)
+        self.make_amb_info(latitude, longitude, incident_size, amb_count, save_folder)
+        self.make_hospital_info(latitude, longitude, incident_size, save_folder, uav_count)
+        self.make_uav_info(latitude, longitude, incident_size, uav_count, save_folder)
         self.make_patient_info(save_folder)
         self.make_distance_Hos2Hos(save_folder)
         config_path = self.make_config_yaml(
@@ -1036,8 +1036,8 @@ if __name__ == "__main__":
     parser.add_argument("--latitude", type=float, required=False, help="위도")
     parser.add_argument("--longitude", type=float, required=False, help="경도")
     parser.add_argument("--incident_size", type=int, default=30, help="환자 수")
-    parser.add_argument("--amb_size", type=int, default=30, help="구급차 수")
-    parser.add_argument("--uav_size", type=int, default=3, help="UAV 수")
+    parser.add_argument("--amb_count", type=int, default=30, help="구급차 수")
+    parser.add_argument("--uav_count", type=int, default=3, help="UAV 수")
     parser.add_argument("--amb_velocity", type=int, default=40, help="구급차 속도")
     parser.add_argument("--uav_velocity", type=int, default=80, help="UAV 속도")
     parser.add_argument("--total_samples", type=int, default=10, help="시뮬레이션 반복 수")
@@ -1112,7 +1112,7 @@ if __name__ == "__main__":
         # 시나리오 생성
         config_path = generator.generate_scenario(
             latitude, longitude,
-            args.incident_size, args.amb_size, args.uav_size,
+            args.incident_size, args.amb_count, args.uav_count,
             args.amb_velocity, args.uav_velocity,
             args.total_samples, args.random_seed,
             is_use_time=is_use_time_bool,

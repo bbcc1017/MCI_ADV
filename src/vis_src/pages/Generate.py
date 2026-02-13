@@ -201,8 +201,8 @@ if "batch_presets" not in st.session_state:
     st.session_state.batch_presets = [{
         "name": "기본",
         "incident_size": 30,
-        "amb_size": 30,
-        "uav_size": 3,
+        "amb_count": 30,
+        "uav_count": 3,
         "amb_velocity": 40,
         "uav_velocity": 80,
         "amb_handover": 0.0,
@@ -230,8 +230,8 @@ def _append_coord_row(label: str, lat: float, lon: float, address: str = "", pre
         "lon": lon,
         "address": address,
         "incident_size": p.get("incident_size", 30),
-        "amb_size": p.get("amb_size", 30),
-        "uav_size": p.get("uav_size", 3),
+        "amb_count": p.get("amb_count", 30),
+        "uav_count": p.get("uav_count", 3),
         "amb_velocity": p.get("amb_velocity", 40),
         "uav_velocity": p.get("uav_velocity", 80),
         "amb_handover": p.get("amb_handover", 0.0),
@@ -715,12 +715,12 @@ with colA:
     total_samples = st.number_input("시뮬레이션 반복 (totalSamples)", value=10, min_value=1, step=1)
 with colB:
     longitude = st.number_input("경도 (longitude)", value=st.session_state.selected_lon, format="%.6f")
-    amb_size  = st.number_input("구급차 수 (amb_size)", value=30, min_value=1, step=1)
+    amb_count  = st.number_input("구급차 수 (amb_count)", value=30, min_value=1, step=1)
     uav_velocity = st.number_input("UAV 속도 (km/h)", value=80, min_value=1, step=1)
     uav_handover_time = st.number_input("UAV 환자 인계시간 (분)", value=0.0, min_value=0.0, step=0.1, format="%.1f", help="현장에서 환자를 싣거나 병원에 내리는 시간")
     random_seed  = st.number_input("랜덤시드", value=0, min_value=0, step=1)
 with colC:
-    uav_size = st.number_input("UAV 수 (uav_size)", value=3, min_value=0, step=1)
+    uav_count = st.number_input("UAV 수 (uav_count)", value=3, min_value=0, step=1)
     hospital_max_send_coeff = st.text_input("max_send_coeff (예: 1.05,1)", value="1,1")
     buffer_ratio = st.number_input("buffer_ratio", value=1.5, min_value=1.0, step=0.1)
 
@@ -747,7 +747,7 @@ if st.button("📦 시나리오 생성", key="btn_generate_scenario"):
         res = orc.generate_scenario(
             latitude=latitude, longitude=longitude,
             incident_size=int(incident_size),
-            amb_size=int(amb_size), uav_size=int(uav_size),
+            amb_count=int(amb_count), uav_count=int(uav_count),
             amb_velocity=int(amb_velocity), uav_velocity=int(uav_velocity),
             total_samples=int(total_samples), random_seed=int(random_seed),
             exp_id=None,  # 항상 자동 생성
@@ -831,8 +831,8 @@ st.markdown("#### 프리셋 편집 (기본값 세트)")
 default_preset = [{
     "name": "기본",
     "incident_size": 30,
-    "amb_size": 30,
-    "uav_size": 3,
+    "amb_count": 30,
+    "uav_count": 3,
     "amb_velocity": 40,
     "uav_velocity": 80,
     "amb_handover": 0.0,
@@ -857,8 +857,8 @@ preset_edited = st.data_editor(
     column_config={
         "name": st.column_config.TextColumn("프리셋 이름", required=True),
         "incident_size": st.column_config.NumberColumn("incident_size", step=1, format="%d"),
-        "amb_size": st.column_config.NumberColumn("amb_size", step=1, format="%d"),
-        "uav_size": st.column_config.NumberColumn("uav_size", step=1, format="%d"),
+        "amb_count": st.column_config.NumberColumn("amb_count", step=1, format="%d"),
+        "uav_count": st.column_config.NumberColumn("uav_count", step=1, format="%d"),
         "amb_velocity": st.column_config.NumberColumn("AMB 속도", step=1, format="%d"),
         "uav_velocity": st.column_config.NumberColumn("UAV 속도", step=1, format="%d"),
         "amb_handover": st.column_config.NumberColumn("AMB 핸드오버(분)", step=0.1, format="%.1f"),
@@ -882,7 +882,7 @@ preset_names = [p.get("name", "") for p in st.session_state.batch_presets]
 st.markdown("#### 좌표 + 파라미터 테이블 (행 추가/수정)")
 coord_columns = [
     "label", "lat", "lon", "address", "preset",
-    "incident_size", "amb_size", "uav_size",
+    "incident_size", "amb_count", "uav_count",
     "amb_velocity", "uav_velocity",
     "amb_handover", "uav_handover",
     "total_samples", "random_seed",
@@ -909,8 +909,8 @@ coord_edited = st.data_editor(
         "address": st.column_config.TextColumn("주소", required=False),
         "preset": st.column_config.SelectboxColumn("프리셋", options=preset_names or ["기본"]),
         "incident_size": st.column_config.NumberColumn("incident_size", step=1, format="%d"),
-        "amb_size": st.column_config.NumberColumn("amb_size", step=1, format="%d"),
-        "uav_size": st.column_config.NumberColumn("uav_size", step=1, format="%d"),
+        "amb_count": st.column_config.NumberColumn("amb_count", step=1, format="%d"),
+        "uav_count": st.column_config.NumberColumn("uav_count", step=1, format="%d"),
         "amb_velocity": st.column_config.NumberColumn("AMB 속도", step=1, format="%d"),
         "uav_velocity": st.column_config.NumberColumn("UAV 속도", step=1, format="%d"),
         "amb_handover": st.column_config.NumberColumn("AMB 핸드오버(분)", step=0.1, format="%.1f"),
@@ -996,8 +996,8 @@ if st.button("일괄 실행", type="primary", key="btn_batch_run"):
                     latitude=lat_val,
                     longitude=lon_val,
                     incident_size=int(pick("incident_size", 30)),
-                    amb_size=int(pick("amb_size", 30)),
-                    uav_size=int(pick("uav_size", 3)),
+                    amb_count=int(pick("amb_count", 30)),
+                    uav_count=int(pick("uav_count", 3)),
                     amb_velocity=int(pick("amb_velocity", 40)),
                     uav_velocity=int(pick("uav_velocity", 80)),
                     total_samples=int(pick("total_samples", 10)),

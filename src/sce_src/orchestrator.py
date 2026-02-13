@@ -548,7 +548,7 @@ class Orchestrator:
 
     # ---------- scenario generation ----------
     def generate_scenario(self, latitude: float, longitude: float,
-                          incident_size: int = 30, amb_size: int = 30, uav_size: int = 3,
+                          incident_size: int = 30, amb_count: int = 30, uav_count: int = 3,
                           amb_velocity: int = 40, uav_velocity: int = 80,
                           total_samples: int = 10, random_seed: int = 0,
                           exp_id: Optional[str] = None,
@@ -566,8 +566,8 @@ class Orchestrator:
             "--latitude", str(latitude),
             "--longitude", str(longitude),
             "--incident_size", str(incident_size),
-            "--amb_size", str(amb_size),
-            "--uav_size", str(uav_size),
+            "--amb_count", str(amb_count),
+            "--uav_count", str(uav_count),
             "--amb_velocity", str(amb_velocity),
             "--uav_velocity", str(uav_velocity),
             "--total_samples", str(total_samples),
