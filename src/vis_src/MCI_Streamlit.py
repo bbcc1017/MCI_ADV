@@ -14,7 +14,7 @@
 #    - 동일 병원 출동·이송 겹침 시 이송선에 소폭 오프셋 적용(겹침 완화)
 #    - 범례에 AMB 혼잡도 색/ UAV 점선 샘플 + (가능 시) YAML의 AMB/UAV 속도 표기
 #    - 경로 요약(거리 km, 시간 분) 팝업에 삽입, duration(ms) → 분 보정
-# 4) Analytics: 상단 원본 표 유지 + "정렬 기준" 선택(Reward↓, PDR↑(작을수록 좋음), Time↑(짧을수록 좋음))로 전체 표 재정렬
+# 4) Analytics: 상단 원본 표 유지 + "Sort by" 선택(Reward↓, PDR↑(작을수록 좋음), Time↑(짧을수록 좋음))로 전체 표 재정렬
 #    - 히트맵/막대 그래프 제거 → 대신 ANOVA 스위트 추가(Full Factorial, M1=Reward 기본)
 #      · raw(results_{coord}.txt) 파싱 → Phase, RedPolicy, RedAction, YellowAction × Sample
 #      · statsmodels 있으면 OLS+Type-II ANOVA, 잔차 정규성(Shapiro)·QQ 스캐터·잔차 히스토그램 제공
@@ -487,7 +487,7 @@ def read_excel_hospital(base_path: str) -> Optional[pd.DataFrame]:
                 df = pd.read_excel(excel_path, engine="openpyxl")
                 return df
             except Exception as e:
-                st.warning(f"엑셀 로드 실패: {excel_path} ({e})")
+                st.warning(f"Excel load failed: {excel_path} ({e})")
     return None
 
 @st.cache_data(ttl=300)
@@ -534,7 +534,7 @@ def summarize_experiment(df: pd.DataFrame) -> Tuple[Dict[str,str], Optional[str]
     return info, addr
 
 def summarize_experiment_extended(df: Optional[pd.DataFrame]) -> Tuple[Dict[str,str], Dict[str,str]]:
-    site_info = {"좌표":"","주소":"","도로명 주소":""}
+    site_info = {"Coordinate":"","Address":"","Road Address":""}
     sim_info: Dict[str,str] = {}
     if df is None or df.empty: return site_info, sim_info
 
@@ -544,9 +544,9 @@ def summarize_experiment_extended(df: Optional[pd.DataFrame]) -> Tuple[Dict[str,
     addr_cols = [c for c in df.columns if ("주소" in str(c) and "도로" not in str(c)) or "address" in str(c).lower()]
     road_cols = [c for c in df.columns if "도로명" in str(c)]
     if addr_cols:
-        v = df.iloc[latest_row_idx][addr_cols[0]]; site_info["주소"] = "" if pd.isna(v) else str(v)
+        v = df.iloc[latest_row_idx][addr_cols[0]]; site_info["Address"] = "" if pd.isna(v) else str(v)
     if road_cols:
-        v = df.iloc[latest_row_idx][road_cols[0]]; site_info["도로명 주소"] = "" if pd.isna(v) else str(v)
+        v = df.iloc[latest_row_idx][road_cols[0]]; site_info["Road Address"] = "" if pd.isna(v) else str(v)
     start_idx = None
     for i,c in enumerate(df.columns):
         if "시나리오생성_시작" in str(c):
@@ -586,6 +586,27 @@ def get_patient_count(base_path: str, exp_id: str, coord: str) -> Optional[int]:
                 pass
     return None
 
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _load_scenario_csvs(bp: str, exp: str, coord: str):
+    """Load & rename scenario CSVs (cached at top level)."""
+    base = Path(bp) / "scenarios" / exp / coord
+    _KR_HOSP = {"종별코드":"Grade Code","요양기관명":"Hospital Name","수술실수":"ORs","병상수":"Beds","헬기장 여부":"Helipad"}
+    _KR_AMB  = {"안전센터/소방서이름":"Fire Station","보유대수":"Fleet Size"}
+
+    def _read(p, enc=None):
+        if not p.is_file(): return pd.DataFrame()
+        return pd.read_csv(p, encoding=enc) if enc else pd.read_csv(p)
+
+    h = _read(base / "hospital_info_road.csv").rename(columns=_KR_HOSP)
+    c = _read(Path(bp) / "scenarios" / "안전센터와 소방서.csv", "cp949")
+    a = _read(base / "amb_info_road.csv").rename(columns=_KR_AMB)
+    dr = _read(base / "distance_Hos2Site_road.csv")
+    he = _read(base / "hospital_info_euc.csv").rename(columns=_KR_HOSP)
+    de = _read(base / "distance_Hos2Site_euc.csv")
+    return h, c, a, dr, he, de
+
+
 # ------------------------------
 # Logs (실행 로그 탐색 + 파싱)
 # ------------------------------
@@ -614,10 +635,10 @@ EV_ARG_PARSERS = {
 }
 
 ACTION_TOOLTIP_MD = (
-    "**Action 인덱스 해석**\n"
-    "- `action[0] = p_class` → 환자 중증도 (0=Red, 1=Yellow, 2=Green)\n"
-    "- `action[1] = destination` → 0=현장대기, 1…N → 병원 index+1\n"
-    "- `action[2] = mode` → 0=AMB(구급차), 1=UAV"
+    "**Action Index Reference**\n"
+    "- `action[0] = p_class` → Patient severity (0=Red, 1=Yellow, 2=Green)\n"
+    "- `action[1] = destination` → 0=On-site wait, 1…N → Hospital index+1\n"
+    "- `action[2] = mode` → 0=AMB(Ambulance), 1=UAV"
 )
 
 def _strip_np_scalar(token: str) -> str:
@@ -807,20 +828,20 @@ def build_patient_summary(events: List[Dict]) -> pd.DataFrame:
     rows = []
     for p, info in sorted(byp.items(), key=lambda kv: kv[0]):
         hist = arrival_hist.get(p, [])
-        remark = "정상처리"
+        remark = "Normal"
         if len(hist) >= 2:
             hosp_set = {h for (_,h,_) in hist}; mode_set = {m for (m,_,_) in hist}
             if len(hosp_set) > 1 or len(mode_set) > 1:
                 remark = "divert"
         rows.append({
-            "환자ID": p,
-            "구조시각": info.get("rescue_t"),
-            "이송수단": info.get("mode"),
-            "도착 병원": info.get("hospital"),
-            "병원도착시각": info.get("arrive_t"),
-            "치료대기완료": info.get("care_ready_t"),
-            "치료완료시각": info.get("def_care_t"),
-            "특이사항": remark,
+            "PatientID": p,
+            "Rescue Time": info.get("rescue_t"),
+            "Transport Mode": info.get("mode"),
+            "Dest. Hospital": info.get("hospital"),
+            "Hospital Arrival": info.get("arrive_t"),
+            "Care Ready": info.get("care_ready_t"),
+            "Care Complete": info.get("def_care_t"),
+            "Remarks": remark,
         })
     return pd.DataFrame(rows)
 
@@ -849,7 +870,7 @@ def experiment_log_candidates(base_path: str, exp_id: str, coord: str) -> List[s
 # ------------------------------
 # Kakao traffic_state: 0=정보없음, 1=정체, 2=지체, 3=서행, 4=원활, 6=교통사고
 CONG_COLORS = {0:"#888888", 1:"#FF0000", 2:"#FF6347", 3:"#FFD700", 4:"#7CFC00", 6:"#000000"}
-CONG_LABELS = {0:"정보없음", 1:"정체", 2:"지체", 3:"서행", 4:"원활", 6:"교통사고"}
+CONG_LABELS = {0:"Unknown", 1:"Congested", 2:"Slow", 3:"Moderate", 4:"Clear", 6:"Accident"}
 UAV_OUT_COLOR = "#8A2BE2"   # 출동(병원→사고)
 UAV_BACK_COLOR = "#00CED1"  # 이송(사고→병원)
 
@@ -943,7 +964,7 @@ def add_site_marker(m: folium.Map, site_latlon: Tuple[float,float]):
         location=[site_latlon[0], site_latlon[1]],
         icon=folium.Icon(color="purple", icon="map-pin", prefix="fa"),
         radius =  10,
-        tooltip="사고지점",
+        tooltip="Incident Site",
         popup=f"사고지점<br>lat,lon={site_latlon[0]:.6f},{site_latlon[1]:.6f}"
     ).add_to(m)
 
@@ -977,10 +998,10 @@ def add_hospital_marker(
     body = [f"<b>{name}</b>"]                    # 제목
     body.append(f"lat,lon={latlon[0]:.6f},{latlon[1]:.6f}")  # ① 좌표
     if op_rooms is not None and not (isinstance(op_rooms, float) and math.isnan(op_rooms)):
-        body.append(f"수술실수={int(op_rooms)}")              # ② 수술실수
+        body.append(f"OR={int(op_rooms)}")              # ② 수술실수
     if beds is not None and not (isinstance(beds, float) and math.isnan(beds)):
-        body.append(f"병상수={int(beds)}")                    # ③ 병상수
-    body.append(f"등급코드={grade_code}")                    # ④ 등급코드
+        body.append(f"Beds={int(beds)}")                    # ③ 병상수
+    body.append(f"GradeCode={grade_code}")                    # ④ 등급코드
     if extra_lines:                                           # ⑤ 병원등급, 거리, 소요시간 등
         body += [x for x in extra_lines if x]
 
@@ -1177,53 +1198,64 @@ with st.sidebar:
     base_input = st.text_input(
         "base_path",
         st.session_state.base_path,
-        placeholder="예: C:\\Users\\사용자명\\MCI",
+        placeholder="e.g. C:\\Users\\USER\\MCI",
         disabled=IS_CLOUD,
     )
 
     if IS_CLOUD:
-        st.caption(f"☁️ Streamlit Cloud에서는 base_path가 `{CLOUD_BASE_PATH}` 로 자동 고정됩니다.")
+        st.caption(f"☁️ Cloud mode: base_path is fixed to `{CLOUD_BASE_PATH}`.")
 
     # 로컬에서만 버튼 동작
     if (not IS_CLOUD) and st.button("Set base_path"):
         st.session_state.base_path = norm(base_input)
         if base_ok(norm(base_input)):
-            st.success("✅ base_path 설정 완료!\n\n🧪 Generate 탭에서 새 시나리오를 생성하거나, 기존 시나리오를 선택하세요.")
+            st.success("✅ base_path set! Select a scenario or create a new one in the Generate tab.")
     if st.session_state.base_path and not base_ok(st.session_state.base_path):
-        st.warning("유효한 base_path가 아닙니다. (scenarios 폴더가 필요)")
-    st.text("※ 위에 버튼 클릭해야 시작 가능")
+        st.warning("Invalid base_path. (scenarios folder required)")
+    st.text("※ Click the button above to start")
     if base_ok(st.session_state.base_path):
         exps = list_experiments_any(st.session_state.base_path)
-        st.caption("📂 기존 시나리오 선택 (선택사항)")
-        st.session_state.selected_exp = st.selectbox(
+        st.caption("📂 Select existing scenario (optional)")
+
+        # Ensure stored value is still valid; reset if not
+        if st.session_state.selected_exp not in exps:
+            st.session_state.selected_exp = ""
+        # Reset coord when exp changes
+        def _on_exp_change():
+            st.session_state.selected_coord = ""
+
+        st.selectbox(
             "Experiment ID",
             options=[""] + exps,
-            index=0 if st.session_state.selected_exp not in exps else (exps.index(st.session_state.selected_exp) + 1),
+            key="selected_exp",
+            on_change=_on_exp_change,
         )
         coords = list_coords_from_scenarios(st.session_state.base_path, st.session_state.selected_exp) if st.session_state.selected_exp else []
-        st.session_state.selected_coord = st.selectbox(
+        if st.session_state.selected_coord not in coords:
+            st.session_state.selected_coord = ""
+        st.selectbox(
             "Coordinate folder",
             options=[""] + coords,
-            index=0 if st.session_state.selected_coord not in coords else (coords.index(st.session_state.selected_coord) + 1),
+            key="selected_coord",
         )
 
         # 1) 미니맵 (좌표 선택시)
         if st.session_state.selected_coord:
             lat, lon = coord_center(st.session_state.selected_coord)
-            st.caption("현재 좌표 위치")
+            st.caption("Current Coordinate")
 
             # ── 베이스맵 선택(라이트 전용) + 테마 토글 ─────────────────
             col_m1, col_m2 = st.columns(2)
             with col_m1:
                 basemap_choice_ui = st.selectbox(
-                    "Light 타일 선택",
+                    "Light Tile",
                     ["OpenStreetMap","CartoDB Positron"],
                     index=0,
                     key="mini_basemap_light",
                 )
             with col_m2:
                 theme_choice = st.radio(
-                    "테마",
+                    "Theme",
                     ["Light", "Dark"],
                     index=0,
                     horizontal=True,
@@ -1276,14 +1308,198 @@ with st.sidebar:
 
 
 
-# CSS: 멀티셀렉트 폭 확장 → '...'(ellipsis) 최소화
+# CSS: 전역 UI 테마 + 멀티셀렉트 폭 확장
 st.markdown("""
 <style>
+/* ── 원본 보존: 멀티셀렉트 폭 ── */
 .stMultiSelect [data-baseweb="select"]{max-width:100%!important}
+
+/* ── 폰트 ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+html, body, .stApp, [data-testid="stAppViewContainer"] {
+    font-family: 'Inter', 'Pretendard', -apple-system, sans-serif !important;
+}
+
+/* ── 배경 그라데이션 ── */
+.stApp {
+    background: linear-gradient(160deg, #0a0f1e 0%, #111827 40%, #0f172a 100%);
+}
+
+/* ── 사이드바 ── */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0d1526 0%, #111d35 100%) !important;
+    border-right: 1px solid rgba(56, 189, 248, 0.08) !important;
+}
+[data-testid="stSidebar"] .stMarkdown h1,
+[data-testid="stSidebar"] .stMarkdown h2,
+[data-testid="stSidebar"] .stMarkdown h3 {
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+[data-testid="stSidebar"] label {
+    color: #cbd5e1 !important;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+/* ── 메인 타이틀 ── */
+h1 {
+    font-weight: 700 !important;
+    letter-spacing: -0.5px;
+    padding-bottom: 4px;
+    color: #e2e8f0 !important;
+}
+.gradient-text {
+    background: linear-gradient(90deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* ── 서브헤더 ── */
+h2, h3 {
+    color: #e2e8f0 !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid rgba(56, 189, 248, 0.15);
+    padding-bottom: 8px;
+    margin-bottom: 16px !important;
+}
+
+/* ── 탭 바 ── */
+.stTabs [data-baseweb="tab-list"] {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 14px;
+    padding: 5px;
+    gap: 4px;
+    border: 1px solid rgba(56, 189, 248, 0.08);
+}
+.stTabs [data-baseweb="tab"] {
+    border-radius: 10px;
+    padding: 10px 22px;
+    font-weight: 500;
+    color: #94a3b8 !important;
+    transition: all 0.25s ease;
+}
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, #1e3a5f, #1e40af) !important;
+    color: #e0f2fe !important;
+    box-shadow: 0 2px 12px rgba(59, 130, 246, 0.25);
+}
+.stTabs [data-baseweb="tab"]:hover {
+    color: #e2e8f0 !important;
+    background: rgba(30, 58, 95, 0.4);
+}
+.stTabs [data-baseweb="tab-highlight"] { display: none; }
+.stTabs [data-baseweb="tab-border"] { display: none; }
+
+/* ── 버튼 ── */
+.stButton > button {
+    border-radius: 10px !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%) !important;
+    color: #e0f2fe !important;
+    font-weight: 500 !important;
+    padding: 8px 20px !important;
+    transition: all 0.25s ease !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+    border-color: rgba(56, 189, 248, 0.5) !important;
+}
+.stButton > button:active { transform: translateY(0); }
+
+/* ── 입력 필드 ── */
+[data-baseweb="input"],
+[data-baseweb="select"] > div,
+.stTextInput > div > div,
+.stNumberInput > div > div > div {
+    background: rgba(15, 23, 42, 0.6) !important;
+    border: 1px solid rgba(56, 189, 248, 0.12) !important;
+    border-radius: 10px !important;
+    transition: border-color 0.2s ease;
+}
+[data-baseweb="input"]:focus-within,
+[data-baseweb="select"] > div:focus-within {
+    border-color: rgba(59, 130, 246, 0.5) !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* ── 드롭다운 메뉴 ── */
+[data-baseweb="popover"] {
+    border-radius: 12px !important;
+    border: 1px solid rgba(56, 189, 248, 0.12) !important;
+    overflow: hidden;
+}
+[data-baseweb="menu"] { background: #111827 !important; }
+
+/* ── Expander ── */
+[data-testid="stExpander"] {
+    background: rgba(15, 23, 42, 0.4) !important;
+    border: 1px solid rgba(56, 189, 248, 0.08) !important;
+    border-radius: 14px !important;
+    overflow: hidden;
+    transition: border-color 0.2s ease;
+}
+[data-testid="stExpander"]:hover {
+    border-color: rgba(56, 189, 248, 0.18) !important;
+}
+
+/* ── 메트릭 카드 ── */
+[data-testid="stMetric"] {
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(56, 189, 248, 0.08);
+    border-radius: 14px;
+    padding: 18px 20px;
+    transition: all 0.2s ease;
+}
+[data-testid="stMetric"]:hover {
+    border-color: rgba(56, 189, 248, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+[data-testid="stMetricLabel"] {
+    color: #94a3b8 !important;
+    font-size: 0.82rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+[data-testid="stMetricValue"] {
+    color: #e0f2fe !important;
+    font-weight: 700 !important;
+}
+
+/* ── 데이터프레임 ── */
+[data-testid="stDataFrame"], .stDataFrame {
+    border-radius: 12px !important;
+    overflow: hidden;
+    border: 1px solid rgba(56, 189, 248, 0.08);
+}
+
+/* ── 구분선 ── */
+hr {
+    border-color: rgba(56, 189, 248, 0.1) !important;
+    margin: 24px 0 !important;
+}
+
+/* ── 알림 메시지 ── */
+.stAlert, [data-testid="stAlert"] { border-radius: 10px !important; }
+
+/* ── 체크박스/라디오 호버 ── */
+.stCheckbox label:hover, .stRadio label:hover { color: #38bdf8 !important; }
+
+/* ── 스크롤바 ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.3); }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #1e40af, #38bdf8);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🚑 MCI 재난 시뮬레이션 대시보드")
+st.markdown('<h1><span>🚑</span> <span class="gradient-text">MCI Disaster Simulation Dashboard</span></h1>', unsafe_allow_html=True)
 
 tabs = st.tabs(["Maps", "Scenarios", "Analytics", "Data Tables", "Rerun"])
 
@@ -1291,7 +1507,7 @@ tabs = st.tabs(["Maps", "Scenarios", "Analytics", "Data Tables", "Rerun"])
 # Scenarios 탭
 # ------------------------------
 with tabs[1]:
-    st.subheader("📁 선택된 시나리오")
+    st.subheader("📁 Selected Scenario")
     bp = st.session_state.base_path; exp = st.session_state.selected_exp; coord = st.session_state.selected_coord
 
     # 시나리오 변경 시 로그 로드 상태 리셋
@@ -1302,26 +1518,26 @@ with tabs[1]:
 
     if bp and exp and coord:
         yaml_path = find_yaml_in_coord(bp, exp, coord)
-        st.write("**YAML**:", yaml_path or "(없음)")
+        st.write("**YAML**:", yaml_path or "(none)")
         
         smdf = read_experiment_summary_csv(bp, exp)
         info, site_addr = summarize_experiment(smdf) if smdf is not None else ({}, None)
         lat, lon = coord_center(coord)
 
         site_info, sim_info = summarize_experiment_extended(smdf)
-        site_info["좌표"] = f"{lat:.6f}, {lon:.6f}"
+        site_info["Coordinate"] = f"{lat:.6f}, {lon:.6f}"
 
-        with st.expander("📝 실험 요약 보기", expanded=True):
+        with st.expander("📝 View Experiment Summary", expanded=True):
             left, right = st.columns([0.42, 0.58])
             with left:
-                st.markdown("**사고지점**")
-                st.dataframe(pd.DataFrame({"항목":list(site_info.keys()), "값":list(site_info.values())}), width='stretch', height=170)
+                st.markdown("**Incident Site**")
+                st.dataframe(pd.DataFrame({"Field":list(site_info.keys()), "Value":list(site_info.values())}), width='stretch', height=170)
             with right:
-                st.markdown("**시뮬레이션 정보** (summary.csv: '시나리오생성_시작'→끝)")
+                st.markdown("**Simulation Info** (summary.csv)")
                 if sim_info:
-                    st.dataframe(pd.DataFrame(sorted(sim_info.items(), key=lambda x: x[0]), columns=["항목","값"]), width='stretch', height=170)
+                    st.dataframe(pd.DataFrame(sorted(sim_info.items(), key=lambda x: x[0]), columns=["Field","Value"]), width='stretch', height=170)
                 else:
-                    st.caption("summary.csv에서 '시나리오생성_시작' 이후 열을 찾지 못했습니다.")
+                    st.caption("No simulation info columns found in summary.csv.")
 
 
         # 성능 최적화: summary CSV에서 시뮬레이션반복 직접 확인 (가장 최신 시도)
@@ -1335,42 +1551,42 @@ with tabs[1]:
                 if pd.notna(total_samples_val):
                     total_samples = int(total_samples_val)
 
-        st.markdown("### 🧾 실행 로그")
+        st.markdown("### 🧾 Execution Log")
 
         # 디버깅: total_samples 값 확인
         if total_samples > 0:
-            st.caption(f"🔍 감지된 시뮬레이션 반복 횟수: {total_samples}회 (summary CSV의 가장 최신 시도 기준)")
+            st.caption(f"🔍 Detected simulation iterations: {total_samples} (latest run in summary CSV)")
 
         # total_samples 기반 조건부 로딩 (101회 이상은 버튼도 비활성화)
         if total_samples >= 101:
-            st.warning(f"⚠️ 시뮬레이션 반복 횟수({total_samples}회)가 101회 이상이어서 로그 뷰어를 비활성화합니다.")
-            st.info(f"📁 로그 파일을 직접 확인하세요: `experiment_logs/{coord}_*.txt`")
-            st.caption(f"💡 대시보드 성능 최적화를 위해 101회 이상의 로그는 원본 폴더에서 직접 확인해주세요.")
+            st.warning(f"⚠️ Simulation iterations ({total_samples}) >= 101. Log viewer disabled.")
+            st.info(f"📁 Check log files directly: `experiment_logs/{coord}_*.txt`")
+            st.caption(f"💡 For performance, logs with 101+ iterations should be checked in the source folder.")
 
             # 버튼 비활성화 상태로 표시
-            st.button("📂 로그 파일 로드하기", key="load_logs_btn_disabled", disabled=True, help="101회 이상은 로그 뷰어가 비활성화됩니다")
+            st.button("📂 Load Log Files", key="load_logs_btn_disabled", disabled=True, help="Log viewer is disabled for 101+ iterations")
             logs = None
         else:
             # 성능 최적화: 버튼 클릭 시에만 로그 로드 (다른 탭 로딩 속도 개선)
-            if st.button("📂 로그 파일 로드하기", key="load_logs_btn", help="로그를 로드하려면 클릭하세요"):
+            if st.button("📂 Load Log Files", key="load_logs_btn", help="Click to load logs"):
                 st.session_state.logs_loaded = True
 
             if st.session_state.get("logs_loaded", False):
                 logs = experiment_log_candidates(bp, exp, coord)
             else:
-                st.info("💡 로그를 보려면 위의 '로그 파일 로드하기' 버튼을 클릭하세요. (다른 탭의 로딩 속도를 위해 기본적으로 비활성화됨)")
+                st.info("💡 Click 'Load Log Files' above to view logs. (Disabled by default for faster tab loading)")
                 logs = None
 
         if logs:
-            log_sel = st.selectbox("로그 파일 선택 (experiment_logs/<coord>만)", logs)
+            log_sel = st.selectbox("Select Log File (experiment_logs/<coord>)", logs)
             log_text = _read_text_any(log_sel)
             blocks = parse_log_blocks(log_text)
             # (Unlabeled) 블록 숨김
             rule_list = [b["rule"] for b in blocks if b.get("rule")!="(Unlabeled)"] if blocks else []
             if not rule_list:
-                st.info("이벤트 패턴을 찾지 못했습니다. (로그 포맷 확인)")
+                st.info("No event patterns found. (Check log format)")
             else:
-                sel_rule = st.selectbox("Rule 선택", options=rule_list, index=0)
+                sel_rule = st.selectbox("Select Rule", options=rule_list, index=0)
 
                 # [추가] 선택한 Rule에서 사용 가능한 Iter 목록 수집
                 rule_blocks = [b for b in blocks if b.get("rule") == sel_rule]
@@ -1379,7 +1595,7 @@ with tabs[1]:
                 # [추가] Iter 셀렉터 (있을 때만 노출)
                 sel_iter = None
                 if iter_list:
-                    sel_iter = st.selectbox("반복(Iter) 선택", iter_list, index=0, help="로그의 'Iter : n' 라인 기준")
+                    sel_iter = st.selectbox("Select Iteration", iter_list, index=0, help="Based on 'Iter : n' lines in the log")
                     # 선택된 Rule & Iter 조합으로 필터
                     cand_blocks = [b for b in rule_blocks if b.get("iter") == sel_iter]
                 else:
@@ -1391,46 +1607,46 @@ with tabs[1]:
                 blk = cand_blocks[0] if cand_blocks else None
 
                 # (선택) 현재 선택 상태 안내
-                st.caption(f"선택: Rule={sel_rule} / Iter={sel_iter if sel_iter is not None else '미표기'}")
+                st.caption(f"Selected: Rule={sel_rule} / Iter={sel_iter if sel_iter is not None else 'N/A'}")
 
 
-                st.markdown("#### 👤 환자 스토리(요약)")
+                st.markdown("#### 👤 Patient Story (Summary)")
                 psum = build_patient_summary(blk["events"]) if blk else pd.DataFrame()
                 if psum.empty:
-                    st.caption("환자 이벤트를 찾지 못했습니다.")
+                    st.caption("No patient events found.")
                 else:
                     st.dataframe(psum, width='stretch', height=340)
                     _suffix = f"_iter{sel_iter}" if sel_iter is not None else ""
                     st.download_button(
-                        "⬇️ 환자 타임라인(csv)",
+                        "⬇️ Patient Timeline (csv)",
                         psum.to_csv(index=False).encode('utf-8-sig'),
                         file_name=f"patient_timeline{_suffix}.csv"
                     )
 
 
-                st.markdown("#### 🧰 전체 이벤트 표")
-                ev_df = pd.DataFrame(blk["events"]).rename(columns={"t":"시각","eid":"이벤트ID","ev":"이벤트","p":"환자","a":"구급차","u":"UAV","h":"병원"}) if blk else pd.DataFrame()
+                st.markdown("#### 🧰 Full Event Table")
+                ev_df = pd.DataFrame(blk["events"]).rename(columns={"t":"Time","eid":"EventID","ev":"Event","p":"Patient","a":"Ambulance","u":"UAV","h":"Hospital"}) if blk else pd.DataFrame()
                 st.dataframe(ev_df, width='stretch', height=320)
                 _suffix = f"_iter{sel_iter}" if sel_iter is not None else ""
-                st.download_button("⬇️ 전체 이벤트(csv)", ev_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"events_all{_suffix}.csv")
+                st.download_button("⬇️ Full Events (csv)", ev_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"events_all{_suffix}.csv")
 
-            st.markdown("#### 🗂 원본 로그 보기")
-            with st.expander("원본 텍스트 펼치기", expanded=False):
+            st.markdown("#### 🗂 View Raw Log")
+            with st.expander("Expand Raw Text", expanded=False):
                 st.code(log_text[:30000] + ("\n... (생략)" if len(log_text) > 30000 else ""))
-                st.download_button("원본 로그 다운로드", log_text, file_name=os.path.basename(log_sel))
+                st.download_button("Download Raw Log", log_text, file_name=os.path.basename(log_sel))
 
             st.markdown("---")
-            st.markdown("### 🛈 Action/Rule 설명")
+            st.markdown("### 🛈 Action/Rule Reference")
             st.markdown(ACTION_TOOLTIP_MD)
         else:
-            st.info("해당 조합의 로그 파일을 찾지 못했습니다.")
+            st.info("No log files found for this combination.")
 
 
 # ------------------------------
 # Maps 탭 (복수선택 + UAV 출동/이송 토글 + 범례 강화)
 # ------------------------------
 with tabs[0]:
-    st.subheader("🗺️ 지도 시각화")
+    st.subheader("🗺️ Map Visualization")
     bp   = st.session_state.base_path
     exp  = st.session_state.selected_exp
     coord= st.session_state.selected_coord
@@ -1456,26 +1672,10 @@ with tabs[0]:
     # 병원/센터 메타
     hosp_xl   = read_excel_hospital(bp)   # 엑셀(요양기관명, 종별코드, x/y좌표, 전화/주소 등)
 
-    # road/euc CSV (표/거리 참조용)
-    hinfo_csv  = Path(bp) / "scenarios" / exp / coord / "hospital_info_road.csv"
-    hinfo_df   = pd.read_csv(hinfo_csv) if hinfo_csv.is_file() else pd.DataFrame()
-
-    center_csv = Path(bp) / "scenarios" / "안전센터와 소방서.csv"
-    center_df  = pd.read_csv(center_csv, encoding="cp949") if center_csv.is_file() else pd.DataFrame()
-
-    ambinfo_csv   = Path(bp) / "scenarios" / exp / coord / "amb_info_road.csv"
-    ambinfo_df    = pd.read_csv(ambinfo_csv) if ambinfo_csv.is_file() else pd.DataFrame()
-
-    dist_road_csv = Path(bp) / "scenarios" / exp / coord / "distance_Hos2Site_road.csv"
-    dist_road_df  = pd.read_csv(dist_road_csv) if dist_road_csv.is_file() else pd.DataFrame()
+    # road/euc CSV (표/거리 참조용) — cached (top-level function)
+    hinfo_df, center_df, ambinfo_df, dist_road_df, hinfo_euc_df, dist_euc_df = _load_scenario_csvs(bp, exp, coord)
     dist_road_map = dict(zip(dist_road_df["Index"], dist_road_df["distance"])) if not dist_road_df.empty else {}
     dur_road_map = dict(zip(dist_road_df["Index"], dist_road_df["duration"])) if not dist_road_df.empty and "duration" in dist_road_df.columns else {}
-
-    hinfo_euc_csv = Path(bp) / "scenarios" / exp / coord / "hospital_info_euc.csv"
-    hinfo_euc_df  = pd.read_csv(hinfo_euc_csv) if hinfo_euc_csv.is_file() else pd.DataFrame()
-
-    dist_euc_csv  = Path(bp) / "scenarios" / exp / coord / "distance_Hos2Site_euc.csv"
-    dist_euc_df   = pd.read_csv(dist_euc_csv) if dist_euc_csv.is_file() else pd.DataFrame()
     dist_euc_map  = dict(zip(dist_euc_df["Index"], dist_euc_df["distance"])) if not dist_euc_df.empty else {}
 
     # 엑셀 이름→좌표 매핑
@@ -1493,97 +1693,97 @@ with tabs[0]:
         try:
             c = int(c)
         except Exception:
-            return "일반병원"
-        if c == 1:  return "상급종합병원"
-        if c == 11: return "종합병원"
-        return "일반병원"
+            return "Hospital"
+        if c == 1:  return "Tertiary Hospital"
+        if c == 11: return "General Hospital"
+        return "Hospital"
 
     # ── 지도 테마(지도 바로 위) ─────────────────────────────────────────────
-    theme = st.radio("지도 테마", ["Light","Dark"], horizontal=True, key="theme_radio_maps_bottom")
+    theme = st.radio("Map Theme", ["Light","Dark"], horizontal=True, key="theme_radio_maps_bottom")
     if theme == "Light":
-        tile_name = st.selectbox("Light 타일 선택", ["OpenStreetMap","CartoDB Positron"], index=0, key="light_tile_select")
+        tile_name = st.selectbox("Light Tile", ["OpenStreetMap","CartoDB Positron"], index=0, key="light_tile_select")
     else:
         tile_name = "CartoDB Dark_Matter"
 
     if not (bp and exp and coord):
-        st.info("좌측 사이드바에서 base_path / Experiment / Coord를 선택하세요.")
+        st.info("Select base_path / Experiment / Coord from the sidebar.")
         st.stop()
 
     # ─────────────────────────────────────────────────────────────────────
     # ① AMB 경로 (C→S 표 / S→H 표)
     # ─────────────────────────────────────────────────────────────────────
-    st.markdown("### AMB 경로")
+    st.markdown("### AMB Routes")
     col_amb_c2s, col_amb_s2h = st.columns(2)
 
     # --- AMB: C→S(출동) 표 (표시, 인덱스, 안전센터/소방서, 거리) ---
     with col_amb_c2s:
-        st.markdown("**안전센터/소방서→사고지점 (출동)**")
+        st.markdown("**Fire Station → Incident Site (Dispatch)**")
 
         # ✔ amb_info_road.csv 기준 표 구성 (인덱스/이름/거리=init_distance/시간=duration)
         if not ambinfo_df.empty:
             rename_dict = {
-                "Index":"인덱스",
-                "안전센터/소방서이름":"안전센터/소방서",
-                "init_distance":"거리(km)",
+                "Index":"Index",
+                "Fire Station":"Fire Station",
+                "init_distance":"Distance(km)",
             }
-            cols = ["인덱스","안전센터/소방서","거리(km)"]
-            if "보유대수" in ambinfo_df.columns:
-                rename_dict["보유대수"] = "보유대수"
-                cols.append("보유대수")
+            cols = ["Index","Fire Station","Distance(km)"]
+            if "Fleet Size" in ambinfo_df.columns:
+                rename_dict["Fleet Size"] = "Fleet Size"
+                cols.append("Fleet Size")
             if "duration" in ambinfo_df.columns:
-                rename_dict["duration"] = "시간(분)"
-                cols.append("시간(분)")
+                rename_dict["duration"] = "Duration(min)"
+                cols.append("Duration(min)")
 
             c2s_df = ambinfo_df.rename(columns=rename_dict)[cols].copy()
             # 모든 숫자 컬럼을 명시적으로 변환
-            c2s_df["인덱스"] = pd.to_numeric(c2s_df["인덱스"], errors="coerce").fillna(0).astype(int)
-            c2s_df["거리(km)"] = pd.to_numeric(c2s_df["거리(km)"], errors="coerce").fillna(0.0).round(2)
-            if "시간(분)" in c2s_df.columns:
-                c2s_df["시간(분)"] = pd.to_numeric(c2s_df["시간(분)"], errors="coerce").fillna(0.0).round(1)
-            if "보유대수" in c2s_df.columns:
-                c2s_df["보유대수"] = pd.to_numeric(c2s_df["보유대수"], errors="coerce").fillna(1).astype(int)
+            c2s_df["Index"] = pd.to_numeric(c2s_df["Index"], errors="coerce").fillna(0).astype(int)
+            c2s_df["Distance(km)"] = pd.to_numeric(c2s_df["Distance(km)"], errors="coerce").fillna(0.0).round(2)
+            if "Duration(min)" in c2s_df.columns:
+                c2s_df["Duration(min)"] = pd.to_numeric(c2s_df["Duration(min)"], errors="coerce").fillna(0.0).round(1)
+            if "Fleet Size" in c2s_df.columns:
+                c2s_df["Fleet Size"] = pd.to_numeric(c2s_df["Fleet Size"], errors="coerce").fillna(1).astype(int)
             # 안전센터/소방서는 문자열로 확실히 변환
-            c2s_df["안전센터/소방서"] = c2s_df["안전센터/소방서"].astype(str)
+            c2s_df["Fire Station"] = c2s_df["Fire Station"].astype(str)
         else:
             c2s_df = pd.DataFrame({
-                "인덱스": pd.Series(dtype='int'),
-                "안전센터/소방서": pd.Series(dtype='str'),
-                "거리(km)": pd.Series(dtype='float'),
-                "시간(분)": pd.Series(dtype='float'),
+                "Index": pd.Series(dtype='int'),
+                "Fire Station": pd.Series(dtype='str'),
+                "Distance(km)": pd.Series(dtype='float'),
+                "Duration(min)": pd.Series(dtype='float'),
             })
 
         # 기본 선택 상태
         if "amb_c2s_sel_idx" not in st.session_state:
-            st.session_state.amb_c2s_sel_idx = set(c2s_df["인덱스"].tolist())
+            st.session_state.amb_c2s_sel_idx = set(c2s_df["Index"].tolist())
 
         b1, b2 = st.columns(2)
-        if b1.button("전체선택(C→S)"):
-            st.session_state.amb_c2s_sel_idx = set(c2s_df["인덱스"].tolist())
-        if b2.button("전체해제(C→S)"):
+        if b1.button("Select All (C→S)"):
+            st.session_state.amb_c2s_sel_idx = set(c2s_df["Index"].tolist())
+        if b2.button("Deselect All (C→S)"):
             st.session_state.amb_c2s_sel_idx = set()
 
         c2s_df_show = c2s_df.copy()
-        c2s_df_show["표시"] = c2s_df_show["인덱스"].apply(lambda i: i in st.session_state.amb_c2s_sel_idx)
+        c2s_df_show["Show"] = c2s_df_show["Index"].apply(lambda i: i in st.session_state.amb_c2s_sel_idx)
         # Explicit boolean conversion to prevent React error #185
-        c2s_df_show["표시"] = c2s_df_show["표시"].astype(bool)
+        c2s_df_show["Show"] = c2s_df_show["Show"].astype(bool)
         # ▶ 표시를 맨 앞으로
-        show_cols = ["표시","인덱스","안전센터/소방서","거리(km)"]
-        if "시간(분)" in c2s_df_show.columns:
-            show_cols.append("시간(분)")
-        if "보유대수" in c2s_df_show.columns:
-            show_cols.insert(3, "보유대수")
+        show_cols = ["Show","Index","Fire Station","Distance(km)"]
+        if "Duration(min)" in c2s_df_show.columns:
+            show_cols.append("Duration(min)")
+        if "Fleet Size" in c2s_df_show.columns:
+            show_cols.insert(3, "Fleet Size")
         c2s_df_show = c2s_df_show[show_cols].reset_index(drop=True)
 
         col_cfg = {
-            "표시": st.column_config.CheckboxColumn("표시"),
-            "인덱스": st.column_config.NumberColumn("인덱스", disabled=True),
-            "안전센터/소방서": st.column_config.TextColumn("안전센터/소방서", disabled=True),
-            "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
+            "Show": st.column_config.CheckboxColumn("Show"),
+            "Index": st.column_config.NumberColumn("Index", disabled=True),
+            "Fire Station": st.column_config.TextColumn("Fire Station", disabled=True),
+            "Distance(km)": st.column_config.NumberColumn("Distance(km)", disabled=True, format="%.2f"),
         }
-        if "시간(분)" in c2s_df_show.columns:
-            col_cfg["시간(분)"] = st.column_config.NumberColumn("시간(분)", disabled=True, format="%.1f")
-        if "보유대수" in c2s_df_show.columns:
-            col_cfg["보유대수"] = st.column_config.NumberColumn("보유대수", disabled=True)
+        if "Duration(min)" in c2s_df_show.columns:
+            col_cfg["Duration(min)"] = st.column_config.NumberColumn("Duration(min)", disabled=True, format="%.1f")
+        if "Fleet Size" in c2s_df_show.columns:
+            col_cfg["Fleet Size"] = st.column_config.NumberColumn("Fleet Size", disabled=True)
         edited_c2s = st.data_editor(
             c2s_df_show,
             width='stretch',
@@ -1592,53 +1792,52 @@ with tabs[0]:
             column_config=col_cfg,
             key="tbl_c2s"
         )
-        st.session_state.amb_c2s_sel_idx = set(edited_c2s.loc[edited_c2s["표시"]==True, "인덱스"].tolist())
+        st.session_state.amb_c2s_sel_idx = set(edited_c2s.loc[edited_c2s["Show"]==True, "Index"].tolist())
 
     # --- AMB: S→H(이송) 표 (표시, 인덱스, 병원, 종별코드, 병원등급, 거리) ---
     with col_amb_s2h:
-        st.markdown("**사고지점→병원 (이송)**")
+        st.markdown("**Incident Site → Hospital (Transport)**")
 
         # ✔ hospital_info_road + distance_Hos2Site_road 기준
         if not hinfo_df.empty:
             s2h_df = hinfo_df.rename(columns={
-                "Index":"인덱스",
-                "요양기관명":"병원"
-            })[["인덱스","병원","종별코드"]].copy()
-            s2h_df["병원등급"] = s2h_df["종별코드"].apply(code_to_grade)
+                "Hospital Name":"Hospital"
+            })[["Index","Hospital","Grade Code"]].copy()
+            s2h_df["Hospital Grade"] = s2h_df["Grade Code"].apply(code_to_grade)
             if dist_road_map:
-                s2h_df["거리(km)"] = s2h_df["인덱스"].map(dist_road_map).round(2)
+                s2h_df["Distance(km)"] = s2h_df["Index"].map(dist_road_map).round(2)
             if dur_road_map:
-                s2h_df["시간(분)"] = s2h_df["인덱스"].map(dur_road_map).round(1)
+                s2h_df["Duration(min)"] = s2h_df["Index"].map(dur_road_map).round(1)
         else:
-            s2h_df = pd.DataFrame(columns=["인덱스","병원","종별코드","병원등급","거리(km)","시간(분)"])
+            s2h_df = pd.DataFrame(columns=["Index","Hospital","Grade Code","Hospital Grade","Distance(km)","Duration(min)"])
 
         if "amb_s2h_sel_idx" not in st.session_state:
-            st.session_state.amb_s2h_sel_idx = set(s2h_df["인덱스"].tolist())
+            st.session_state.amb_s2h_sel_idx = set(s2h_df["Index"].tolist())
 
         c, d = st.columns(2)
-        if c.button("전체선택(S→H)"):
-            st.session_state.amb_s2h_sel_idx = set(s2h_df["인덱스"].tolist())
-        if d.button("전체해제(S→H)"):
+        if c.button("Select All (S→H)"):
+            st.session_state.amb_s2h_sel_idx = set(s2h_df["Index"].tolist())
+        if d.button("Deselect All (S→H)"):
             st.session_state.amb_s2h_sel_idx = set()
 
         s2h_df_show = s2h_df.copy()
-        s2h_df_show["표시"] = s2h_df_show["인덱스"].apply(lambda i: i in st.session_state.amb_s2h_sel_idx)
+        s2h_df_show["Show"] = s2h_df_show["Index"].apply(lambda i: i in st.session_state.amb_s2h_sel_idx)
         # ▶ 표시를 맨 앞으로
-        s2h_show_cols = ["표시","인덱스","병원","종별코드","병원등급","거리(km)"]
-        if "시간(분)" in s2h_df_show.columns:
-            s2h_show_cols.append("시간(분)")
+        s2h_show_cols = ["Show","Index","Hospital","Grade Code","Hospital Grade","Distance(km)"]
+        if "Duration(min)" in s2h_df_show.columns:
+            s2h_show_cols.append("Duration(min)")
         s2h_df_show = s2h_df_show[s2h_show_cols]
 
         s2h_col_cfg = {
-            "표시":     st.column_config.CheckboxColumn("표시"),
-            "인덱스":   st.column_config.NumberColumn("인덱스", disabled=True),
-            "병원":     st.column_config.TextColumn("병원", disabled=True),
-            "종별코드": st.column_config.NumberColumn("종별코드", disabled=True),
-            "병원등급": st.column_config.TextColumn("병원등급", disabled=True),
-            "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
+            "Show":     st.column_config.CheckboxColumn("Show"),
+            "Index":   st.column_config.NumberColumn("Index", disabled=True),
+            "Hospital":     st.column_config.TextColumn("Hospital", disabled=True),
+            "Grade Code": st.column_config.NumberColumn("Grade Code", disabled=True),
+            "Hospital Grade": st.column_config.TextColumn("Hospital Grade", disabled=True),
+            "Distance(km)": st.column_config.NumberColumn("Distance(km)", disabled=True, format="%.2f"),
         }
-        if "시간(분)" in s2h_df_show.columns:
-            s2h_col_cfg["시간(분)"] = st.column_config.NumberColumn("시간(분)", disabled=True, format="%.1f")
+        if "Duration(min)" in s2h_df_show.columns:
+            s2h_col_cfg["Duration(min)"] = st.column_config.NumberColumn("Duration(min)", disabled=True, format="%.1f")
 
         edited_s2h = st.data_editor(
             s2h_df_show,
@@ -1648,17 +1847,17 @@ with tabs[0]:
             column_config=s2h_col_cfg,
             key="tbl_s2h"
         )
-        st.session_state.amb_s2h_sel_idx = set(edited_s2h.loc[edited_s2h["표시"]==True, "인덱스"].tolist())
+        st.session_state.amb_s2h_sel_idx = set(edited_s2h.loc[edited_s2h["Show"]==True, "Index"].tolist())
 
     # ─────────────────────────────────────────────────────────────────────
     # ② UAV 경로 (출동/이송 — 직선거리 표출)
     # ─────────────────────────────────────────────────────────────────────
-    st.markdown("### UAV 경로")
+    st.markdown("### UAV Routes")
     col_uav_out, col_uav_back = st.columns(2)
 
     # 출동(병원→사고): 헬기장 병원 (uav_info.csv에서 읽기)
     with col_uav_out:
-        st.markdown("**헬기장 병원→사고지점 (출동)**")
+        st.markdown("**Helipad Hospital → Incident Site (Dispatch)**")
 
         uav_dispatch_latlons = []
 
@@ -1667,12 +1866,16 @@ with tabs[0]:
         if os.path.exists(uav_info_path):
             try:
                 uav_df = pd.read_csv(uav_info_path, encoding="utf-8-sig")
+                uav_df.rename(columns={
+                    "종별코드": "Grade Code", "요양기관명": "Hospital Name",
+                    "수술실수": "ORs", "병상수": "Beds",
+                }, inplace=True)
 
                 # 새 형식 확인 (6컬럼)
-                if "요양기관명" in uav_df.columns:
+                if "Hospital Name" in uav_df.columns:
                     for _, row in uav_df.iterrows():
-                        name = str(row["요양기관명"]).strip()
-                        code = row.get("종별코드", 1)
+                        name = str(row["Hospital Name"]).strip()
+                        code = row.get("Grade Code", 1)
 
                         # 엑셀에서 좌표 조회
                         if name in xl_coord:
@@ -1683,11 +1886,11 @@ with tabs[0]:
                 else:
                     print("⚠️ uav_info.csv 구 형식 (2컬럼) - 업데이트 필요")
                     # 폴백: tier1 사용
-                    if not hinfo_df.empty and {"종별코드","요양기관명"}.issubset(hinfo_df.columns):
+                    if not hinfo_df.empty and {"Grade Code","Hospital Name"}.issubset(hinfo_df.columns):
                         tmp = hinfo_df.copy()
-                        tmp["종별코드"] = pd.to_numeric(tmp["종별코드"], errors="coerce")
-                        for _, rr in tmp[tmp["종별코드"]==1].iterrows():
-                            name = str(rr.get("요양기관명","Tier1")).strip()
+                        tmp["Grade Code"] = pd.to_numeric(tmp["Grade Code"], errors="coerce")
+                        for _, rr in tmp[tmp["Grade Code"]==1].iterrows():
+                            name = str(rr.get("Hospital Name","Tier1")).strip()
                             if name in xl_coord:
                                 y, x = xl_coord[name]
                                 uav_dispatch_latlons.append((y, x, name, 1))
@@ -1697,11 +1900,11 @@ with tabs[0]:
             print(f"⚠️ uav_info.csv 없음: {uav_info_path}")
 
         # 데이터가 없으면 tier1 폴백
-        if not uav_dispatch_latlons and not hinfo_df.empty and {"종별코드","요양기관명"}.issubset(hinfo_df.columns):
+        if not uav_dispatch_latlons and not hinfo_df.empty and {"Grade Code","Hospital Name"}.issubset(hinfo_df.columns):
             tmp = hinfo_df.copy()
-            tmp["종별코드"] = pd.to_numeric(tmp["종별코드"], errors="coerce")
-            for _, rr in tmp[tmp["종별코드"]==1].iterrows():
-                name = str(rr.get("요양기관명","Tier1")).strip()
+            tmp["Grade Code"] = pd.to_numeric(tmp["Grade Code"], errors="coerce")
+            for _, rr in tmp[tmp["Grade Code"]==1].iterrows():
+                name = str(rr.get("Hospital Name","Tier1")).strip()
                 if name in xl_coord:
                     y, x = xl_coord[name]
                     uav_dispatch_latlons.append((y, x, name, 1))
@@ -1715,28 +1918,28 @@ with tabs[0]:
             dkm = _haversine_km(y, x, lat, lon)  # 직선거리
             duration_min = (dkm / uav_velocity) * 60  # 시간(분) = 거리 / 속도 * 60
             uav_out_rows.append({
-                "인덱스": i,
-                "병원": nm,
-                "종별코드": code,
-                "병원등급": code_to_grade(code),
-                "거리(km)": round(dkm, 2),
-                "시간(분)": round(duration_min, 1)
+                "Index": i,
+                "Hospital": nm,
+                "Grade Code": code,
+                "Hospital Grade": code_to_grade(code),
+                "Distance(km)": round(dkm, 2),
+                "Duration(min)": round(duration_min, 1)
             })
         uav_out_df = pd.DataFrame(uav_out_rows)
 
         if "uav_c2s_sel_idx" not in st.session_state:
-            st.session_state.uav_c2s_sel_idx = set(uav_out_df["인덱스"].tolist())
+            st.session_state.uav_c2s_sel_idx = set(uav_out_df["Index"].tolist())
 
         f1, f2 = st.columns(2)
-        if f1.button("UAV 출동 전체선택"):
-            st.session_state.uav_c2s_sel_idx = set(uav_out_df["인덱스"].tolist())
-        if f2.button("UAV 출동 전체해제"):
+        if f1.button("UAV Dispatch Select All"):
+            st.session_state.uav_c2s_sel_idx = set(uav_out_df["Index"].tolist())
+        if f2.button("UAV Dispatch Deselect All"):
             st.session_state.uav_c2s_sel_idx = set()
 
         uav_out_df_show = uav_out_df.copy()
-        uav_out_df_show["표시"] = uav_out_df_show["인덱스"].apply(lambda i: i in st.session_state.uav_c2s_sel_idx)
+        uav_out_df_show["Show"] = uav_out_df_show["Index"].apply(lambda i: i in st.session_state.uav_c2s_sel_idx)
         # ▶ 표시를 맨 앞으로, 거리와 시간은 마지막
-        uav_out_df_show = uav_out_df_show[["표시","인덱스","병원","종별코드","병원등급","거리(km)","시간(분)"]]
+        uav_out_df_show = uav_out_df_show[["Show","Index","Hospital","Grade Code","Hospital Grade","Distance(km)","Duration(min)"]]
 
         edited_uav_out = st.data_editor(
             uav_out_df_show,
@@ -1744,24 +1947,24 @@ with tabs[0]:
             num_rows="fixed",
             hide_index=True,
             column_config={
-                "표시":     st.column_config.CheckboxColumn("표시"),
-                "인덱스":   st.column_config.NumberColumn("인덱스", disabled=True),
-                "병원":     st.column_config.TextColumn("병원", disabled=True),
-                "종별코드": st.column_config.NumberColumn("종별코드", disabled=True),
-                "병원등급": st.column_config.TextColumn("병원등급", disabled=True),
-                "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
-                "시간(분)": st.column_config.NumberColumn("시간(분)", disabled=True, format="%.1f"),
+                "Show":     st.column_config.CheckboxColumn("Show"),
+                "Index":   st.column_config.NumberColumn("Index", disabled=True),
+                "Hospital":     st.column_config.TextColumn("Hospital", disabled=True),
+                "Grade Code": st.column_config.NumberColumn("Grade Code", disabled=True),
+                "Hospital Grade": st.column_config.TextColumn("Hospital Grade", disabled=True),
+                "Distance(km)": st.column_config.NumberColumn("Distance(km)", disabled=True, format="%.2f"),
+                "Duration(min)": st.column_config.NumberColumn("Duration(min)", disabled=True, format="%.1f"),
             },
             key="tbl_uav_out"
         )
         # 출동과 이송 선택 동기화
-        selected_indices = set(edited_uav_out.loc[edited_uav_out["표시"]==True, "인덱스"].tolist())
+        selected_indices = set(edited_uav_out.loc[edited_uav_out["Show"]==True, "Index"].tolist())
         st.session_state.uav_c2s_sel_idx = selected_indices
         st.session_state.uav_s2h_sel_idx = selected_indices
 
     # 이송(사고→병원): 출동과 동일한 헬기장 병원 (왕복 셔틀)
     with col_uav_back:
-        st.markdown("**사고지점→헬기장 병원 (이송)**")
+        st.markdown("**Incident Site → Helipad Hospital (Transport)**")
 
         # ✔ UAV는 왕복 셔틀: 출동과 동일한 헬기장 병원으로 이송
         # uav_out_df와 동일한 데이터 사용
@@ -1772,17 +1975,17 @@ with tabs[0]:
             st.session_state.uav_s2h_sel_idx = st.session_state.uav_c2s_sel_idx.copy()
 
         g1, g2 = st.columns(2)
-        if g1.button("UAV 이송 전체선택"):
-            st.session_state.uav_s2h_sel_idx = set(uav_back_df["인덱스"].tolist())
-            st.session_state.uav_c2s_sel_idx = set(uav_back_df["인덱스"].tolist())
-        if g2.button("UAV 이송 전체해제"):
+        if g1.button("UAV Transport Select All"):
+            st.session_state.uav_s2h_sel_idx = set(uav_back_df["Index"].tolist())
+            st.session_state.uav_c2s_sel_idx = set(uav_back_df["Index"].tolist())
+        if g2.button("UAV Transport Deselect All"):
             st.session_state.uav_s2h_sel_idx = set()
             st.session_state.uav_c2s_sel_idx = set()
 
         uav_back_df_show = uav_back_df.copy()
-        uav_back_df_show["표시"] = uav_back_df_show["인덱스"].apply(lambda i: i in st.session_state.uav_s2h_sel_idx)
+        uav_back_df_show["Show"] = uav_back_df_show["Index"].apply(lambda i: i in st.session_state.uav_s2h_sel_idx)
         # ▶ 표시를 맨 앞으로, 거리와 시간은 마지막
-        uav_back_df_show = uav_back_df_show[["표시","인덱스","병원","종별코드","병원등급","거리(km)","시간(분)"]]
+        uav_back_df_show = uav_back_df_show[["Show","Index","Hospital","Grade Code","Hospital Grade","Distance(km)","Duration(min)"]]
 
         edited_uav_back = st.data_editor(
             uav_back_df_show,
@@ -1790,18 +1993,18 @@ with tabs[0]:
             num_rows="fixed",
             hide_index=True,
             column_config={
-                "표시":     st.column_config.CheckboxColumn("표시"),
-                "인덱스":   st.column_config.NumberColumn("인덱스", disabled=True),
-                "병원":     st.column_config.TextColumn("병원", disabled=True),
-                "종별코드": st.column_config.NumberColumn("종별코드", disabled=True),
-                "병원등급": st.column_config.TextColumn("병원등급", disabled=True),
-                "거리(km)": st.column_config.NumberColumn("거리(km)", disabled=True, format="%.2f"),
-                "시간(분)": st.column_config.NumberColumn("시간(분)", disabled=True, format="%.1f"),
+                "Show":     st.column_config.CheckboxColumn("Show"),
+                "Index":   st.column_config.NumberColumn("Index", disabled=True),
+                "Hospital":     st.column_config.TextColumn("Hospital", disabled=True),
+                "Grade Code": st.column_config.NumberColumn("Grade Code", disabled=True),
+                "Hospital Grade": st.column_config.TextColumn("Hospital Grade", disabled=True),
+                "Distance(km)": st.column_config.NumberColumn("Distance(km)", disabled=True, format="%.2f"),
+                "Duration(min)": st.column_config.NumberColumn("Duration(min)", disabled=True, format="%.1f"),
             },
             key="tbl_uav_back"
         )
         # 출동과 이송 선택 동기화
-        selected_indices = set(edited_uav_back.loc[edited_uav_back["표시"]==True, "인덱스"].tolist())
+        selected_indices = set(edited_uav_back.loc[edited_uav_back["Show"]==True, "Index"].tolist())
         st.session_state.uav_s2h_sel_idx = selected_indices
         st.session_state.uav_c2s_sel_idx = selected_indices
 
@@ -1811,12 +2014,12 @@ with tabs[0]:
     m = folium.Map(location=center, zoom_start=12, control_scale=True, tiles=tile_name)
 
     # 사고지점 마커
-    site_popup = f"사고지점<br>lat,lon={lat:.6f},{lon:.6f}"
-    if site_addr: site_popup += f"<br>주소: {site_addr}"
+    site_popup = f"Incident Site<br>lat,lon={lat:.6f},{lon:.6f}"
+    if site_addr: site_popup += f"<br>Address: {site_addr}"
     folium.Marker(
         [lat,lon],
         icon=folium.Icon(color="purple", icon="map-pin", prefix="fa"),
-        tooltip="사고지점", popup=site_popup
+        tooltip="Incident Site", popup=site_popup
     ).add_to(m)
 
     # ─ AMB C→S 라인/마커 ─
@@ -1830,10 +2033,10 @@ with tabs[0]:
 
     # ✔ amb_info_road 순서/선택 기준으로 그림
     for _, row in c2s_df.iterrows():
-        i = int(row["인덱스"])
+        i = int(row["Index"])
         if i not in st.session_state.amb_c2s_sel_idx:
             continue
-        cname = str(row["안전센터/소방서"]).strip()
+        cname = str(row["Fire Station"]).strip()
         obj   = c2s_map.get(cname)
         if obj is None:
             continue
@@ -1859,22 +2062,22 @@ with tabs[0]:
 
         # 거리는 ✔ amb_info_road의 init_distance 사용
         # (기존) extra 구성부를 아래처럼 교체
-        dist_csv = row["거리(km)"] if "거리(km)" in row and pd.notna(row["거리(km)"]) else None
+        dist_csv = row["Distance(km)"] if "Distance(km)" in row and pd.notna(row["Distance(km)"]) else None
         dist_json, dur_min, _ = _extract_summary_meta(obj)  # JSON 경로 요약
 
         extra = []
-        if addr: extra.append(f"주소: {addr}")       # ① 주소
-        if tel:  extra.append(f"전화: {tel}")        # ② 전화
-        qty = row.get("보유대수", None)
+        if addr: extra.append(f"Address: {addr}")       # ① 주소
+        if tel:  extra.append(f"Phone: {tel}")        # ② 전화
+        qty = row.get("Fleet Size", None)
         if qty is not None and pd.notna(qty):
-            extra.append(f"보유대수: {int(qty)}대")
+            extra.append(f"Fleet: {int(qty)}")
         # ③ 거리 (우선 CSV, 없으면 JSON)
         dk = float(dist_csv) if dist_csv is not None else (float(dist_json) if dist_json is not None else None)
         if dk is not None:
             extra.append(f"🚑 Center→Site: {dk:.2f} km")
         # ④ 소요시간
         if dur_min is not None and dur_min > 0:
-            extra.append(f"소요시간: {dur_min:.1f} 분")
+            extra.append(f"Duration: {dur_min:.1f} min")
 
         if clatlon:
             add_center_marker(m, cname, clatlon, extra)
@@ -1900,10 +2103,10 @@ with tabs[0]:
 
     # ✔ hospital_info_road 순서/선택 + distance_Hos2Site_road 거리 표출
     for _, row in s2h_df.iterrows():
-        i = int(row["인덱스"])
+        i = int(row["Index"])
         if i not in st.session_state.amb_s2h_sel_idx:
             continue
-        name = str(row["병원"]).strip()
+        name = str(row["Hospital"]).strip()
         euc_idx = int(row.get("euc_idx", i))
         obj = h2s_idx_map.get(euc_idx) or h2s_map.get(name)
         if obj is None:
@@ -1911,7 +2114,7 @@ with tabs[0]:
 
         # 좌표/메타는 엑셀에서 보강
         latlon = None; phone = addr = None
-        code   = row.get("종별코드", None)
+        code   = row.get("Grade Code", None)
         # 1) route meta 좌표(이름 중복시 Index 우선)
         meta = obj.get("meta", {}) if isinstance(obj, dict) else {}
         hosp_meta = meta.get("hospital")
@@ -1934,7 +2137,7 @@ with tabs[0]:
             #       추가로 hinfo_df에서 병상수/수술실수, JSON에서 소요시간을 읽어 붙임
 
             # 거리: 표의 (거리(km)) 우선, 없으면 JSON 요약 거리
-            dkm_csv = row.get("거리(km)", None)
+            dkm_csv = row.get("Distance(km)", None)
             dkm_json, dur_min, _ = _extract_summary_meta(obj)
 
             dk = float(dkm_csv) if pd.notna(dkm_csv) else (float(dkm_json) if dkm_json is not None else None)
@@ -1944,15 +2147,15 @@ with tabs[0]:
             ops_val  = None
             orig = hinfo_df[hinfo_df["Index"] == i]
             if not orig.empty:
-                beds_val = orig.iloc[0].get("병상수", None)
-                ops_val  = orig.iloc[0].get("수술실수", None)  # ← 새로 추가된 열 사용
+                beds_val = orig.iloc[0].get("Beds", None)
+                ops_val  = orig.iloc[0].get("ORs", None)
 
             grade_label = code_to_grade(code)
-            extras = [f"병원등급: {grade_label}"]                 # ⑤-1 병원등급
+            extras = [f"Grade: {grade_label}"]                 # ⑤-1 병원등급
             if dk is not None:
                 extras.append(f"🏥 Site→Hospital: {dk:.2f} km")   # ⑤-2 거리 (이모지 유지)
             if dur_min is not None and dur_min > 0:
-                extras.append(f"소요시간: {dur_min:.1f} 분")      # ⑤-3 소요시간
+                extras.append(f"Duration: {dur_min:.1f} min")      # ⑤-3 소요시간
 
             if latlon:
                 add_hospital_marker(
@@ -1962,7 +2165,7 @@ with tabs[0]:
         # 라인은 JSON 경로
         draw_route_from_json(m, obj, highlight=False)
 
-    # ─ UAV 출동(병원→사고) ─
+    # ─ UAV Dispatch(Hosp→Site) ─
     for i, (y, x, name, code) in enumerate(uav_dispatch_latlons):
         if i not in st.session_state.uav_c2s_sel_idx:
             continue
@@ -1972,24 +2175,17 @@ with tabs[0]:
         # uav_out_df에서 병상수/수술실수 가져오기
         beds_val = None
         ops_val = None
-        if i < len(uav_out_df):
-            row = uav_out_df.iloc[i]
-            # uav_info.csv에서 병상수/수술실수가 있는지 확인
-            uav_info_path = Path(bp) / "scenarios" / exp / coord / "uav_info.csv"
-            if os.path.exists(uav_info_path):
-                try:
-                    uav_csv = pd.read_csv(uav_info_path, encoding="utf-8-sig")
-                    if "병상수" in uav_csv.columns and i < len(uav_csv):
-                        beds_val = uav_csv.iloc[i].get("병상수", None)
-                    if "수술실수" in uav_csv.columns and i < len(uav_csv):
-                        ops_val = uav_csv.iloc[i].get("수술실수", None)
-                except:
-                    pass
+        # Reuse already-loaded uav_df instead of re-reading CSV
+        if 'uav_df' in dir() and uav_df is not None and i < len(uav_df):
+            if "Beds" in uav_df.columns:
+                beds_val = uav_df.iloc[i].get("Beds", None)
+            if "ORs" in uav_df.columns:
+                ops_val = uav_df.iloc[i].get("ORs", None)
 
         grade_label = code_to_grade(code)
         extras = [
-            f"병원등급: {grade_label}",
-            f"🛩️ 헬기장→Site: {dkm:.2f} km"
+            f"Grade: {grade_label}",
+            f"🛩️ Helipad→Site: {dkm:.2f} km"
         ]
 
         add_hospital_marker(m, name, code, (y, x), ops_val, beds_val, extras)
@@ -1998,7 +2194,7 @@ with tabs[0]:
         draw_uav_dash(
             m, (y,x), (lat,lon),
             UAV_OUT_COLOR,
-            f"🛩️ 출동 {name}→Site · {dkm:.2f} km"
+            f"🛩️ Dispatch {name}→Site · {dkm:.2f} km"
         )
 
     # ─ UAV 이송(사고→헬기장 병원) ─
@@ -2011,29 +2207,29 @@ with tabs[0]:
         draw_uav_dash(
             m, (lat,lon), (y,x),
             UAV_BACK_COLOR,
-            f"🛩️ 이송 Site→{name} · {dkm:.2f} km"
+            f"🛩️ Transport Site→{name} · {dkm:.2f} km"
         )
 
     # ─ 범례/속도 ─
     amb_speed, uav_speed = get_speed_from_yaml(find_yaml_in_coord(bp, exp, coord))
     legend_html = [
-        '<div style="position: fixed; bottom: 18px; left: 12px; z-index: 9999; background: rgba(255,255,255,0.94); padding: 10px 12px; border-radius: 10px; font-size: 12px; line-height: 1.35; box-shadow: 0 2px 6px rgba(0,0,0,.15);">',
-        '<b>범례 (카카오 교통정보)</b><br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[0]};margin:2px 6px 2px 0;"></span>정보없음(0)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[1]};margin:2px 6px 2px 0;"></span>정체(1)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[2]};margin:2px 6px 2px 0;"></span>지체(2)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[3]};margin:2px 6px 2px 0;"></span>서행(3)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[4]};margin:2px 6px 2px 0;"></span>원활(4)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[6]};margin:2px 6px 2px 0;"></span>교통사고(6)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:3px dashed {UAV_OUT_COLOR};margin:6px 6px 2px 0;"></span>UAV 출동(병원→사고)<br>',
-        f'<span style="display:inline-block;width:26px;height:0;border-top:3px dashed {UAV_BACK_COLOR};margin:2px 6px 0 0;"></span>UAV 이송(사고→병원)<br>',
+        '<div style="position: fixed; bottom: 18px; left: 12px; z-index: 9999; background: rgba(255,255,255,0.96); color: #222; padding: 10px 12px; border-radius: 10px; font-size: 12px; line-height: 1.35; box-shadow: 0 2px 8px rgba(0,0,0,.25); border: 1px solid #ccc;">',
+        '<b>Legend (Kakao Traffic)</b><br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[0]};margin:2px 6px 2px 0;"></span>Unknown(0)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[1]};margin:2px 6px 2px 0;"></span>Congested(1)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[2]};margin:2px 6px 2px 0;"></span>Slow(2)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[3]};margin:2px 6px 2px 0;"></span>Moderate(3)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[4]};margin:2px 6px 2px 0;"></span>Clear(4)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[6]};margin:2px 6px 2px 0;"></span>Accident(6)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:3px dashed {UAV_OUT_COLOR};margin:6px 6px 2px 0;"></span>UAV Dispatch(Hosp→Site)<br>',
+        f'<span style="display:inline-block;width:26px;height:0;border-top:3px dashed {UAV_BACK_COLOR};margin:2px 6px 0 0;"></span>UAV Transport(Site→Hosp)<br>',
     ]
     if amb_speed or uav_speed:
         sp = []
         if amb_speed: sp.append(f"🚑 AMB≈{amb_speed} km/h")
         if uav_speed: sp.append(f"🛩️ UAV≈{uav_speed} km/h")
         legend_html.append(" · ".join(sp) + '<br>')
-    legend_html.append('<span style="opacity:.8;">* 경로 상세 안내는 마커 팝업 ▶ 클릭</span>')
+    legend_html.append('<span style="opacity:.7; color:#555;">* Click marker popup for route details</span>')
     legend_html.append('</div>')
     m.get_root().html.add_child(folium.Element("".join(legend_html)))
 
@@ -2088,13 +2284,13 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     with open(stat_path, "r", encoding="utf-8") as f:
         lines = [ln.strip() for ln in f if ln.strip()]
     
-    st.caption(f"📊 STAT 파일 총 {len(lines)}줄")
+    st.caption(f"📊 STAT file: {len(lines)} lines total")
     
     # 예상 라인 수 확인
     expected = 320  # 64 × 5
     if len(lines) != expected:
-        st.warning(f"⚠️ STAT 라인 수 불일치: {len(lines)}줄 (예상: {expected}줄)")
-        st.caption(f"→ {expected - len(lines)}개 시나리오가 누락되었을 수 있습니다")
+        st.warning(f"⚠️ STAT line count mismatch: {len(lines)} (expected: {expected})")
+        st.caption(f"→ {expected - len(lines)} scenarios may be missing")
     
     # 2. 각 줄을 파싱하여 딕셔너리에 저장
     for line in lines:
@@ -2124,7 +2320,7 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     raw_path = stat_path.replace("_stat.txt", ".txt")
     
     if not os.path.exists(raw_path):
-        st.error("❌ RAW 파일을 찾을 수 없습니다!")
+        st.error("❌ RAW file not found!")
         return pd.DataFrame(), pd.DataFrame()
     
     dfraw = parse_raw_results(raw_path)
@@ -2133,7 +2329,7 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # RAW의 룰 순서 (실제 실행된 순서)
     rule_order = reward_data[reward_data["run"] == 1]["rule"].tolist()
     
-    st.info(f"✅ RAW 파일: {len(rule_order)}개 시나리오 확인")
+    st.info(f"✅ RAW file: {len(rule_order)} scenarios confirmed")
     
     # 4. RAW 순서대로 STAT 데이터 매칭
     result_rows = []
@@ -2172,7 +2368,7 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
                     row[f"M{m_idx+1}_ci"] = np.nan
         else:
             # STAT에 없는 룰 → RAW에서 직접 계산
-            st.warning(f"⚠️ STAT에 없음: {rule}")
+            st.warning(f"⚠️ Not in STAT: {rule}")
             missing_count += 1
             
             # RAW 데이터에서 직접 통계 계산
@@ -2206,7 +2402,7 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         result_rows.append(row)
     
     if missing_count > 0:
-        st.warning(f"⚠️ {missing_count}개 시나리오를 RAW에서 직접 계산했습니다")
+        st.warning(f"⚠️ {missing_count} scenarios computed directly from RAW")
     
     wide = pd.DataFrame(result_rows)
     
@@ -2245,7 +2441,7 @@ RAW_RE = re.compile(r'^(START|ReSTART),\s*(RedOnly|YellowNearest),\s*Red\s+([A-Z
 
 # ===== Analysis 탭 =====
 with tabs[2]:
-    st.subheader("📊 RAW 결과 분석 (results_{coord}.txt 기반)")
+    st.subheader("📊 RAW Result Analysis (results_{coord}.txt)")
 
     bp   = st.session_state.base_path
     exp  = st.session_state.selected_exp
@@ -2258,47 +2454,47 @@ with tabs[2]:
         st.session_state.last_analytics_key = current_analytics_key
 
     if not (bp and exp and coord):
-        st.info("좌측에서 시나리오를 먼저 선택하세요.")
+        st.info("Select a scenario from the sidebar first.")
     else:
         spath = results_stat_path(bp, exp, coord)   # 기존 함수
         rpath = results_raw_path(bp, exp, coord)    # 기존 함수
 
         # 성능 최적화: 버튼 클릭 시에만 Analytics 데이터 로드
-        st.info("💡 대용량 시뮬레이션 결과는 로딩에 시간이 소요될 수 있습니다. 아래 버튼을 클릭하여 분석을 시작하세요.")
+        st.info("💡 Large simulation results may take time to load. Click the button below to start analysis.")
 
-        if st.button("📊 분석 데이터 로드하기", key="load_analytics_btn", help="RAW 결과를 파싱하고 분석합니다"):
+        if st.button("📊 Load Analysis Data", key="load_analytics_btn", help="Parse and analyze RAW results"):
             st.session_state.analytics_loaded = True
 
         if not st.session_state.get("analytics_loaded", False):
-            st.caption("💡 분석을 보려면 위의 '분석 데이터 로드하기' 버튼을 클릭하세요. (다른 탭의 로딩 속도를 위해 기본적으로 비활성화됨)")
+            st.caption("💡 Click 'Load Analysis Data' above to view analysis. (Disabled by default for faster tab loading)")
         else:
             # ── RAW: 선택한 지표만 토글 표출
             raw_tables = {}
             if rpath and os.path.exists(rpath):
-                with st.spinner("RAW 결과 파싱 중... (대용량 파일은 시간이 걸릴 수 있습니다)"):
+                with st.spinner("Parsing RAW results... (large files may take a moment)"):
                     raw_tables = parse_raw_all_metrics(rpath)  # {metric: df}
 
                 if raw_tables:
                     # 파일에 실제 들어있는 지표만 옵션으로 노출
                     metric_options = [m for m in RAW_METRIC_NAMES if m in raw_tables.keys()]
                     picked = st.multiselect(
-                        "표시할 지표를 선택하세요",
+                        "Select metrics to display",
                         options=metric_options,
                         default=[metric_options[0]] if metric_options else [],
-                        help="선택한 지표만 아래에 표로 표시됩니다."
+                        help="Only selected metrics will be shown below."
                     )
                     for m in picked:
-                        st.markdown(f"#### ▶ RAW 테이블 — **{m}** (run별)")
+                        st.markdown(f"#### ▶ RAW Table — **{m}** (per run)")
                         st.dataframe(raw_tables[m], width='stretch')
                 else:
-                    st.warning("RAW(results_*.txt)에서 읽을 수 있는 블록이 없습니다.")
+                    st.warning("No readable blocks found in RAW (results_*.txt).")
             else:
-                st.warning("RAW(results_*.txt) 파일을 찾지 못했습니다.")
+                st.warning("RAW (results_*.txt) file not found.")
 
             st.divider()
 
             # ===== (기존) stat 요약 분석 섹션 =====
-            st.subheader("📈 STAT 요약 분석 (_stat.txt 기반)")
+            st.subheader("📈 STAT Summary Analysis (_stat.txt)")
             st.info(
                 "📂 results/exp_YYYYMMDD_HHMMSS/(lat,lon)/results_{coord}.txt (Raw), results_{coord}_stat.txt (통계)\n\n"
                 "- **Reward**: 생존확률 합\n- **Time**: 소요시간\n- **PDR**\n- **w.o.G**: Green 제외 지표"
@@ -2310,20 +2506,20 @@ with tabs[2]:
 
             if not wide.empty:
                 display = wide.rename(columns={
-                    "M1_mean":"Reward(생존) 평균","M1_std":"Reward 표준편차","M1_ci":"Reward 95%CI",
-                    "M2_mean":"Time 평균","M2_std":"Time 표준편차","M2_ci":"Time 95%CI",
-                    "M3_mean":"PDR 평균","M3_std":"PDR 표준편차","M3_ci":"PDR 95%CI",
+                    "M1_mean":"Reward Mean","M1_std":"Reward Std","M1_ci":"Reward 95%CI",
+                    "M2_mean":"Time Mean","M2_std":"Time Std","M2_ci":"Time 95%CI",
+                    "M3_mean":"PDR Mean","M3_std":"PDR Std","M3_ci":"PDR 95%CI",
                     "M4_mean":"Reward w.o.G 평균","M4_std":"Reward w.o.G 표준편차","M4_ci":"Reward w.o.G 95%CI",
                     "M5_mean":"PDR w.o.G 평균","M5_std":"PDR w.o.G 표준편차","M5_ci":"PDR w.o.G 95%CI",
                 })
                 st.dataframe(display, width='stretch')
 
-                st.markdown("#### 🏆 시나리오 추천(정렬 기준)")
-                crit = st.selectbox("정렬 기준", ["Reward 큰 순","PDR 작은 순","Time 짧은 순"], index=0)
-                if crit == "Reward 큰 순":
+                st.markdown("#### 🏆 Scenario Ranking (Sort by)")
+                crit = st.selectbox("Sort by", ["Reward (desc)","PDR (asc)","Time (asc)"], index=0)
+                if crit == "Reward (desc)":
                     df_sorted = wide.sort_values("M1_mean", ascending=False)
                     cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M1_mean","M1_ci"]
-                elif crit == "PDR 작은 순":
+                elif crit == "PDR (asc)":
                     df_sorted = wide.sort_values("M3_mean", ascending=True)
                     cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M3_mean","M3_ci"]
                 else:
@@ -2331,26 +2527,35 @@ with tabs[2]:
                     cols = ["ScenarioIdx","Phase","RedPolicy","RedAction","YellowAction","M2_mean","M2_ci"]
                 st.dataframe(df_sorted[cols], width='stretch')
             else:
-                st.info("STAT 요약 파일을 찾지 못했거나 비어 있습니다.")
+                st.info("STAT summary file not found or empty.")
 
 
-            # ── ANOVA 스위트 (raw가 있을 때)
-            st.markdown("#### 🧪 ANOVA (One-way / RCBD / Full-factorial)")
+            # ── ANOVA Suite (when raw file exists)
+            st.markdown("#### 🧪 ANOVA (One-way / RCBD / Reduced Factorial)")
+
+            import itertools
 
             def make_total_row(anova_tbl: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
                 ss_total = float(((y - y.mean())**2).sum())
+                N = len(y)
                 total = pd.DataFrame(
-                    {"sum_sq":[ss_total], "df":[len(y)-1], "mean_sq":[np.nan], "F":[np.nan], "PR(>F)":[np.nan], "eta_sq":[np.nan]},
+                    {"sum_sq":[ss_total], "df":[N-1], "mean_sq":[np.nan], "F":[np.nan], "PR(>F)":[np.nan], "eta_sq":[np.nan], "omega_sq":[np.nan]},
                     index=["Total"]
                 )
                 out = anova_tbl.copy()
-                # η²
+                # eta-squared
                 out["eta_sq"] = out["sum_sq"] / ss_total
-                # mean_sq 보완
+                # omega-squared (bias-corrected)
+                if "Residual" in out.index:
+                    ms_res = float(out.loc["Residual", "sum_sq"] / out.loc["Residual", "df"]) if out.loc["Residual", "df"] > 0 else 0.0
+                    out["omega_sq"] = (out["sum_sq"] - out["df"] * ms_res) / (ss_total + ms_res)
+                    out.loc[out["omega_sq"] < 0, "omega_sq"] = 0.0
+                    out.loc["Residual", "omega_sq"] = np.nan
+                else:
+                    out["omega_sq"] = np.nan
                 if "df" in out.columns and "sum_sq" in out.columns:
                     out["mean_sq"] = out["sum_sq"] / out["df"]
-                # 열 순서 정리
-                cols = ["sum_sq","df","mean_sq","F","PR(>F)","eta_sq"]
+                cols = ["sum_sq","df","mean_sq","F","PR(>F)","eta_sq","omega_sq"]
                 out = out.reindex(columns=cols)
                 return pd.concat([out, total], axis=0)
 
@@ -2422,7 +2627,7 @@ with tabs[2]:
                 try:
                     import scikit_posthocs as sp
                 except Exception as e:
-                    return pd.DataFrame(), f"scikit-posthocs 가져오기 실패: {e}"
+                    return pd.DataFrame(), f"scikit-posthocs import failed: {e}"
 
                 # 공통: wide → long 변환 함수
                 def _wide_to_long(ph_wide: pd.DataFrame) -> pd.DataFrame:
@@ -2443,10 +2648,10 @@ with tabs[2]:
                     # 2) Nemenyi fallback
                     try:
                         ph2 = sp.posthoc_nemenyi_friedman(df_block_rule)
-                        msg = f"Conover 실패로 Nemenyi로 대체: {e1}"
+                        msg = f"Conover failed, using Nemenyi instead: {e1}"
                         return _wide_to_long(ph2), msg
                     except Exception as e2:
-                        return pd.DataFrame(), f"Conover/Nemenyi 모두 실패: {e1} / {e2}"
+                        return pd.DataFrame(), f"Both Conover/Nemenyi failed: {e1} / {e2}"
 
             def cld_from_pairs(means: pd.Series, pair_tbl: pd.DataFrame, alpha=0.05):
                 """
@@ -2520,56 +2725,60 @@ with tabs[2]:
 
 
             if not rpath:
-                st.caption(f"raw 파일(results_{coord}.txt)을 찾지 못해 ANOVA를 수행하지 않습니다.")
+                st.caption(f"Raw file (results_{coord}.txt) not found; skipping ANOVA.")
             else:
                 dfraw = parse_raw_results(rpath)  # 반드시 long 형식
                 if dfraw.empty:
-                    st.caption("raw 파싱 결과가 비어 있습니다. 파일 형식을 확인해 주세요.")
+                    st.caption("RAW parsing result is empty. Check file format.")
                 else:
                     metric = st.selectbox("Metric", ["Reward","Time","PDR","Reward_woG","PDR_woG"], index=0)
                     d = dfraw[dfraw["metric"] == metric].copy()
                     if d.empty:
-                        st.warning("선택한 지표에 해당하는 데이터가 없습니다.")
+                        st.warning("No data found for the selected metric.")
                     else:
                         # 변환
                         # (요청 반영) Time은 원척도, PDR은 logit 선택 가능, Reward는 원척도
                         if metric == "Time":
-                            trans_opts, trans_idx = ["없음"], 0
+                            trans_opts, trans_idx = ["None"], 0
                         elif metric.startswith("PDR"):
-                            trans_opts, trans_idx = ["없음","logit(PDR)"], 1   # 기본 logit
+                            trans_opts, trans_idx = ["None","logit(PDR)"], 1   # 기본 logit
                         else:  # Reward, Reward_woG
-                            trans_opts, trans_idx = ["없음"], 0
+                            trans_opts, trans_idx = ["None"], 0
 
-                        trans = st.selectbox("변환", trans_opts, index=trans_idx)
+                        trans = st.selectbox("Transform", trans_opts, index=trans_idx)
                         yvar = "value"; eps = 1e-6
 
                         if trans == "logit(PDR)":
-                            d[yvar] = np.log((d[yvar]+eps)/(1-d[yvar]+eps)); st.caption("PDR에 logit 변환 적용.")
+                            d[yvar] = np.log((d[yvar]+eps)/(1-d[yvar]+eps)); st.caption("Logit transform applied to PDR.")
                         # (Time/Reward는 변환 없음)
 
                         if "rule" not in d.columns:
                             d["rule"] = d[["Phase","RedPolicy","RedAction","YellowAction"]].agg(", ".join, axis=1)
 
-                        mode = st.radio("분석 유형", ["One-way(룰만)","One-way + 블록(run) (RCBD 권장)","4요인 Full-factorial"],
+                        mode = st.radio("Analysis Type", ["One-way (rule only)","One-way + Block(run) (RCBD recommended)","Reduced Factorial (main + 2-way)"],
                                         index=1, horizontal=True)
 
                         if not HAS_SM:
-                            st.warning("statsmodels 미설치로 ANOVA를 실행할 수 없습니다. `pip install statsmodels` 후 재시도하세요.")
+                            st.warning("statsmodels not installed. Cannot run ANOVA. `pip install statsmodels` and retry.")
                         else:
                             import statsmodels.api as sm
                             import statsmodels.formula.api as smf
                             from scipy import stats as sps
 
                             # 모형 적합
-                            if mode == "One-way(룰만)":
+                            if mode == "One-way (rule only)":
                                 formula = f"{yvar} ~ C(rule)"
-                                st.caption("모형: value ~ C(rule)")
-                            elif mode == "One-way + 블록(run) (RCBD 권장)":
+                                st.caption("Model: value ~ C(rule)")
+                            elif mode == "One-way + Block(run) (RCBD recommended)":
                                 formula = f"{yvar} ~ C(rule) + C(run)"
-                                st.caption("모형: value ~ C(rule) + C(run)  (run=블록)")
+                                st.caption("Model: value ~ C(rule) + C(run)  (run=block)")
                             else:
-                                formula = f"{yvar} ~ C(Phase)*C(RedPolicy)*C(RedAction)*C(YellowAction)"
-                                st.caption("모형: value ~ Phase*RedPolicy*RedAction*YellowAction")
+                                # Reduced factorial: main effects + 2-way interactions only (no 3/4-way)
+                                formula = (f"{yvar} ~ C(Phase) + C(RedPolicy) + C(RedAction) + C(YellowAction)"
+                                           " + C(Phase):C(RedPolicy) + C(Phase):C(RedAction) + C(Phase):C(YellowAction)"
+                                           " + C(RedPolicy):C(RedAction) + C(RedPolicy):C(YellowAction)"
+                                           " + C(RedAction):C(YellowAction)")
+                                st.caption("Model: main effects + all 2-way interactions (3/4-way excluded for power)")
 
                             model = smf.ols(formula, data=d).fit()
                             anova_tbl = sm.stats.anova_lm(model, typ=2)
@@ -2578,34 +2787,79 @@ with tabs[2]:
                             out = make_total_row(anova_tbl, d[yvar])
                             st.dataframe(out, width='stretch')
 
-                            # 유의한 주효과(룰 등) 요약
-                            alpha = st.slider("유의수준(alpha)", 0.001, 0.1, 0.05, 0.001)
+                            # Significant effects summary
+                            alpha = st.slider("Significance Level (alpha)", 0.001, 0.1, 0.05, 0.001)
                             sig = out[(out.index!="Total") & (out["PR(>F)"] < alpha)].sort_values("PR(>F)")
                             if not sig.empty:
-                                st.markdown("##### 📌 해석 요약")
-                                st.markdown("\n".join([f"- **{idx}**: p={r['PR(>F)']:.3g}, η²={r['eta_sq']:.3f}" 
-                                                    for idx, r in sig.iterrows()]))
+                                st.markdown("##### 📌 Interpretation Summary")
+                                lines = []
+                                for idx, r in sig.iterrows():
+                                    omega = f", ω²={r['omega_sq']:.3f}" if pd.notna(r.get('omega_sq')) else ""
+                                    lines.append(f"- **{idx}**: p={r['PR(>F)']:.3g}, η²={r['eta_sq']:.3f}{omega}")
+                                st.markdown("\n".join(lines))
                             else:
-                                st.caption("유의한 효과가 발견되지 않았습니다.")
-                            st.caption(f"모형 적합도: R²={model.rsquared:.3f}, Adj.R²={model.rsquared_adj:.3f}")
+                                st.caption("No significant effects found.")
+                            st.caption(f"Model fit: R²={model.rsquared:.3f}, Adj.R²={model.rsquared_adj:.3f}")
 
-                            # 잔차 진단
-                            st.markdown("##### 잔차 진단")
+                            # RCBD assumption check: Tukey non-additivity test
+                            if mode == "One-way + Block(run) (RCBD recommended)":
+                                try:
+                                    # Tukey 1-df test for non-additivity
+                                    fitted = model.fittedvalues
+                                    resid_vals = model.resid
+                                    d_tukey = d.copy()
+                                    d_tukey["_fitted_sq"] = fitted ** 2
+                                    model_aug = smf.ols(f"{yvar} ~ C(rule) + C(run) + _fitted_sq", data=d_tukey).fit()
+                                    anova_aug = sm.stats.anova_lm(model_aug, typ=2)
+                                    if "_fitted_sq" in anova_aug.index:
+                                        p_nonadd = float(anova_aug.loc["_fitted_sq", "PR(>F)"])
+                                        st.write(f"Tukey Non-additivity: p={p_nonadd:.3g}")
+                                        if p_nonadd < alpha:
+                                            st.warning("⚠️ Significant block×treatment interaction detected (Tukey non-additivity p < alpha). RCBD additivity assumption may be violated.")
+                                except Exception as e_tukey:
+                                    st.caption(f"Tukey non-additivity test skipped: {e_tukey}")
+
+                            # Residual Diagnostics
+                            st.markdown("##### Residual Diagnostics")
                             resid = model.resid
+                            fitted_vals = model.fittedvalues
+
+                            # Shapiro-Wilk
                             if len(resid) >= 3:
                                 try:
                                     W, p_shap = (sps.shapiro(resid.sample(min(len(resid), 500), random_state=0))
                                                 if len(resid) > 500 else sps.shapiro(resid))
                                     st.write(f"Shapiro-Wilk: W={W:.4f}, p={p_shap:.3g}")
                                 except Exception as e:
-                                    p_shap = 1.0; st.caption(f"Shapiro-Wilk 계산 실패: {e}")
+                                    p_shap = 1.0; st.caption(f"Shapiro-Wilk computation failed: {e}")
                             else:
                                 p_shap = 1.0
-                    
+
+                            # Anderson-Darling
+                            try:
+                                ad_result = sps.anderson(resid, dist="norm")
+                                st.write(f"Anderson-Darling: A²={ad_result.statistic:.4f}, "
+                                         f"critical(5%)={ad_result.critical_values[2]:.4f}")
+                                if ad_result.statistic > ad_result.critical_values[2]:
+                                    st.caption("Anderson-Darling rejects normality at 5% level.")
+                            except Exception:
+                                pass
+
+                            # QQ plot
                             qq = sps.probplot(resid, dist="norm")
                             qq_df = pd.DataFrame({"Theoretical": qq[0][0], "Residual": np.sort(resid)})
-                            st.altair_chart(alt.Chart(qq_df).mark_point().encode(x="Theoretical:Q", y="Residual:Q").properties(height=280), use_container_width=True)
-                            st.altair_chart(alt.Chart(pd.DataFrame({"resid": resid})).mark_bar().encode(x=alt.X("resid:Q", bin=alt.Bin(maxbins=40)), y="count()").properties(height=200), use_container_width=True)
+                            st.altair_chart(alt.Chart(qq_df).mark_point().encode(x="Theoretical:Q", y="Residual:Q").properties(title="QQ Plot", height=280), use_container_width=True)
+
+                            # Residual histogram
+                            st.altair_chart(alt.Chart(pd.DataFrame({"resid": resid})).mark_bar().encode(x=alt.X("resid:Q", bin=alt.Bin(maxbins=40)), y="count()").properties(title="Residual Histogram", height=200), use_container_width=True)
+
+                            # Residuals vs Fitted scatter
+                            rvf_df = pd.DataFrame({"Fitted": fitted_vals, "Residual": resid})
+                            rvf_chart = alt.Chart(rvf_df).mark_point(opacity=0.5).encode(
+                                x=alt.X("Fitted:Q"), y=alt.Y("Residual:Q")
+                            ).properties(title="Residuals vs Fitted", height=280)
+                            zero_line = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="red", strokeDash=[4,4]).encode(y="y:Q")
+                            st.altair_chart(rvf_chart + zero_line, use_container_width=True)
                         
 
                             # 등분산(룰 기준). RCBD면 블록-잔차화 값으로 검사
@@ -2626,7 +2880,7 @@ with tabs[2]:
                             alpha  = _scalar(alpha,  default=0.05)
 
                             # ===== 사후검정 & CLD =====
-                            st.markdown("##### 사후검정")
+                            st.markdown("##### Post-hoc Tests")
                             posthoc = pd.DataFrame(); explain = ""
 
                             def _small_is_better(m: str) -> bool:
@@ -2634,7 +2888,7 @@ with tabs[2]:
                                 return (m == "Time") or m.startswith("PDR")
 
                             # --- 사후검정 입력과 CLD용 평균(Series) 확정 ---
-                            if mode == "One-way + 블록(run) (RCBD 권장)":
+                            if mode == "One-way + Block(run) (RCBD recommended)":
                                 dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
                                 dd_work = _make_dd_work(dd, yvar)               # ▶ 분석 컬럼을 '__y__'로 1D 보장
                                 y_post  = dd_work["__y__"]
@@ -2663,47 +2917,19 @@ with tabs[2]:
                                 p_lev = np.nan
 
 
-                            # --- 사후검정 분기 ---
-                            if (p_shap >= alpha) and (np.isnan(p_lev) or p_lev >= alpha):
-                                # 정규 + 등분산 → Tukey
-                                try:
-                                    posthoc = tukey_table(y_post, grp_post, alpha=alpha)
-                                    explain = "Tukey HSD"
-                                except Exception as e:
-                                    st.warning(f"Tukey 실패: {e}")
-                            elif (p_shap >= alpha) and (not np.isnan(p_lev) and p_lev < alpha):
-                                # 정규 + 이분산 → Games–Howell (fallback Welch+Holm)
-                                try:
-                                    import pingouin as pg
-                                    # RCBD면 y_post는 이미 y*, grp_post는 rule
-                                    gh = pg.pairwise_gameshowell(dv=yvar if not mode.startswith("One-way + 블록") else yvar,
-                                                                between="rule", data=(dd if mode.startswith("One-way + 블록") else d))
-                                    posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
-                                    posthoc["reject"] = posthoc["p-adj"] < alpha
-                                    explain = "Games–Howell"
-                                except Exception:
-                                    posthoc = games_howell_fallback(pd.DataFrame({"rule": grp_post, "y": y_post}), "rule", "y", alpha=alpha)
-                                    explain = "Welch t-tests + Holm (fallback)"
-                            else:
-                                # 비정규 → Friedman(+Conover)
-                                try:
-                                    piv = d.pivot_table(index="run", columns="rule", values=yvar, aggfunc="mean")
-                                    stat, p_f = sps.friedmanchisquare(*[piv[c].dropna().values for c in piv.columns])
-                                    st.write(f"Friedman χ²={stat:.3g}, p={p_f:.3g}")
-                                    if p_f < alpha:
-                                        ph_long, err = conover_friedman(piv, alpha=alpha)
-                                        if ph_long.empty:
-                                            st.warning(f"사후검정 실패: {err}")
-                                        else:
-                                            posthoc = ph_long
-                                            explain = "Conover post-hoc after Friedman (Holm-adjusted)"
-                                            if err:  # Nemenyi로 대체된 경우 안내
-                                                st.caption(err)
-                                    else:
-                                        posthoc = pd.DataFrame()
-                                        explain = "Friedman 비유의 → 사후검정 생략"
-                                except Exception as e:
-                                    st.warning(f"Friedman/사후검정 실패: {e}")
+                            # --- Post-hoc: Games-Howell (robust to non-normality & heteroscedasticity) ---
+                            try:
+                                import pingouin as pg
+                                gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
+                                posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
+                                posthoc["reject"] = posthoc["p-adj"] < alpha
+                                explain = "Games–Howell"
+                            except Exception:
+                                posthoc = games_howell_fallback(
+                                    pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
+                                    "rule", "y", alpha=alpha
+                                )
+                                explain = "Welch t-tests + Holm correction (Games–Howell fallback)"
 
                             # --- 결과 출력 & CLD ---
                             if not posthoc.empty:
@@ -2712,19 +2938,21 @@ with tabs[2]:
 
                                 ph = posthoc.copy()
                                 if ("p-adj" not in ph.columns) and ("reject" not in ph.columns):
-                                    st.info("CLD를 만들기 위한 p값 정보가 없습니다.")
+                                    st.info("No p-value information available for CLD.")
                                 else:
                                     cld = cld_from_pairs(means_for_cld, ph, alpha=alpha)
-                                    st.markdown("##### CLD (동일 문자=유의차 없음, A=최상위)")
+                                    st.markdown("##### CLD (same letter = no significant difference, A = best)")
+                                    st.caption("⚠️ CLD uses a greedy monotone algorithm; letter assignments may vary with group ordering. "
+                                               "Interpret letters as approximate groupings — always check pairwise p-values for precise conclusions.")
                                     st.dataframe(cld, width='stretch')
 
                                     # 최종 후보(‘A’ 그룹) — 지표 방향에 맞춰 정렬
-                                    st.markdown(f"#### ✅ 최종 후보(**{metric} 기준 A=Best**)")
+                                    st.markdown(f"#### ✅ Top Candidates (**{metric}, A=Best**)")
                                     top = cld[cld["CLD"]=="A"].sort_values("mean", ascending=_small_is_better(metric))
                                     st.dataframe(top, width='stretch')
 
                                     # ================== A그룹 교집합 (Reward ∩ Time ∩ PDR, RCBD 기준) ==================구해도 좋습니다.")
-                                    st.markdown("### 🔗 A그룹 교집합 (Reward ∩ Time(작은순) ∩ PDR(작은순), RCBD)")
+                                    st.markdown("### 🔗 A-Group Intersection (Reward ∩ Time(asc) ∩ PDR(asc), RCBD)")
 
                                     def _prep_metric(dfraw_all: pd.DataFrame, metric_name: str):
                                         """raw(long)에서 metric 행 추출 + rule 컬럼 보정."""
@@ -2751,91 +2979,37 @@ with tabs[2]:
 
                                     def _rcbd_posthoc_cld(d: pd.DataFrame, yvar: str, alpha: float = 0.05, prefer_small_is_A: bool = False):
                                         """
-                                        RCBD: y ~ C(rule) + C(run)
-                                        사후: (정규&등분산)Tukey / (정규&이분산)Games-Howell(없으면 Welch+Holm)
-                                            / (비정규)Friedman→Conover(없으면 Nemenyi)
-                                        CLD: cld_from_pairs(단조 레터) — 정렬은 y* 평균 기준.
-                                        prefer_small_is_A=True  → y* 평균 오름차순(A=작은 값=Best)
-                                        prefer_small_is_A=False → y* 평균 내림차순(A=큰 값=Best)
+                                        RCBD: y ~ C(rule) + C(run), then Games-Howell on block-adjusted y*.
+                                        CLD via cld_from_pairs (monotone letter algorithm).
+                                        prefer_small_is_A=True  → ascending sort (A = smallest = Best)
+                                        prefer_small_is_A=False → descending sort (A = largest = Best)
                                         """
-                                        import statsmodels.formula.api as smf
                                         from scipy import stats as sps
 
-                                        # ✅ 항상 초기화 (UnboundLocal 방지)
                                         posthoc = pd.DataFrame()
                                         explain = ""
 
-                                        # --- RCBD 적합 & 잔차 정규성
-                                        model = smf.ols(f"{yvar} ~ C(rule) + C(run)", data=d).fit()
-                                        resid = model.resid
-                                        try:
-                                            if len(resid) > 500:
-                                                _, p_shap = sps.shapiro(resid.sample(500, random_state=0))
-                                            else:
-                                                _, p_shap = sps.shapiro(resid)
-                                        except Exception:
-                                            p_shap = 1.0
-                                        # 스칼라화
-                                        p_shap = float(np.asarray(p_shap).ravel()[0])
-
-                                        # --- 블록-잔차화한 y*로 사후검정 입력 만들기(1D 보장)
+                                        # --- Block-adjust y* for post-hoc input (1D guaranteed)
                                         dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
-                                        dd_work = _make_dd_work(dd, yvar)                # ▶ '__y__' 1D 보장
+                                        dd_work = _make_dd_work(dd, yvar)
                                         y_post, grp_post = dd_work["__y__"], dd_work["rule"]
                                         means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
                                             ascending=prefer_small_is_A
                                         )
 
-                                        # --- 등분산(Levene) — dd_work 기준으로 재계산
+                                        # --- Post-hoc: Games-Howell (robust to non-normality & heteroscedasticity)
                                         try:
-                                            lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
-                                            if len(lev_groups) >= 2 and all(len(x) > 1 for x in lev_groups):
-                                                p_lev = sps.levene(*lev_groups, center="median").pvalue
-                                            else:
-                                                p_lev = np.nan
+                                            import pingouin as pg
+                                            gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
+                                            posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
+                                            posthoc["reject"] = posthoc["p-adj"] < alpha
+                                            explain = "Games–Howell (RCBD, y*)"
                                         except Exception:
-                                            p_lev = np.nan
-
-                                        # --- 사후검정 분기
-                                        if (p_shap >= alpha) and (np.isnan(p_lev) or p_lev >= alpha):
-                                            # 정규 + 등분산 → Tukey
-                                            try:
-                                                posthoc = tukey_table(y_post, grp_post, alpha=alpha)
-                                                explain = "Tukey HSD (RCBD, y*)"
-                                            except Exception as e:
-                                                explain = f"Tukey 실패: {e}"
-
-                                        elif (p_shap >= alpha) and (not np.isnan(p_lev) and p_lev < alpha):
-                                            # 정규 + 이분산 → Games–Howell (없으면 Welch+Holm)
-                                            try:
-                                                import pingouin as pg
-                                                gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
-                                                posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
-                                                posthoc["reject"] = posthoc["p-adj"] < alpha
-                                                explain = "Games–Howell (RCBD, y*)"
-                                            except Exception:
-                                                posthoc = games_howell_fallback(
-                                                    pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
-                                                    "rule", "y", alpha=alpha
-                                                )
-                                                explain = "Welch t-tests + Holm (fallback, RCBD, y*)"
-
-                                        else:
-                                            # 비정규 → Friedman(+Conover/Nemenyi)
-                                            try:
-                                                piv = d.pivot_table(index="run", columns="rule", values=yvar, aggfunc="mean")
-                                                stat, p_f = sps.friedmanchisquare(*[piv[c].dropna().values for c in piv.columns])
-                                                if p_f < alpha:
-                                                    ph_long, err = conover_friedman(piv, alpha=alpha)
-                                                    if not ph_long.empty:
-                                                        posthoc = ph_long
-                                                        explain = "Conover (Holm) after Friedman" + (f" · {err}" if err else "")
-                                                    else:
-                                                        explain = f"사후검정 실패: {err}"
-                                                else:
-                                                    explain = "Friedman 비유의 → 사후검정 생략"
-                                            except Exception as e:
-                                                explain = f"Friedman/사후검정 실패: {e}"
+                                            posthoc = games_howell_fallback(
+                                                pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
+                                                "rule", "y", alpha=alpha
+                                            )
+                                            explain = "Welch t-tests + Holm correction (RCBD, y*)"
 
                                         # --- CLD 산출
                                         if posthoc.empty or (("p-adj" not in posthoc.columns) and ("reject" not in posthoc.columns)):
@@ -2844,13 +3018,13 @@ with tabs[2]:
                                         cld = cld_from_pairs(means_for_cld, posthoc, alpha=alpha)
                                         return means_for_cld, cld, explain
 
-                                    with st.expander("🔍 A그룹 교집합 보기 (Reward↑, Time↓, PDR↓)", expanded=True):
-                                        alpha_int = st.slider("교집합 산출용 유의수준(alpha)", 0.001, 0.1, 0.05, 0.001, key="alpha_intersect_all")
+                                    with st.expander("🔍 A-Group Intersection (Reward↑, Time↓, PDR↓)", expanded=True):
+                                        alpha_int = st.slider("Alpha for intersection", 0.001, 0.1, 0.05, 0.001, key="alpha_intersect_all")
                                         alpha_int = float(alpha_int)   # 슬라이더 값 스칼라화
                                         # --- Reward (클수록 A) ---
                                         d_rew = _prep_metric(dfraw, "Reward")
                                         if d_rew.empty:
-                                            st.info("Reward 데이터가 없습니다.")
+                                            st.info("No Reward data.")
                                             A_rew, disp_rew = set(), pd.Series(dtype=float)
                                         else:
                                             d_rew_tr, y_rew, _ = _transform_for_metric(d_rew, "Reward")
@@ -2861,7 +3035,7 @@ with tabs[2]:
                                         # --- Time (작을수록 A) ---
                                         d_time = _prep_metric(dfraw, "Time")
                                         if d_time.empty:
-                                            st.info("Time 데이터가 없습니다.")
+                                            st.info("No Time data.")
                                             A_time, disp_time = set(), pd.Series(dtype=float)
                                         else:
                                             d_time_tr, y_time, _ = _transform_for_metric(d_time, "Time")
@@ -2872,7 +3046,7 @@ with tabs[2]:
                                         # --- PDR (작을수록 A; logit 분석, 표시는 원척도 평균) ---
                                         d_pdr = _prep_metric(dfraw, "PDR")
                                         if d_pdr.empty:
-                                            st.info("PDR 데이터가 없습니다.")
+                                            st.info("No PDR data.")
                                             A_pdr, disp_pdr = set(), pd.Series(dtype=float)
                                         else:
                                             d_pdr_tr, y_pdr, _ = _transform_for_metric(d_pdr, "PDR")
@@ -2881,7 +3055,7 @@ with tabs[2]:
                                             disp_pdr = d_pdr.groupby("rule")["value"].mean().rename("PDR_mean(orig)")
 
                                         # --- 집합 & 교집합 결과 표시 ---
-                                        st.markdown(f"- **A(Reward)**: {len(A_rew)}개, **A(Time)**: {len(A_time)}개, **A(PDR)**: {len(A_pdr)}개")
+                                        st.markdown(f"- **A(Reward)**: {len(A_rew)}, **A(Time)**: {len(A_time)}, **A(PDR)**: {len(A_pdr)}")
 
                                         inter_RT  = sorted(A_rew.intersection(A_time))
                                         inter_RP  = sorted(A_rew.intersection(A_pdr))
@@ -2889,9 +3063,9 @@ with tabs[2]:
                                         inter_RTP = sorted(A_rew.intersection(A_time).intersection(A_pdr))
 
                                         def _show_table(title, rules):
-                                            st.markdown(f"**{title}** — {len(rules)}개")
+                                            st.markdown(f"**{title}** — {len(rules)} rules")
                                             if len(rules) == 0:
-                                                st.caption("해당 없음")
+                                                st.caption("N/A")
                                                 return
                                             out = (pd.DataFrame({"rule": rules})
                                                     .merge(disp_rew, on="rule", how="left")
@@ -2912,25 +3086,25 @@ with tabs[2]:
                                                                     ascending=[True, True], kind="mergesort")
                                             st.dataframe(out, width='stretch')
 
-                                        _show_table("3중 교집합 (Reward ∩ Time ∩ PDR)", inter_RTP)
-                                        _show_table("2중 교집합 (Reward∩Time)", inter_RT)
-                                        _show_table("2중 교집합 (Reward∩PDR)", inter_RP)
-                                        _show_table("2중 교집합 (Time∩PDR)", inter_TP)
+                                        _show_table("Triple Intersection (Reward ∩ Time ∩ PDR)", inter_RTP)
+                                        _show_table("Double Intersection (Reward∩Time)", inter_RT)
+                                        _show_table("Double Intersection (Reward∩PDR)", inter_RP)
+                                        _show_table("Double Intersection (Time∩PDR)", inter_TP)
 
                             else:
-                                st.caption("사후검정 결과가 없습니다.")
+                                st.caption("No post-hoc test results.")
 
 
 # ------------------------------
 # Data Tables 탭 (편집/읽기 분리 + 파일명 라벨)
 # ------------------------------
 with tabs[3]:
-    st.subheader("🧾 CSV 테이블(편집/저장)")
+    st.subheader("🧾 CSV Tables (Edit/Save)")
     bp = st.session_state.base_path
     exp = st.session_state.selected_exp
     coord = st.session_state.selected_coord
     if not (bp and exp and coord):
-        st.info("좌측에서 시나리오를 먼저 선택하세요.")
+        st.info("Select a scenario from the sidebar first.")
     else:
         coord_folder = Path(bp) / "scenarios" / exp / coord
         st.caption(str(coord_folder))
@@ -2938,55 +3112,55 @@ with tabs[3]:
         # 편집 대상에서 안전센터/소방서 원본 제외
         csvs_editable = [p for p in csvs if os.path.basename(p) != "안전센터와 소방서.csv"]
         if not csvs_editable:
-            st.info("편집할 CSV가 없습니다.")
+            st.info("No editable CSV files found.")
         else:
             labels = {p: os.path.basename(p) for p in csvs_editable}
-            target = st.selectbox("편집할 CSV", options=list(labels.keys()), format_func=lambda p: labels[p])
+            target = st.selectbox("CSV to Edit", options=list(labels.keys()), format_func=lambda p: labels[p])
             df = read_csv_smart(target)
             edit = st.data_editor(df, width='stretch', num_rows="dynamic", height=400)
             c1, c2, c3 = st.columns(3)
             with c1:
-                if st.button("💾 저장(백업 자동)"):
+                if st.button("💾 Save (auto backup)"):
                     write_csv_smart(edit, target)
-                    st.success("저장 완료")
+                    st.success("Save complete")
             with c2:
-                if st.button("🔄 새로고침"):
+                if st.button("🔄 Refresh"):
                     st.experimental_rerun()
             with c3:
                 yaml_path = find_yaml_in_coord(bp, exp, coord)
-                if yaml_path and st.button("▶️ 수정값으로 재실행"):
+                if yaml_path and st.button("▶️ Re-run with Modified Values"):
                     try:
                         from orchestrator import Orchestrator
-                        with st.spinner("시뮬레이션 실행 중..."):
+                        with st.spinner("Running simulation..."):
                             orc = Orchestrator(base_path=bp)
                             result = orc.run_simulation(config_path=yaml_path)
                         if result["ok"]:
-                            st.success("✅ 시뮬레이션 완료!")
-                            st.write(f"• 로그 파일: `{result['log_file']}`")
+                            st.success("✅ Simulation complete!")
+                            st.write(f"• Log file: `{result['log_file']}`")
                         else:
-                            st.error(f"❌ 실행 실패 (코드: {result['returncode']})")
+                            st.error(f"❌ Execution failed (code: {result['returncode']})")
                             with st.expander("stdout"):
                                 st.text(result.get("stdout", ""))
                             with st.expander("stderr"):
                                 st.text(result.get("stderr", ""))
                     except Exception as e:
-                        st.error("시뮬레이션 실행 중 오류")
+                        st.error("Simulation execution error")
                         st.exception(e)
 
-        st.markdown("#### 병원 마스터(엑셀, 읽기전용)")
+        st.markdown("#### Hospital Master (Excel, read-only)")
         hdf = read_excel_hospital(bp)
         if hdf is not None and not hdf.empty:
             st.dataframe(hdf.head(200), width='stretch', height=280)
         else:
-            st.caption("엑셀 결합 데이터.xlsx 미존재 또는 로드 실패")
+            st.caption("Hospital Excel data not found or load failed")
 
-        st.markdown("#### 안전센터·소방서 마스터(읽기전용)")
+        st.markdown("#### Fire Station Master (read-only)")
         global_center_csv = Path(bp) / "scenarios" / "안전센터와 소방서.csv"
         if global_center_csv.is_file():
             cdf = read_csv_smart(str(global_center_csv))
             st.dataframe(cdf.head(200), width='stretch', height=260)
         else:
-            st.caption("안전센터와 소방서.csv 미존재")
+            st.caption("Fire station CSV not found")
 
 # ------------------------------
 # Generate 탭 
@@ -3015,8 +3189,8 @@ if "env_txt2" not in st.session_state:
 # Rerun 탭 (기존 시나리오 재실행)
 # ──────────────────────────────────────────────────────────────────────────────
 with tabs[4]:
-    st.subheader("🔄 기존 시나리오 재실행")
-    st.info("💡 이 탭은 사이드바 설정과 **독립적**으로 작동합니다. 기존 시나리오를 선택하여 파라미터를 수정한 후 재실행할 수 있습니다.")
+    st.subheader("🔄 Re-run Existing Scenario")
+    st.info("💡 This tab operates **independently** from the sidebar. Select an existing scenario to modify parameters and re-run.")
 
     # ─────────────────────────────────────────────────────────────────
     # Rerun 탭 전용 base_path 입력
@@ -3029,25 +3203,25 @@ with tabs[4]:
 
 
     st.markdown("---")
-    st.markdown("### 📁 프로젝트 경로 설정")
+    st.markdown("### 📁 Project Path Setup")
 
     col_path, col_btn = st.columns([4, 1])
     with col_path:
         rerun_bp_input = st.text_input(
-            "🗂️ 프로젝트 경로 (base_path)",
+            "🗂️ Project Path (base_path)",
             value=st.session_state.rerun_base_path,
-            placeholder="예: C:\\Users\\사용자명\\MCI_ADV",
-            help="scenarios 폴더가 있는 프로젝트 루트 경로를 입력하세요",
+            placeholder="e.g. C:\\Users\\USER\\MCI_ADV",
+            help="Enter the project root path containing the scenarios folder",
             key="rerun_bp_input",
             disabled=IS_CLOUD,
         )
         if IS_CLOUD:
-            st.caption(f"☁️ Cloud에서는 `{CLOUD_BASE_PATH}` 로 자동 고정됩니다.")
+            st.caption(f"☁️ Cloud: fixed to `{CLOUD_BASE_PATH}`.")
 
     with col_btn:
         st.write("")  # 정렬용
         st.write("")  # 정렬용
-        if (not IS_CLOUD) and st.button("✅ 경로 확인", key="rerun_check_path"):
+        if (not IS_CLOUD) and st.button("✅ Confirm Path", key="rerun_check_path"):
             st.session_state.rerun_base_path = rerun_bp_input
 
 
@@ -3055,15 +3229,15 @@ with tabs[4]:
 
     # 경로 유효성 검사
     if not bp_rerun:
-        st.warning("⚠️ 위에서 프로젝트 경로를 입력하고 **✅ 경로 확인** 버튼을 클릭하세요.")
+        st.warning("⚠️ Enter the project path above and click **✅ Confirm Path**.")
         st.stop()
 
     if not base_ok(bp_rerun):
-        st.error(f"❌ 유효하지 않은 경로입니다: `{bp_rerun}`")
-        st.caption("• 경로가 존재하는지 확인하세요\n• `scenarios` 폴더가 있는지 확인하세요")
+        st.error(f"❌ Invalid path: `{bp_rerun}`")
+        st.caption("• Check if the path exists\n• Check if the `scenarios` folder is present")
         st.stop()
 
-    st.success(f"✅ 유효한 경로: `{bp_rerun}`")
+    st.success(f"✅ Valid path: `{bp_rerun}`")
 
     # ─────────────────────────────────────────────────────────────────
     # Orchestrator 로드
@@ -3071,7 +3245,7 @@ with tabs[4]:
     try:
         from orchestrator import Orchestrator
     except Exception as e:
-        st.error("❌ `src/sce_src/orchestrator.py`를 찾지 못했습니다.")
+        st.error("❌ `src/sce_src/orchestrator.py` not found.")
         st.exception(e)
         st.stop()
 
@@ -3079,31 +3253,31 @@ with tabs[4]:
     # 실험 폴더 및 좌표 폴더 선택
     # ─────────────────────────────────────────────────────────────────
     st.markdown("---")
-    st.markdown("### 🗂️ 시나리오 선택")
+    st.markdown("### 🗂️ Select Scenario")
 
     # 실험/좌표 목록 만들기
     exps_rerun = list_experiments_any(bp_rerun)
     if not exps_rerun:
-        st.warning("⚠️ scenarios 폴더에 실험이 없습니다.")
+        st.warning("⚠️ No experiments found in scenarios folder.")
         st.stop()
 
     sel_exp_rerun = st.selectbox(
-        "📂 실험 폴더 선택",
+        "📂 Select Experiment Folder",
         options=exps_rerun,
         key="sel_exp_rerun",
-        help="scenarios 폴더 내의 실험 폴더를 선택하세요"
+        help="Select an experiment folder from scenarios"
     )
 
     coords_rerun = list_coords_from_scenarios(bp_rerun, sel_exp_rerun) if sel_exp_rerun else []
     if not coords_rerun:
-        st.warning(f"⚠️ 실험 `{sel_exp_rerun}`에 좌표 폴더가 없습니다.")
+        st.warning(f"⚠️ No coordinate folders in experiment `{sel_exp_rerun}`.")
         st.stop()
 
     sel_coord_rerun = st.selectbox(
-        "📍 좌표 폴더 선택",
+        "📍 Select Coordinate Folder",
         options=coords_rerun,
         key="sel_coord_rerun",
-        help="선택한 실험 폴더 내의 좌표 폴더를 선택하세요"
+        help="Select a coordinate folder from the experiment"
     )
 
     # ─────────────────────────────────────────────────────────────────
@@ -3113,10 +3287,10 @@ with tabs[4]:
         cfg_path_rerun = os.path.join(bp_rerun, "scenarios", sel_exp_rerun, sel_coord_rerun, f"config_{sel_coord_rerun}.yaml")
 
         if not os.path.exists(cfg_path_rerun):
-            st.error(f"❌ CONFIG 파일을 찾을 수 없습니다: `{cfg_path_rerun}`")
+            st.error(f"❌ CONFIG file not found: `{cfg_path_rerun}`")
             st.stop()
 
-        st.success(f"✅ CONFIG 파일: `{os.path.basename(cfg_path_rerun)}`")
+        st.success(f"✅ CONFIG file: `{os.path.basename(cfg_path_rerun)}`")
 
         try:
             with open(cfg_path_rerun, "r", encoding="utf-8") as f:
@@ -3126,17 +3300,17 @@ with tabs[4]:
             # 현재 설정 표시
             # ─────────────────────────────────────────────────────────────────
             st.markdown("---")
-            st.markdown("### ⚙️ 현재 설정")
+            st.markdown("### ⚙️ Current Config")
 
-            with st.expander("📋 현재 시나리오 설정 보기", expanded=False):
+            with st.expander("📋 View Current Scenario Config", expanded=False):
                 st.json(yaml_data_rerun)
 
             # ─────────────────────────────────────────────────────────────────
             # 파라미터 수정 UI
             # ─────────────────────────────────────────────────────────────────
             st.markdown("---")
-            st.markdown("### 🔧 파라미터 수정")
-            st.caption("⚠️ 출발시각, 사고규모, 위경도 변경은 시나리오 재생성이 필요합니다 (API 재호출)")
+            st.markdown("### 🔧 Edit Parameters")
+            st.caption("⚠️ Changing departure time, incident size, or coordinates requires scenario regeneration (API re-call)")
 
             col1, col2 = st.columns(2)
 
@@ -3145,27 +3319,27 @@ with tabs[4]:
                 st.markdown("**🚑 Ambulance**")
                 amb_cfg_rerun = yaml_data_rerun.get('entity_info', {}).get('ambulance', {})
                 is_use_time_amb_rerun = st.checkbox(
-                    "API duration 사용",
+                    "Use API Duration",
                     value=amb_cfg_rerun.get('is_use_time', True),
                     key="rerun_is_use_time",
                     help="True: API duration 사용, False: 거리/속도 계산"
                 )
                 amb_velocity_rerun = st.number_input(
-                    "구급차 속도 (km/h)",
+                    "Ambulance Speed (km/h)",
                     value=float(amb_cfg_rerun.get('velocity', 60)),
                     min_value=1.0,
                     step=1.0,
                     key="rerun_amb_velocity"
                 )
                 amb_handover_rerun = st.number_input(
-                    "환자 인계시간 (분)",
+                    "Patient Handover Time (min)",
                     value=float(amb_cfg_rerun.get('handover_time', 0)),
                     min_value=0.0,
                     step=0.5,
                     key="rerun_amb_handover"
                 )
                 duration_coeff_rerun = st.number_input(
-                    "API duration 시간가중치",
+                    "API Duration Weight",
                     value=float(amb_cfg_rerun.get('duration_coeff', 1.0)),
                     min_value=0.1,
                     max_value=10.0,
@@ -3180,14 +3354,14 @@ with tabs[4]:
                 st.markdown("**🛩️ UAV**")
                 uav_cfg_rerun = yaml_data_rerun.get('entity_info', {}).get('uav', {})
                 uav_velocity_rerun = st.number_input(
-                    "UAV 속도 (km/h)",
+                    "UAV Speed (km/h)",
                     value=float(uav_cfg_rerun.get('velocity', 80)),
                     min_value=1.0,
                     step=1.0,
                     key="rerun_uav_velocity"
                 )
                 uav_handover_rerun = st.number_input(
-                    "환자 인계시간 (분)",
+                    "Patient Handover Time (min)",
                     value=float(uav_cfg_rerun.get('handover_time', 0)),
                     min_value=0.0,
                     step=0.5,
@@ -3208,7 +3382,7 @@ with tabs[4]:
             with col4:
                 run_cfg_rerun = yaml_data_rerun.get('run_setting', {})
                 total_samples_rerun = st.number_input(
-                    "시뮬레이션 반복 횟수",
+                    "Simulation Iterations",
                     value=int(run_cfg_rerun.get('totalSamples', 10)),
                     min_value=1,
                     step=1,
@@ -3219,13 +3393,13 @@ with tabs[4]:
             # 실행 버튼
             # ─────────────────────────────────────────────────────────────────
             st.markdown("---")
-            if st.button("▶️ 파라미터 수정 및 시뮬레이션 실행", key="btn_rerun_execute"):
+            if st.button("▶️ Apply Changes & Run Simulation", key="btn_rerun_execute"):
                 try:
                     # YAML 백업 생성 (타임스탬프) - 수정 전에 백업
                     import shutil
                     backup_path_rerun = cfg_path_rerun.replace(".yaml", f"_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}.yaml")
                     shutil.copy(cfg_path_rerun, backup_path_rerun)
-                    st.info(f"📦 원본 YAML 백업: `{os.path.basename(backup_path_rerun)}`")
+                    st.info(f"📦 Original YAML backup: `{os.path.basename(backup_path_rerun)}`")
 
                     # YAML 파일을 문자열로 읽어서 직접 수정 (주석과 형식 유지)
                     with open(cfg_path_rerun, "r", encoding="utf-8") as f:
@@ -3236,7 +3410,7 @@ with tabs[4]:
                         coeff_list_rerun = [float(x.strip()) for x in max_send_coeff_rerun.split(',')]
                         coeff_str_rerun = "[" + ", ".join(str(c) for c in coeff_list_rerun) + "]"
                     except:
-                        st.warning("max_send_coeff 형식 오류, 기존 값 유지")
+                        st.warning("max_send_coeff format error, keeping original value")
                         coeff_str_rerun = None
 
                     # 정규식으로 값만 교체 (주석 및 형식 유지)
@@ -3304,31 +3478,31 @@ with tabs[4]:
                     with open(cfg_path_rerun, "w", encoding="utf-8") as f:
                         f.write(yaml_text_rerun)
 
-                    st.success("✅ YAML 파일 업데이트 완료!")
+                    st.success("✅ YAML file updated!")
 
                     # 시뮬레이션 실행
-                    with st.spinner("시뮬레이션 실행 중..."):
+                    with st.spinner("Running simulation..."):
                         orc_rerun = Orchestrator(base_path=bp_rerun)
                         res_rerun = orc_rerun.run_simulation(config_path=cfg_path_rerun)
 
                     if res_rerun["ok"]:
-                        st.success("✅ 시뮬레이션 완료!")
-                        st.write(f"• 실험ID: `{res_rerun['exp_id']}`")
-                        st.write(f"• 좌표: `{res_rerun['coord']}`")
-                        st.write(f"• 로그 파일: `{res_rerun['log_file']}`")
-                        st.write(f"• Summary CSV가 자동 업데이트되었습니다")
-                        st.caption("💡 Scenarios/Maps 탭에서 바로 확인해 보세요.")
+                        st.success("✅ Simulation complete!")
+                        st.write(f"• Exp ID: `{res_rerun['exp_id']}`")
+                        st.write(f"• Coord: `{res_rerun['coord']}`")
+                        st.write(f"• Log file: `{res_rerun['log_file']}`")
+                        st.write(f"• Summary CSV has been auto-updated")
+                        st.caption("💡 Check results in the Scenarios/Maps tabs.")
                     else:
-                        st.error(f"❌ 시뮬레이션 실패 (코드: {res_rerun['returncode']})")
+                        st.error(f"❌ Simulation failed (code: {res_rerun['returncode']})")
                         with st.expander("stdout"):
                             st.text(res_rerun.get("stdout", ""))
                         with st.expander("stderr"):
                             st.text(res_rerun.get("stderr", ""))
 
                 except Exception as e_rerun:
-                    st.error("❌ 시뮬레이션 실행 중 오류")
+                    st.error("❌ Simulation execution error")
                     st.exception(e_rerun)
 
         except Exception as e_yaml_rerun:
-            st.error(f"❌ YAML 파일 읽기 실패: {e_yaml_rerun}")
+            st.error(f"❌ YAML file read failed: {e_yaml_rerun}")
             st.exception(e_yaml_rerun)
