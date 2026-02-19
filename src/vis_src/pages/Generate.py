@@ -714,23 +714,13 @@ with colA:
     amb_handover_time = st.number_input("AMB Handover Time (min)", value=0.0, min_value=0.0, step=0.1, format="%.1f", help="Time to load/unload patients at scene or hospital")
     total_samples = st.number_input("Simulation Iterations (totalSamples)", value=10, min_value=1, step=1)
 with colB:
-<<<<<<< HEAD
-    longitude = st.number_input("경도 (longitude)", value=st.session_state.selected_lon, format="%.6f")
-    amb_count  = st.number_input("구급차 수 (amb_count)", value=30, min_value=1, step=1)
-    uav_velocity = st.number_input("UAV 속도 (km/h)", value=80, min_value=1, step=1)
-    uav_handover_time = st.number_input("UAV 환자 인계시간 (분)", value=0.0, min_value=0.0, step=0.1, format="%.1f", help="현장에서 환자를 싣거나 병원에 내리는 시간")
-    random_seed  = st.number_input("랜덤시드", value=0, min_value=0, step=1)
-with colC:
-    uav_count = st.number_input("UAV 수 (uav_count)", value=3, min_value=0, step=1)
-=======
     longitude = st.number_input("Longitude", value=st.session_state.selected_lon, format="%.6f")
-    amb_size  = st.number_input("Ambulance Count (amb_size)", value=30, min_value=1, step=1)
+    amb_count  = st.number_input("Ambulance Count (amb_count)", value=30, min_value=1, step=1)
     uav_velocity = st.number_input("UAV Speed (km/h)", value=80, min_value=1, step=1)
     uav_handover_time = st.number_input("UAV Handover Time (min)", value=0.0, min_value=0.0, step=0.1, format="%.1f", help="Time to load/unload patients at scene or hospital")
     random_seed  = st.number_input("Random Seed", value=0, min_value=0, step=1)
 with colC:
-    uav_size = st.number_input("UAV Count (uav_size)", value=3, min_value=0, step=1)
->>>>>>> 0095b5d881740d26b2674b67ffb2762bab98d979
+    uav_count = st.number_input("UAV Count (uav_count)", value=3, min_value=0, step=1)
     hospital_max_send_coeff = st.text_input("max_send_coeff (예: 1.05,1)", value="1,1")
     buffer_ratio = st.number_input("buffer_ratio", value=1.5, min_value=1.0, step=0.1)
 
@@ -867,21 +857,12 @@ preset_edited = st.data_editor(
     column_config={
         "name": st.column_config.TextColumn("Preset Name", required=True),
         "incident_size": st.column_config.NumberColumn("incident_size", step=1, format="%d"),
-<<<<<<< HEAD
         "amb_count": st.column_config.NumberColumn("amb_count", step=1, format="%d"),
         "uav_count": st.column_config.NumberColumn("uav_count", step=1, format="%d"),
-        "amb_velocity": st.column_config.NumberColumn("AMB 속도", step=1, format="%d"),
-        "uav_velocity": st.column_config.NumberColumn("UAV 속도", step=1, format="%d"),
-        "amb_handover": st.column_config.NumberColumn("AMB 핸드오버(분)", step=0.1, format="%.1f"),
-        "uav_handover": st.column_config.NumberColumn("UAV 핸드오버(분)", step=0.1, format="%.1f"),
-=======
-        "amb_size": st.column_config.NumberColumn("amb_size", step=1, format="%d"),
-        "uav_size": st.column_config.NumberColumn("uav_size", step=1, format="%d"),
         "amb_velocity": st.column_config.NumberColumn("AMB Speed", step=1, format="%d"),
         "uav_velocity": st.column_config.NumberColumn("UAV Speed", step=1, format="%d"),
         "amb_handover": st.column_config.NumberColumn("AMB Handover(min)", step=0.1, format="%.1f"),
         "uav_handover": st.column_config.NumberColumn("UAV Handover(min)", step=0.1, format="%.1f"),
->>>>>>> 0095b5d881740d26b2674b67ffb2762bab98d979
         "total_samples": st.column_config.NumberColumn("totalSamples", step=1, format="%d"),
         "random_seed": st.column_config.NumberColumn("random_seed", step=1, format="%d"),
         "buffer_ratio": st.column_config.NumberColumn("buffer_ratio", step=0.1, format="%.2f"),
@@ -928,21 +909,12 @@ coord_edited = st.data_editor(
         "address": st.column_config.TextColumn("Address", required=False),
         "preset": st.column_config.SelectboxColumn("Preset", options=preset_names or ["Default"]),
         "incident_size": st.column_config.NumberColumn("incident_size", step=1, format="%d"),
-<<<<<<< HEAD
         "amb_count": st.column_config.NumberColumn("amb_count", step=1, format="%d"),
         "uav_count": st.column_config.NumberColumn("uav_count", step=1, format="%d"),
-        "amb_velocity": st.column_config.NumberColumn("AMB 속도", step=1, format="%d"),
-        "uav_velocity": st.column_config.NumberColumn("UAV 속도", step=1, format="%d"),
-        "amb_handover": st.column_config.NumberColumn("AMB 핸드오버(분)", step=0.1, format="%.1f"),
-        "uav_handover": st.column_config.NumberColumn("UAV 핸드오버(분)", step=0.1, format="%.1f"),
-=======
-        "amb_size": st.column_config.NumberColumn("amb_size", step=1, format="%d"),
-        "uav_size": st.column_config.NumberColumn("uav_size", step=1, format="%d"),
         "amb_velocity": st.column_config.NumberColumn("AMB Speed", step=1, format="%d"),
         "uav_velocity": st.column_config.NumberColumn("UAV Speed", step=1, format="%d"),
         "amb_handover": st.column_config.NumberColumn("AMB Handover(min)", step=0.1, format="%.1f"),
         "uav_handover": st.column_config.NumberColumn("UAV Handover(min)", step=0.1, format="%.1f"),
->>>>>>> 0095b5d881740d26b2674b67ffb2762bab98d979
         "total_samples": st.column_config.NumberColumn("totalSamples", step=1, format="%d"),
         "random_seed": st.column_config.NumberColumn("random_seed", step=1, format="%d"),
         "buffer_ratio": st.column_config.NumberColumn("buffer_ratio", step=0.1, format="%.2f"),
