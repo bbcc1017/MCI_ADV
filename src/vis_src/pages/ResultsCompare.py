@@ -235,8 +235,8 @@ def list_results_experiments(base_path: str) -> list[str]:
 # ------------------------------
 # UI
 # ------------------------------
-st.set_page_config(page_title="결과 비교", page_icon="📊", layout="wide")
-st.title("시뮬레이션 결과 비교")
+st.set_page_config(page_title="Results Compare", page_icon="📊", layout="wide")
+st.title("Simulation Results Comparison")
 st.caption("PDR is shown as percent; PDR/Time axes are reversed so lower is better.")
 
 # base_path
@@ -246,15 +246,15 @@ if "base_path_compare" not in st.session_state:
 col_bp, = st.columns(1)
 with col_bp:
     bp_input = st.text_input(
-        "base_path (MCI_ADV 루트)",
+        "base_path (MCI_ADV root)",
         value=st.session_state.base_path_compare,
-        placeholder="예: C:\\Users\\USER\\MCI_ADV",
+        placeholder="e.g. C:\\Users\\USER\\MCI_ADV",
         disabled=IS_CLOUD,
     )
-    if st.button("적용", key="btn_set_bp"):
+    if st.button("Apply", key="btn_set_bp"):
         st.session_state.base_path_compare = bp_input.strip()
     if IS_CLOUD:
-        st.info(f"Cloud 모드 감지: `{CLOUD_BASE_PATH}` 고정")
+        st.info(f"Cloud mode detected: fixed to `{CLOUD_BASE_PATH}`")
 bp = st.session_state.base_path_compare
 if not bp or not Path(bp).is_dir():
     st.stop()
@@ -269,22 +269,22 @@ if saved_label_coord:
 
 # 실험 선택
 experiments = list_results_experiments(bp)
-sel_exps = st.multiselect("결과 폴더 선택 (results/<exp_id>)", options=experiments, default=experiments[:5])
+sel_exps = st.multiselect("Select Result Folders (results/<exp_id>)", options=experiments, default=experiments[:5])
 
 if not sel_exps:
-    st.info("왼쪽에서 base_path를 설정하고 결과 폴더를 선택하세요.")
+    st.info("Set base_path and select result folders.")
     st.stop()
 
 metric_choices = ["Reward", "PDR", "Time", "Reward_woG", "PDR_woG"]
-metric_sel = st.selectbox("주요 메트릭", metric_choices, index=0)
+metric_sel = st.selectbox("Primary Metric", metric_choices, index=0)
 
-if st.button("결과 불러오기", type="primary"):
+if st.button("Load Results", type="primary"):
     df_raw = collect_results(bp, sel_exps)
     st.session_state.df_compare_raw = df_raw
 
 df_raw = st.session_state.get("df_compare_raw", pd.DataFrame())
 if df_raw.empty:
-    st.warning("불러온 결과가 없습니다.")
+    st.warning("No results loaded.")
     st.stop()
 
 # 라벨 적용
@@ -301,7 +301,7 @@ df_raw["label"] = df_raw.apply(_resolve_label, axis=1)
 
 df_m = df_raw[df_raw["metric"] == metric_sel].copy()
 if df_m.empty:
-    st.warning(f"{metric_sel} 데이터가 없습니다.")
+    st.warning(f"{metric_sel}: No data available.")
     st.stop()
 
 agg = (
@@ -309,38 +309,37 @@ agg = (
     .agg(mean=("value", "mean"), std=("value", "std"), n=("value", "count"))
     .reset_index()
 )
-st.success(f"{len(agg)}개 rule 요약 로드 (행 개수 기준)")
+st.success(f"{len(agg)} rule summaries loaded")
 
-st.markdown("#### 메트릭 요약 (표)")
+st.markdown("#### Metric Summary (Table)")
 st.dataframe(agg, width='stretch', hide_index=True)
 
 st.download_button(
-    "요약 CSV 다운로드",
+    "Download Summary CSV",
     agg.to_csv(index=False).encode("utf-8-sig"),
     file_name=f"results_compare_{metric_sel}.csv",
     mime="text/csv",
 )
 
-# Top-N 바
-st.markdown("#### Top-N 바 차트 (평균)")
+# Top-N bar with ±1 SD error bars
+st.markdown("#### Top-N Bar Chart (Mean ± 1 SD)")
 topN = st.slider("Top N", min_value=5, max_value=50, value=15, step=1)
 lower_better = metric_sel in ("PDR", "Time", "PDR_woG")
 top_rules = agg.sort_values("mean", ascending=lower_better).head(topN)
-chart_bar = (
-    alt.Chart(top_rules)
-    .mark_bar()
-    .encode(
-        x=alt.X("mean:Q", title=f"{metric_sel} (mean)"),
-        y=alt.Y("rule:N", sort="-x"),
-        color="label:N",
-        tooltip=["exp_id", "label", "coord", "rule", "mean", "std", "n"],
-    )
-    .properties(height=400)
-)
-st.altair_chart(chart_bar, use_container_width=True)
+_tr = top_rules.sort_values("mean", ascending=not lower_better)
+fig_bar = go.Figure()
+fig_bar.add_trace(go.Bar(
+    y=_tr["rule"], x=_tr["mean"], orientation="h",
+    error_x=dict(type="data", array=_tr["std"].fillna(0), visible=True),
+    marker_color=[pc.qualitative.Set2[i % len(pc.qualitative.Set2)] for i in range(len(_tr))],
+    hovertemplate="%{y}<br>mean=%{x:.4f} ± %{error_x.array:.4f}<extra></extra>",
+))
+fig_bar.update_layout(height=max(400, topN * 28), yaxis_title="Rule", xaxis_title=f"{metric_sel} (mean)",
+                       margin=dict(l=0, r=20, t=30, b=40))
+st.plotly_chart(fig_bar, use_container_width=True)
 
 # Reward vs Time 산점도
-st.markdown("#### Reward vs Time (평균) 산점도")
+st.markdown("#### Reward vs Time (Mean) Scatter Plot")
 if {"Reward", "Time"}.issubset(set(df_raw["metric"].unique())):
     pivot_rt = (
         df_raw[df_raw["metric"].isin(["Reward", "Time"])]
@@ -350,6 +349,16 @@ if {"Reward", "Time"}.issubset(set(df_raw["metric"].unique())):
         .pivot_table(index=["exp_id", "coord", "label", "rule"], columns="metric", values="mean")
         .reset_index()
     )
+    # Pareto frontier: minimize Time, maximize Reward
+    _prt = pivot_rt.dropna(subset=["Time", "Reward"]).sort_values("Time").reset_index(drop=True)
+    pareto_idx = []
+    best_reward = -np.inf
+    for _i, _r in _prt.iterrows():
+        if _r["Reward"] > best_reward:
+            best_reward = _r["Reward"]
+            pareto_idx.append(_i)
+    pareto_pts = _prt.loc[pareto_idx].sort_values("Time")
+
     scat = (
         alt.Chart(pivot_rt)
         .mark_circle(size=80, opacity=0.7)
@@ -363,12 +372,24 @@ if {"Reward", "Time"}.issubset(set(df_raw["metric"].unique())):
         .properties(height=420)
         .interactive()
     )
-    st.altair_chart(scat, use_container_width=True)
+    pareto_line = (
+        alt.Chart(pareto_pts)
+        .mark_line(color="red", strokeDash=[6, 3], strokeWidth=2)
+        .encode(x="Time:Q", y="Reward:Q")
+    )
+    pareto_dots = (
+        alt.Chart(pareto_pts)
+        .mark_point(color="red", size=120, filled=True, shape="diamond")
+        .encode(x="Time:Q", y="Reward:Q",
+                tooltip=["rule", "Reward", "Time"])
+    )
+    st.altair_chart(scat + pareto_line + pareto_dots, use_container_width=True)
+    st.caption("Red dashed line = Pareto frontier (Reward↑, Time↓).")
 else:
-    st.info("Reward/Time 동시 데이터가 없어 산점도를 건너뜁니다.")
+    st.info("Reward/Time data not available; skipping scatter plot.")
 
 # 히트맵 (rule × 라벨)
-st.markdown("#### 라벨 × Rule 히트맵")
+st.markdown("#### Label x Rule Heatmap")
 hm_base = agg.copy()
 hm_base["rule_short"] = hm_base["rule"].str.slice(0, 40)
 heat = (
@@ -376,7 +397,7 @@ heat = (
     .mark_rect()
     .encode(
         x=alt.X("rule_short:N", title="Rule", sort=None),
-        y=alt.Y("label:N", title="라벨"),
+        y=alt.Y("label:N", title="Label"),
         color=alt.Color("mean:Q", title=f"{metric_sel} (mean)", scale=alt.Scale(scheme="blueorange")),
         tooltip=["label", "rule", "mean", "std", "n", "exp_id", "coord"],
     )
@@ -384,20 +405,23 @@ heat = (
 )
 st.altair_chart(heat, use_container_width=True)
 
-# 라벨별 박스플롯
-st.markdown("#### 라벨별 분포 (박스플롯)")
-box = (
-    alt.Chart(df_m)
-    .mark_boxplot()
-    .encode(
-        x=alt.X("label:N", title="라벨"),
-        y=alt.Y("value:Q", title=metric_sel),
-        color="label:N",
-        tooltip=["label", "value", "rule", "exp_id", "coord", "run"],
-    )
-    .properties(height=420)
-)
-st.altair_chart(box, use_container_width=True)
+# Box plot with jitter overlay (Plotly)
+st.markdown("#### Distribution by Label (Box Plot + Jitter)")
+fig_box = go.Figure()
+_labels_unique = sorted(df_m["label"].unique())
+_box_colors = pc.qualitative.Set2
+for _li, _lbl in enumerate(_labels_unique):
+    _sub = df_m[df_m["label"] == _lbl]
+    _clr = _box_colors[_li % len(_box_colors)]
+    fig_box.add_trace(go.Box(
+        y=_sub["value"], name=_lbl, marker_color=_clr,
+        boxpoints="all", jitter=0.4, pointpos=-1.5,
+        marker=dict(size=3, opacity=0.5),
+        hovertext=_sub["rule"],
+    ))
+fig_box.update_layout(height=450, yaxis_title=metric_sel, showlegend=True,
+                       margin=dict(l=50, r=20, t=30, b=40))
+st.plotly_chart(fig_box, use_container_width=True)
 # 3D compare (mean over all rules; x=PDR, y=Time, z=Reward)
 st.markdown("#### Label 3D comparison (PDR/Time/Reward)")
 metric_3d = ["PDR", "Time", "Reward"]
@@ -500,3 +524,120 @@ else:
             margin=dict(l=0, r=0, t=30, b=0),
         )
         st.plotly_chart(fig, use_container_width=True)
+
+# ========== Multi-metric pivot for new charts ==========
+_multi_metrics = ["Reward", "Time", "PDR"]
+_avail_metrics = set(df_raw["metric"].unique())
+if set(_multi_metrics).issubset(_avail_metrics):
+    _pv_multi = (
+        df_raw[df_raw["metric"].isin(_multi_metrics)]
+        .groupby(["label", "rule", "metric"])
+        .agg(mean=("value", "mean"))
+        .reset_index()
+        .pivot_table(index=["label", "rule"], columns="metric", values="mean")
+        .reindex(columns=_multi_metrics)
+        .dropna()
+        .reset_index()
+    )
+else:
+    _pv_multi = pd.DataFrame()
+
+# --- Parallel Coordinates ---
+st.markdown("#### Parallel Coordinates (Reward / Time / PDR)")
+if _pv_multi.empty:
+    st.info("Reward/Time/PDR data not all available; skipping parallel coordinates.")
+else:
+    _pc_df = _pv_multi.copy()
+    _pc_labels = sorted(_pc_df["label"].unique())
+    _pc_label_num = {lbl: i for i, lbl in enumerate(_pc_labels)}
+    _pc_df["_label_num"] = _pc_df["label"].map(_pc_label_num)
+    _pc_colorscale = pc.qualitative.Set2
+    _pc_cs = [[i / max(len(_pc_labels) - 1, 1), _pc_colorscale[i % len(_pc_colorscale)]] for i in range(len(_pc_labels))]
+
+    fig_pc = go.Figure(data=go.Parcoords(
+        line=dict(
+            color=_pc_df["_label_num"],
+            colorscale=_pc_cs,
+            showscale=False,
+        ),
+        dimensions=[
+            dict(label="Reward", values=_pc_df["Reward"]),
+            dict(label="Time", values=_pc_df["Time"]),
+            dict(label="PDR", values=_pc_df["PDR"]),
+        ],
+    ))
+    fig_pc.update_layout(height=420, margin=dict(l=80, r=80, t=40, b=30))
+    st.plotly_chart(fig_pc, use_container_width=True)
+    st.caption("Color = label. Each line = one rule. "
+               + ", ".join(f"{lbl} = color {i}" for i, lbl in enumerate(_pc_labels)))
+
+# --- Radar Chart (Top-N rules) ---
+st.markdown("#### Radar Chart (Top-N Rules)")
+if _pv_multi.empty:
+    st.info("Reward/Time/PDR data not all available; skipping radar chart.")
+else:
+    radar_n = st.slider("Radar Top N", min_value=3, max_value=20, value=8, step=1, key="radar_n")
+    # Composite score for ranking: normalize each metric to [0,1], Reward↑ Time↓ PDR↓
+    _rdr = _pv_multi.copy()
+    for _col, _asc in [("Reward", False), ("Time", True), ("PDR", True)]:
+        _mn, _mx = _rdr[_col].min(), _rdr[_col].max()
+        if _mx - _mn > 1e-12:
+            _norm = (_rdr[_col] - _mn) / (_mx - _mn)
+            _rdr[f"{_col}_n"] = _norm if _asc else (1 - _norm)  # higher = better after normalization
+        else:
+            _rdr[f"{_col}_n"] = 0.5
+    _rdr["_composite"] = (_rdr["Reward_n"] + _rdr["Time_n"] + _rdr["PDR_n"]) / 3
+    _rdr_top = _rdr.sort_values("_composite", ascending=False).head(radar_n)
+
+    _radar_axes = ["Reward_n", "Time_n", "PDR_n"]
+    _radar_labels = ["Reward ↑", "Time ↓", "PDR ↓"]
+    _radar_colors = pc.qualitative.Plotly
+    fig_radar = go.Figure()
+    for _ri, (_, _row) in enumerate(_rdr_top.iterrows()):
+        _vals = [_row[a] for a in _radar_axes] + [_row[_radar_axes[0]]]  # close polygon
+        fig_radar.add_trace(go.Scatterpolar(
+            r=_vals,
+            theta=_radar_labels + [_radar_labels[0]],
+            fill="toself",
+            name=_row["rule"][:50],
+            opacity=0.55,
+            line_color=_radar_colors[_ri % len(_radar_colors)],
+        ))
+    fig_radar.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+        height=500,
+        margin=dict(l=60, r=60, t=40, b=40),
+    )
+    st.plotly_chart(fig_radar, use_container_width=True)
+    st.caption("Axes normalized to [0,1]; higher = better for all axes after direction adjustment.")
+
+# --- Ranked Summary Table with Composite Score & Tier ---
+st.markdown("#### Ranked Summary Table")
+if _pv_multi.empty:
+    st.info("Reward/Time/PDR data not all available; skipping ranked table.")
+else:
+    _rank = _pv_multi.copy()
+    for _col, _asc in [("Reward", False), ("Time", True), ("PDR", True)]:
+        _mn, _mx = _rank[_col].min(), _rank[_col].max()
+        if _mx - _mn > 1e-12:
+            _norm = (_rank[_col] - _mn) / (_mx - _mn)
+            _rank[f"{_col}_n"] = _norm if _asc else (1 - _norm)
+        else:
+            _rank[f"{_col}_n"] = 0.5
+    _rank["Composite"] = (_rank["Reward_n"] + _rank["Time_n"] + _rank["PDR_n"]) / 3
+    _rank = _rank.sort_values("Composite", ascending=False).reset_index(drop=True)
+    _rank["Rank"] = range(1, len(_rank) + 1)
+
+    # Tier assignment: top 25% = A, next 25% = B, rest = C
+    _n = len(_rank)
+    _rank["Tier"] = "C"
+    _rank.loc[_rank["Rank"] <= max(1, int(_n * 0.25)), "Tier"] = "A"
+    _rank.loc[(_rank["Rank"] > max(1, int(_n * 0.25))) & (_rank["Rank"] <= max(1, int(_n * 0.50))), "Tier"] = "B"
+
+    _disp_cols = ["Rank", "Tier", "label", "rule", "Reward", "Time", "PDR", "Composite"]
+    st.dataframe(
+        _rank[_disp_cols].style.format({"Reward": "{:.4f}", "Time": "{:.3f}", "PDR": "{:.4f}", "Composite": "{:.4f}"}),
+        width='stretch', hide_index=True,
+    )
+    st.caption("Composite = mean of min-max normalized scores (Reward↑, Time↓, PDR↓). "
+               "Tier: A = top 25%, B = 25–50%, C = bottom 50%.")
