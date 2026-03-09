@@ -336,7 +336,7 @@ fig_bar.add_trace(go.Bar(
 ))
 fig_bar.update_layout(height=max(400, topN * 28), yaxis_title="Rule", xaxis_title=f"{metric_sel} (mean)",
                        margin=dict(l=0, r=20, t=30, b=40))
-st.plotly_chart(fig_bar, use_container_width=True)
+st.plotly_chart(fig_bar, width='stretch')
 
 # Reward vs Time 산점도
 st.markdown("#### Reward vs Time (Mean) Scatter Plot")
@@ -383,7 +383,7 @@ if {"Reward", "Time"}.issubset(set(df_raw["metric"].unique())):
         .encode(x="Time:Q", y="Reward:Q",
                 tooltip=["rule", "Reward", "Time"])
     )
-    st.altair_chart(scat + pareto_line + pareto_dots, use_container_width=True)
+    st.altair_chart(scat + pareto_line + pareto_dots, width='stretch')
     st.caption("Red dashed line = Pareto frontier (Reward↑, Time↓).")
 else:
     st.info("Reward/Time data not available; skipping scatter plot.")
@@ -403,7 +403,7 @@ heat = (
     )
     .properties(height=400)
 )
-st.altair_chart(heat, use_container_width=True)
+st.altair_chart(heat, width='stretch')
 
 # Box plot with jitter overlay (Plotly)
 st.markdown("#### Distribution by Label (Box Plot + Jitter)")
@@ -421,7 +421,7 @@ for _li, _lbl in enumerate(_labels_unique):
     ))
 fig_box.update_layout(height=450, yaxis_title=metric_sel, showlegend=True,
                        margin=dict(l=50, r=20, t=30, b=40))
-st.plotly_chart(fig_box, use_container_width=True)
+st.plotly_chart(fig_box, width='stretch')
 # 3D compare (mean over all rules; x=PDR, y=Time, z=Reward)
 st.markdown("#### Label 3D comparison (PDR/Time/Reward)")
 metric_3d = ["PDR", "Time", "Reward"]
@@ -523,7 +523,7 @@ else:
             ),
             margin=dict(l=0, r=0, t=30, b=0),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 # ========== Multi-metric pivot for new charts ==========
 _multi_metrics = ["Reward", "Time", "PDR"]
@@ -567,7 +567,7 @@ else:
         ],
     ))
     fig_pc.update_layout(height=420, margin=dict(l=80, r=80, t=40, b=30))
-    st.plotly_chart(fig_pc, use_container_width=True)
+    st.plotly_chart(fig_pc, width='stretch')
     st.caption("Color = label. Each line = one rule. "
                + ", ".join(f"{lbl} = color {i}" for i, lbl in enumerate(_pc_labels)))
 
@@ -608,7 +608,7 @@ else:
         height=500,
         margin=dict(l=60, r=60, t=40, b=40),
     )
-    st.plotly_chart(fig_radar, use_container_width=True)
+    st.plotly_chart(fig_radar, width='stretch')
     st.caption("Axes normalized to [0,1]; higher = better for all axes after direction adjustment.")
 
 # --- Ranked Summary Table with Composite Score & Tier ---

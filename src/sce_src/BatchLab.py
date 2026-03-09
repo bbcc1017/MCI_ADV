@@ -493,7 +493,7 @@ if st.button("Add preset"):
     st.success("Preset added.")
 
 if st.session_state.batch_params:
-    st.dataframe(pd.DataFrame(st.session_state.batch_params), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(st.session_state.batch_params), width='stretch', hide_index=True)
     for idx, _ in enumerate(st.session_state.batch_params):
         if st.button(f"Remove preset {idx+1}", key=f"rm_preset_{idx}"):
             st.session_state.batch_params.pop(idx)
@@ -589,7 +589,7 @@ if st.button("Run batch now", type="primary"):
 
 if st.session_state.batch_results:
     st.markdown("**Run log**")
-    st.dataframe(pd.DataFrame(st.session_state.batch_results), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(st.session_state.batch_results), width='stretch', hide_index=True)
 
 
 # -------------------------------------------------
@@ -621,7 +621,7 @@ if load_btn and sel_exps:
                 .reset_index()
             )
             st.markdown("**Summary (mean/std per rule)**")
-            st.dataframe(agg, use_container_width=True, hide_index=True)
+            st.dataframe(agg, width='stretch', hide_index=True)
 
             topN = st.slider("Top N by mean", min_value=5, max_value=50, value=15, step=1)
             top_rules = agg.sort_values("mean", ascending=False).head(topN)
@@ -636,7 +636,7 @@ if load_btn and sel_exps:
                 )
                 .properties(height=400)
             )
-            st.altair_chart(chart, use_container_width=True)
+            st.altair_chart(chart, width='stretch')
 
             # Reward vs Time trade-off scatter (mean per rule)
             pivot = (
@@ -666,7 +666,7 @@ if load_btn and sel_exps:
                     )
                     .properties(height=400)
                 )
-                st.altair_chart(scat, use_container_width=True)
+                st.altair_chart(scat, width='stretch')
 
             st.download_button(
                 "Download summary CSV",

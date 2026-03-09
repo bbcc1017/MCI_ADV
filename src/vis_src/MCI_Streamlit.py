@@ -2837,10 +2837,10 @@ with tabs[2]:
 
                             # Anderson-Darling
                             try:
-                                ad_result = sps.anderson(resid, dist="norm")
+                                ad_result = sps.anderson(resid, dist="norm", method="interpolate")
                                 st.write(f"Anderson-Darling: A²={ad_result.statistic:.4f}, "
-                                         f"critical(5%)={ad_result.critical_values[2]:.4f}")
-                                if ad_result.statistic > ad_result.critical_values[2]:
+                                         f"p={ad_result.pvalue:.4f}")
+                                if ad_result.pvalue < 0.05:
                                     st.caption("Anderson-Darling rejects normality at 5% level.")
                             except Exception:
                                 pass
@@ -2848,10 +2848,10 @@ with tabs[2]:
                             # QQ plot
                             qq = sps.probplot(resid, dist="norm")
                             qq_df = pd.DataFrame({"Theoretical": qq[0][0], "Residual": np.sort(resid)})
-                            st.altair_chart(alt.Chart(qq_df).mark_point().encode(x="Theoretical:Q", y="Residual:Q").properties(title="QQ Plot", height=280), use_container_width=True)
+                            st.altair_chart(alt.Chart(qq_df).mark_point().encode(x="Theoretical:Q", y="Residual:Q").properties(title="QQ Plot", height=280), width='stretch')
 
                             # Residual histogram
-                            st.altair_chart(alt.Chart(pd.DataFrame({"resid": resid})).mark_bar().encode(x=alt.X("resid:Q", bin=alt.Bin(maxbins=40)), y="count()").properties(title="Residual Histogram", height=200), use_container_width=True)
+                            st.altair_chart(alt.Chart(pd.DataFrame({"resid": resid})).mark_bar().encode(x=alt.X("resid:Q", bin=alt.Bin(maxbins=40)), y="count()").properties(title="Residual Histogram", height=200), width='stretch')
 
                             # Residuals vs Fitted scatter
                             rvf_df = pd.DataFrame({"Fitted": fitted_vals, "Residual": resid})
@@ -2859,7 +2859,7 @@ with tabs[2]:
                                 x=alt.X("Fitted:Q"), y=alt.Y("Residual:Q")
                             ).properties(title="Residuals vs Fitted", height=280)
                             zero_line = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="red", strokeDash=[4,4]).encode(y="y:Q")
-                            st.altair_chart(rvf_chart + zero_line, use_container_width=True)
+                            st.altair_chart(rvf_chart + zero_line, width='stretch')
                         
 
                             # 등분산(룰 기준). RCBD면 블록-잔차화 값으로 검사
