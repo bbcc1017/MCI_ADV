@@ -455,16 +455,16 @@ class EventManager():
 
         # Ambulance return
         transportation_t = self.sample_transportation_time(mode=0, origination=h_idx + 1, destination=destination)
-        if destination:
+        if destination == 0:  # 현장 복귀
+            # Ambulance 상태 업데이트
+            self.status['ambulance']['amb_states'][a_idx] = (destination, 0, transportation_t)  # destination, severity, time
+            # 이벤트 추가
+            self.add_event(transportation_t + handover_time, 'amb_arrival_site', (a_idx,))
+        else:  # 다른 병원으로 전원
             # Ambulance 상태 업데이트
             self.status['ambulance']['amb_states'][a_idx] = (destination, p_class + 1, transportation_t)  # destination, severity, time
             # 이벤트 추가
             self.add_event(transportation_t + handover_time, 'amb_arrival_hospital', (p_idx, a_idx, destination - 1))
-        else:
-            # Ambulance 상태 업데이트
-            self.status['ambulance']['amb_states'][a_idx] = (destination, 0, transportation_t)  # destination, severity, time
-            # 이벤트 추가
-            self.add_event(transportation_t, 'amb_arrival_site', (a_idx,))
         return log, False
 
     def ev_uav_arrival_hospital(self, log, entity_idx):
@@ -512,16 +512,16 @@ class EventManager():
 
         # UAV return
         transportation_t = self.sample_transportation_time(mode=1, origination=h_idx + 1, destination=destination)
-        if destination:
+        if destination == 0:  # 현장 복귀
+            # UAV 상태 업데이트
+            self.status['uav']['uav_states'][u_idx] = (destination, 0, transportation_t)  # destination, severity, time
+            # 이벤트 추가
+            self.add_event(transportation_t + handover_time, 'uav_arrival_site', (u_idx,))
+        else:  # 다른 병원으로 전원
             # UAV 상태 업데이트
             self.status['uav']['uav_states'][u_idx] = (destination, p_class + 1, transportation_t)  # destination, severity, time
             # 이벤트 추가
             self.add_event(transportation_t + handover_time, 'uav_arrival_hospital', (p_idx, u_idx, destination - 1))
-        else:
-            # Ambulance 상태 업데이트
-            self.status['uav']['uav_states'][u_idx] = (destination, 0, transportation_t)  # destination, severity, time
-            # 이벤트 추가
-            self.add_event(transportation_t, 'uav_arrival_site', (u_idx,))
         return log, False
 
     def ev_p_def_care(self, log, entity_idx):
