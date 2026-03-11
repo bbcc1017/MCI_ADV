@@ -265,43 +265,6 @@ class ScenarioGenerator:
         print(f"  ⚠️ API 실패, 유클리드 거리 사용: {dist_km:.2f}km")
         return dist_km, estimated_duration_min
 
-    def generate_coordinate_for_scenario(self, mode="korea_random", sido_name=None):
-        """
-        시나리오용 좌표 생성 (JSON 형태로 상세 정보 출력)
-        Args:
-            mode: "korea_random", "sido", "manual"
-            sido_name: 시도명 (mode="sido"일 때 필요)
-        Returns:
-            (latitude, longitude) 또는 None
-        """
-        try:
-            if mode == "manual":
-                return None  # 수동은 외부에서 값 제공
-            
-            result = self.coord_generator.generate_valid_coordinate(mode, sido_name)
-            if result:
-                lat, lon, addr_info = result
-                output_info = {
-                    "latitude": lat,
-                    "longitude": lon,
-                    "full_address": addr_info.get("full_address", ""),
-                    "road_address": addr_info.get("road_address", ""),
-                    "area1": addr_info.get("area1", ""),
-                    "area2": addr_info.get("area2", ""),
-                    "area3": addr_info.get("area3", ""),
-                    "area4": addr_info.get("area4", ""),
-                    "is_valid": addr_info.get("is_valid", False)
-                }
-                print(f"COORDINATE_INFO:{json.dumps(output_info, ensure_ascii=False)}")
-                print(f"  📍 좌표 생성: ({lat}, {lon}) - {addr_info.get('area1','')} {addr_info.get('area2','')}")
-                return lat, lon
-            else:
-                print("  ❌ 유효한 좌표 생성 실패")
-                return None
-        except Exception as e:
-            print(f"  💥 좌표 생성 오류: {e}")
-            return None
-
     def make_amb_info(self, latitude, longitude, incident_size, amb_count, save_folder):
         """구급차 정보 생성"""
         print(f"  🚑 구급차 정보 생성 중...")
@@ -1043,10 +1006,6 @@ if __name__ == "__main__":
     parser.add_argument("--total_samples", type=int, default=10, help="시뮬레이션 반복 수")
     parser.add_argument("--random_seed", type=int, default=0, help="랜덤 시드")
     parser.add_argument("--experiment_id", type=str, default=None, help="실험 ID")
-    # 좌표 생성 관련
-    parser.add_argument("--generate_coord", action="store_true", help="좌표 자동 생성")
-    parser.add_argument("--coord_mode", choices=["korea_random", "sido"], default="korea_random", help="좌표 생성 모드")
-    parser.add_argument("--sido_name", type=str, help="시도명 (coord_mode=sido일 때)")
     # 고급 옵션(ENV 또는 CLI 둘 다 허용)
     # parser.add_argument("--queue_policy", type=str, help='예: "0", "capa/2", "0.5"')
     parser.add_argument("--buffer_ratio", type=float, help="후보군 버퍼 배수 (기본 1.5)")
@@ -1095,19 +1054,11 @@ if __name__ == "__main__":
         # 현재 적용값 재출력
         print(f"buffer_ratio={generator.buffer_ratio}")
 
-        # 좌표 처리
-        if args.generate_coord:
-            coord_result = generator.generate_coordinate_for_scenario(args.coord_mode, args.sido_name)
-            if coord_result:
-                latitude, longitude = coord_result
-            else:
-                print("❌ 좌표 생성 실패")
-                sys.exit(1)
-        else:
-            if args.latitude is None or args.longitude is None:
-                print("❌ --latitude, --longitude 인자가 필요합니다.")
-                sys.exit(1)
-            latitude, longitude = args.latitude, args.longitude
+        # 현재 프로젝트 흐름에서는 사고 좌표를 외부에서 직접 전달한다.
+        if args.latitude is None or args.longitude is None:
+            print("❌ --latitude, --longitude 인자가 필요합니다.")
+            sys.exit(1)
+        latitude, longitude = args.latitude, args.longitude
         
         # 시나리오 생성
         config_path = generator.generate_scenario(
