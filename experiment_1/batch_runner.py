@@ -69,8 +69,8 @@ def parse_args():
     # 경로
     p.add_argument("--base-path",   default=str(_PROJECT_ROOT),
                    help="프로젝트 루트 경로")
-    p.add_argument("--coords",      default="experiment_1/coords_korea_1000.csv",
-                   help="좌표 CSV 경로 (기본: experiment_1/coords_korea_1000.csv)")
+    p.add_argument("--coords",      default="experiment_1/coords_korea.csv",
+                   help="좌표 CSV 경로 (기본: experiment_1/coords_korea.csv)")
     p.add_argument("--progress",    default="experiment_1/progress.json",
                    help="진행 상태 JSON 경로 (기본: experiment_1/progress.json)")
 

@@ -175,6 +175,7 @@ class ScenarioGenerator:
             "origin": f"{start[1]},{start[0]}",  # lon,lat 순서
             "destination": f"{end[1]},{end[0]}",
             "priority": "TIME",  # 최단시간 우선
+            "avoid": "ferries",  # 페리 항로 제외 (섬→육지 해상 경로 차단)
             "car_fuel": "GASOLINE",
             "car_hipass": "false",
             "alternatives": "false",
@@ -193,10 +194,18 @@ class ScenarioGenerator:
 
                     # 카카오 API 응답 구조: routes[0].summary
                     if not data.get("routes") or len(data["routes"]) == 0:
-                        print(f"  ⚠️ 카카오 API 응답에 경로 정보가 없습니다.")
-                        break
+                        raise RuntimeError(
+                            f"카카오 API 경로 없음 ({start} → {end}): "
+                            f"해상·섬 좌표이거나 도로가 연결되지 않는 구간입니다."
+                        )
 
                     route = data["routes"][0]
+                    result_code = route.get("result_code", 0)
+                    if result_code != 0:
+                        raise RuntimeError(
+                            f"카카오 API 경로 없음 (result_code={result_code}, {start} → {end}): "
+                            f"페리 없이 도달할 수 없는 구간입니다."
+                        )
                     summary = route.get("summary", {})
 
                     # 거리(m) → km 변환
@@ -245,25 +254,32 @@ class ScenarioGenerator:
                     return distance_km, duration_min
 
                 elif response.status_code == 401:
-                    print(f"  ❌ 카카오 API 인증 실패 (401): API 키를 확인하세요.")
-                    break
+                    raise RuntimeError(
+                        f"카카오 API 인증 실패 (401): API 키를 확인하세요."
+                    )
                 elif response.status_code == 429:
                     print(f"  ⚠️ API 호출 한도 초과 (429): 3초 대기 중...")
                     time.sleep(3)
                 else:
-                    print(f"  ⚠️ API 호출 실패 (status {response.status_code})")
-                    break
+                    raise RuntimeError(
+                        f"카카오 API 호출 실패 (status {response.status_code}): {start} → {end}"
+                    )
 
+            except RuntimeError:
+                raise
             except Exception as e:
-                print(f"  ⚠️ API 호출 중 오류 발생: {e}")
                 if attempt < max_retries - 1:
+                    print(f"  ⚠️ API 호출 중 오류 ({attempt+1}/{max_retries}): {e}")
                     time.sleep(2)
+                else:
+                    raise RuntimeError(
+                        f"카카오 API 호출 실패 ({max_retries}회 재시도 초과): {e}"
+                    ) from e
 
-        # API 실패 시 유클리드 거리 + 추정 시간으로 대체
-        dist_km = haversine(start, end)
-        estimated_duration_min = (dist_km / 40) * 60  # 40km/h 가정
-        print(f"  ⚠️ API 실패, 유클리드 거리 사용: {dist_km:.2f}km")
-        return dist_km, estimated_duration_min
+        raise RuntimeError(
+            f"카카오 API 호출 한도 초과 (429): {max_retries}회 재시도 후에도 실패. "
+            f"일일 할당량이 소진되었습니다."
+        )
 
     def make_amb_info(self, latitude, longitude, incident_size, amb_count, save_folder):
         """구급차 정보 생성"""
@@ -1015,7 +1031,7 @@ if __name__ == "__main__":
     # 카카오 API 관련 파라미터
     parser.add_argument("--kakao_api_key", type=str, default=None, help="카카오 모빌리티 REST API 키")
     parser.add_argument("--departure_time", type=str, default=None, help="출발시간 (YYYYMMDDHHMM 형식, 예: 202512241800)")
-    parser.add_argument("--is_use_time", type=str, default=True, help="API duration 사용 여부 (true/false)")
+    parser.add_argument("--is_use_time", type=str, default="true", help="API duration 사용 여부 (true/false)")
     parser.add_argument("--amb_handover_time", type=float, default=0.0, help="구급차 환자 인계시간 (분)")
     parser.add_argument("--uav_handover_time", type=float, default=0.0, help="UAV 환자 인계시간 (분)")
     parser.add_argument("--duration_coeff", type=float, default=1.0, help="API duration 시간가중치 (기본값: 1.0)")

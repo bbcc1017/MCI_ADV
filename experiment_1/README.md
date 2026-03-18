@@ -12,12 +12,12 @@ experiment_1/
 ├── generate_coords.py          # 좌표 생성기 (shapefile PIP 필터링)
 ├── batch_runner.py             # 배치 실험 러너 (시나리오 생성 + 시뮬레이션)
 ├── ctprvn.shp / .shx / .dbf   # 한국 행정구역 shapefile (좌표 생성 시 사용)
-├── coords_korea_1000.csv       # (생성됨) 좌표 CSV
+├── coords_korea.csv       # (생성됨) 좌표 CSV
 ├── coords_map.html             # (생성됨) 좌표 시각화 지도
 └── progress.json               # (생성됨) 실험 진행 상태
 ```
 
-> `coords_korea_1000.csv`, `coords_map.html`, `progress.json`은 실행 후 자동 생성됩니다.
+> `coords_korea.csv`, `coords_map.html`, `progress.json`은 실행 후 자동 생성됩니다.
 
 ---
 
@@ -36,11 +36,11 @@ pip install geopandas shapely
 모든 명령은 **프로젝트 루트** (`MCI_ADV/`)에서 실행합니다.
 
 ```bash
-python experiment_1/generate_coords.py --n 1000 --seed 42
+python experiment_1/generate_coords.py --n 1000 --seed 0
 ```
 
 완료 후:
-- `experiment_1/coords_korea_1000.csv` 생성 (컬럼: `coord_id`, `latitude`, `longitude`, `generated_at`)
+- `experiment_1/coords_korea.csv` 생성 (컬럼: `coord_id`, `latitude`, `longitude`, `generated_at`)
 - `experiment_1/coords_map.html` 생성 → 브라우저로 열어 모든 점이 육지에 있는지 확인
 
 **옵션:**
@@ -48,14 +48,14 @@ python experiment_1/generate_coords.py --n 1000 --seed 42
 | 인수 | 기본값 | 설명 |
 |------|--------|------|
 | `--n` | `1000` | 생성할 좌표 수 |
-| `--seed` | `42` | 랜덤 시드 |
+| `--seed` | `0` | 랜덤 시드 |
 | `--shp` | `ctprvn.shp` | shapefile 경로 (experiment_1/ 기준) |
-| `--out` | `experiment_1/coords_korea_1000.csv` | 출력 CSV 경로 |
+| `--out` | `experiment_1/coords_korea.csv` | 출력 CSV 경로 |
 | `--map` | `<out_dir>/coords_map.html` | folium 지도 출력 경로 |
 
 소규모 테스트:
 ```bash
-python experiment_1/generate_coords.py --n 50 --seed 42
+python experiment_1/generate_coords.py --n 50 --seed 0
 ```
 
 ---
@@ -86,7 +86,7 @@ python experiment_1/batch_runner.py \
     --amb-velocity 40 \
     --uav-velocity 80 \
     --total-samples 10 \
-    --random-seed 42 \
+    --random-seed 0 \
     --amb-handover-time 0.0 \
     --uav-handover-time 0.0 \
     --is-use-time true \
@@ -102,7 +102,7 @@ python experiment_1/batch_runner.py \
 | 인수 | 기본값 | 설명 |
 |------|--------|------|
 | `--base-path` | 프로젝트 루트 | MCI_ADV 루트 경로 |
-| `--coords` | `experiment_1/coords_korea_1000.csv` | 좌표 CSV |
+| `--coords` | `experiment_1/coords_korea.csv` | 좌표 CSV |
 | `--progress` | `experiment_1/progress.json` | 진행 상태 파일 |
 | `--experiment-id` | `exp_batch_research` | 실험 ID (`scenarios/` 하위 폴더명) |
 
@@ -116,7 +116,7 @@ python experiment_1/batch_runner.py \
 | `--amb-velocity` | `40` | 구급차 속도 (km/h) |
 | `--uav-velocity` | `80` | UAV 속도 (km/h) |
 | `--total-samples` | `10` | 시뮬레이션 반복 횟수 |
-| `--random-seed` | `42` | 랜덤 시드 |
+| `--random-seed` | `0` | 랜덤 시드 |
 
 **이송 / 시간 파라미터**
 

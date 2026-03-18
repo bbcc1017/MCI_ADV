@@ -34,7 +34,7 @@ def parse_args():
                         help="랜덤 시드 (기본: 42)")
     parser.add_argument("--shp",  type=str,   default="ctprvn.shp",
                         help="shapefile 경로 (기본: ctprvn.shp, experiment_1/ 폴더 기준)")
-    parser.add_argument("--out",  type=str,   default="experiment_1/coords_korea_1000.csv",
+    parser.add_argument("--out",  type=str,   default="experiment_1/coords_korea.csv",
                         help="출력 CSV 경로 (프로젝트 루트 기준)")
     parser.add_argument("--map",  type=str,   default="",
                         help="folium HTML 출력 경로 (기본: <out_dir>/coords_map.html)")
@@ -59,7 +59,10 @@ def load_korea_boundary(shp_path: str):
         sys.exit(1)
 
     print(f"[1/4] shapefile 로드 중: {shp_path}")
-    korea = gpd.read_file(str(shp_path))          # EPSG:5179
+    korea = gpd.read_file(str(shp_path))
+    # CRS가 없는 경우(naive geometry) EPSG:5179 수동 지정
+    if korea.crs is None:
+        korea = korea.set_crs(epsg=5179)
     korea_wgs84 = korea.to_crs(epsg=4326)         # WGS84 변환
     korea_union = korea_wgs84.geometry.union_all() # 남한 전체 경계 단일 폴리곤
     print(f"      CRS: {korea_wgs84.crs} → EPSG:4326 변환 완료")
@@ -81,8 +84,7 @@ def generate_points(korea_union, n: int, seed: int) -> list:
     pts = []
     batch = max(n * 4, 10_000)  # bounding box 내 hit rate ≈ 25~30%
 
-    print(f"[2/4] Rejection Sampling 시작 (n={n}, seed={seed}) ...")
-    total_tries = 0
+    print(f"[2/4] 좌표 생성 중 (n={n}, seed={seed}) ...")
     while len(pts) < n:
         lons = rng.uniform(minx, maxx, batch)
         lats = rng.uniform(miny, maxy, batch)
@@ -90,12 +92,11 @@ def generate_points(korea_union, n: int, seed: int) -> list:
             if korea_union.contains(Point(lon, lat)):
                 pts.append((lat, lon))
                 if len(pts) % 100 == 0:
-                    print(f"      {len(pts)}/{n} 완료 (시도: {total_tries + len(lons)})")
+                    print(f"      {len(pts)}/{n}")
                 if len(pts) >= n:
                     break
-        total_tries += batch
 
-    print(f"      완료: {n}개 생성 (총 시도: {total_tries})")
+    print(f"      {n}개 생성 완료")
     return pts[:n]
 
 
