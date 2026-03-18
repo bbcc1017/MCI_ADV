@@ -28,3 +28,7 @@ gymnasium==1.2.3
 
 # Simulation results comparison by 3D plot
 plotly==6.6.0
+
+# Experiment coordinate generation (experiment/generate_coords.py)
+geopandas>=1.0.0
+shapely>=2.0.0
