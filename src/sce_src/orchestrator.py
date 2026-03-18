@@ -78,6 +78,7 @@ def parse_exp_from_config_path(config_path: str) -> Optional[str]:
 def parse_make_generator_stdout(stdout_text: str):
     coord_info = None
     config_path = None
+    api_call_count = None
     for line in stdout_text.splitlines():
         s = line.strip()
         if s.startswith("COORDINATE_INFO:"):
@@ -88,7 +89,12 @@ def parse_make_generator_stdout(stdout_text: str):
                 pass
         elif s.startswith("CONFIG_PATH:"):
             config_path = s.split("CONFIG_PATH:",1)[1].strip()
-    return coord_info, config_path
+        elif s.startswith("API_CALL_COUNT:"):
+            try:
+                api_call_count = int(s.split("API_CALL_COUNT:",1)[1].strip())
+            except Exception:
+                pass
+    return coord_info, config_path, api_call_count
 
 # ------------------------------------------------------------------
 # Reverse Geocoding (Kakao API)
@@ -594,7 +600,7 @@ class Orchestrator:
 
         stdout = proc.stdout or ""
         stderr = proc.stderr or ""
-        _, config_path = parse_make_generator_stdout(stdout)  # coord_info는 무시
+        _, config_path, api_call_count = parse_make_generator_stdout(stdout)
         if not config_path:
             raise RuntimeError(f"CONFIG_PATH not found in generator stdout.\n[stdout]\n{stdout}\n[stderr]\n{stderr}")
 
@@ -690,6 +696,7 @@ class Orchestrator:
             "exp_id": exp_id2,
             "coord": coord,
             "config_path": config_path,
+            "api_call_count": api_call_count,
             "summary_csv_path": summary_main,
             "summary_csv_path_legacy": summary_legacy,
             "log_file": log_file,

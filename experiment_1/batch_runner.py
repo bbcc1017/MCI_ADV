@@ -362,9 +362,12 @@ def process_coord(
             "error": err,
             "finished_at": now_kst(),
         }
-        return progress, args.calls_per_coord, False
+        return progress, 0, False
 
     gen_elapsed = time.time() - t0
+
+    # 실제 API 호출 수 (없으면 추정값으로 대체)
+    actual_calls = gen_result.get("api_call_count") or args.calls_per_coord
 
     # subprocess 자체는 완료됐지만 returncode != 0 인 경우
     if not gen_result.get("ok"):
@@ -379,10 +382,11 @@ def process_coord(
             "error": err,
             "finished_at": now_kst(),
         }
-        return progress, args.calls_per_coord, False
+        return progress, actual_calls, False
 
     config_path = gen_result.get("config_path", "")
-    print(f"{prefix}  시나리오 완료 ({gen_elapsed:.1f}초) → 시뮬레이션 실행 중...")
+    actual_calls = gen_result.get("api_call_count") or args.calls_per_coord
+    print(f"{prefix}  시나리오 완료 ({gen_elapsed:.1f}초, API {actual_calls}콜) → 시뮬레이션 실행 중...")
 
     # ── 2단계: 시뮬레이션 실행 (API 호출 없음) ───────────────────────────
     # 시뮬레이션 파라미터(환자수, 구급차수, UAV수, 속도, 반복횟수 등)는
@@ -401,11 +405,11 @@ def process_coord(
         print(f"{prefix}  시뮬레이션 예외 ✗  {sim_error}")
 
     sim_elapsed = time.time() - t1
-    total_calls = session_calls + args.calls_per_coord
+    cumulative_calls = session_calls + actual_calls
 
     status_icon = "[OK]" if sim_ok else "[시뮬 실패]"
     print(f"{prefix}  시뮬레이션 완료 ({sim_elapsed:.1f}초) {status_icon}  "
-          f"누적API: {total_calls}/{args.daily_limit}")
+          f"실제API: {actual_calls}콜  누적: {cumulative_calls} / {args.daily_limit}")
 
     statuses[coord_id] = {
         "status": "done",          # 시뮬 실패여도 시나리오 생성 완료면 done
@@ -419,7 +423,7 @@ def process_coord(
     if sim_error:
         statuses[coord_id]["sim_error"] = sim_error
 
-    return progress, args.calls_per_coord, sim_ok
+    return progress, actual_calls, sim_ok
 
 
 # ---------------------------------------------------------------------------

@@ -64,6 +64,8 @@ class ScenarioGenerator:
     """동적 파라미터 기반 시나리오 생성 클래스 (크로스 환경 호환)"""
 
     def __init__(self, base_path, experiment_id=None, kakao_api_key=None, departure_time=None):
+        # 실제 Kakao API 호출 횟수 카운터
+        self.api_call_count = 0
         # 프로젝트 경로 절대화
         self.base_path = os.path.abspath(base_path)
 
@@ -251,6 +253,7 @@ class ScenarioGenerator:
 
                         print(f"  📦 [{route_type}] idx={source_index:03d} {name} → {distance_km:.2f}km, {duration_min:.1f}min")
 
+                    self.api_call_count += 1
                     return distance_km, duration_min
 
                 elif response.status_code == 401:
@@ -1005,6 +1008,7 @@ run_setting:
         
         elapsed = round(time.time() - start_time, 2)
         print(f"  ⏱️ 시나리오 생성 완료 ({elapsed}초)")
+        print(f"API_CALL_COUNT:{self.api_call_count}")
         print(f"CONFIG_PATH:{config_path}")
         return config_path
 
