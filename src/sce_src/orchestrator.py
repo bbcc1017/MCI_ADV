@@ -731,24 +731,53 @@ class Orchestrator:
 
         sim_started = now_kst_iso()
         t1 = time.time()
-        proc = subprocess.run(cmd, cwd=self.base_path, env=env,
-                              capture_output=True, text=True, encoding="utf-8", errors="ignore")
+
+        # Popen + 스레드로 파이프 버퍼 데드락 방지 (stdout이 64KB 초과 시 capture_output=True 데드락 발생)
+        import threading as _threading
+        _stdout_buf: list = []
+        _stderr_buf: list = []
+
+        proc = subprocess.Popen(cmd, cwd=self.base_path, env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, encoding="utf-8", errors="ignore")
+
+        def _read_pipe(pipe, buf):
+            for line in pipe:
+                buf.append(line)
+
+        _t_out = _threading.Thread(target=_read_pipe, args=(proc.stdout, _stdout_buf), daemon=True)
+        _t_err = _threading.Thread(target=_read_pipe, args=(proc.stderr, _stderr_buf), daemon=True)
+        _t_out.start(); _t_err.start()
+
+        proc.wait()
+        _t_out.join(); _t_err.join()
+
         t2 = time.time()
         elapsed = round(t2 - t1, 3)
         ok = (proc.returncode == 0)
+
+        stdout_text = "".join(_stdout_buf)
+        stderr_text = "".join(_stderr_buf)
 
         # Per-run log file
         log_file = os.path.join(self.paths["logs"], f"{coord2}_{ts_short_now()}.txt")
         pieces = []
         pieces.append(f"=== SIM_START {sim_started} ===\n")
-        if proc.stdout:
-            pieces.append(proc.stdout)
-            if not proc.stdout.endswith("\n"):
+        if stdout_text:
+            pieces.append(stdout_text)
+            if not stdout_text.endswith("\n"):
                 pieces.append("\n")
-        if proc.stderr and proc.stderr.strip():
-            pieces.append(f"--- stderr ---\n{proc.stderr}\n")
+        if stderr_text.strip():
+            pieces.append(f"--- stderr ---\n{stderr_text}\n")
         pieces.append(f"=== SIM_END {now_kst_iso()} (elapsed: {elapsed}s, rc={proc.returncode}) ===\n\n")
         write_text(log_file, "".join(pieces), encoding="utf-8")
+
+        # proc 속성 호환을 위한 네임스페이스 (이하 코드가 proc.stdout 등을 참조하지 않으므로 불필요)
+        class _ProcCompat:
+            returncode = proc.returncode
+            stdout = stdout_text
+            stderr = stderr_text
+        proc = _ProcCompat()
 
         # Summary update (attempt-aware)
         if pd is not None:

@@ -247,6 +247,8 @@ class EventManager():
         destination = None
         idle_capa = self.properties['hospital']['hos_max_send'] - self.status['patient']['p_sent']
         helipad_idx = self.properties['hospital'].get('hos_helipad_idx', np.array([]))
+        max_capa_arr = self.properties['hospital']['hos_max_capa'] + self.properties['hospital']['hos_max_queue']
+        n_occupied_arr = self.status['hospital']['h_states'][:, -1]
 
         sorted_h = np.argsort(d_to_H)
         for h_idx in sorted_h:
@@ -254,7 +256,7 @@ class EventManager():
                 continue
             h_tier = self.properties['hospital']['hos_tier'][h_idx]
             can_admit = (pass_to_tier1 and h_tier==1) or (pass_to_tier2 and h_tier==2)
-            if can_admit and idle_capa[h_idx] > 0:
+            if can_admit and idle_capa[h_idx] > 0 and n_occupied_arr[h_idx] < max_capa_arr[h_idx]:
                 destination = h_idx + 1
                 break
         if destination is None: # 전원 가능 병원 없음

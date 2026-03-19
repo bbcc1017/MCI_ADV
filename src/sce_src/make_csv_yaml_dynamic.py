@@ -978,6 +978,12 @@ run_setting:
         save_folder = os.path.join(self.base_path, "scenarios", self.experiment_id, folder_name)
         os.makedirs(save_folder, exist_ok=True)
 
+        # 이전 실행의 routes/ 폴더 정리 (재시도 시 JSON 누적 방지)
+        import shutil as _shutil
+        routes_cleanup = os.path.join(save_folder, "routes")
+        if os.path.exists(routes_cleanup):
+            _shutil.rmtree(routes_cleanup)
+
         # 역지오코딩은 orchestrator.py에서 수행하므로 간단한 정보만 출력
         coordinate_info = {
             "latitude": latitude,
