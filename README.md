@@ -23,7 +23,8 @@
 7. [정책 조합 (64개 시나리오)](#정책-조합-64개-시나리오)
 8. [대시보드 사용법](#대시보드-사용법)
 9. [평가 지표](#평가-지표)
-10. [설치 및 실행](#설치-및-실행)
+10. [배치 실험 파이프라인 (experiment_1)](#배치-실험-파이프라인-experiment_1)
+11. [설치 및 실행](#설치-및-실행)
 
 ---
 
@@ -81,6 +82,15 @@ MCI_ADV/
 │
 ├── experiment_logs/                       # 실행 로그
 │   └── (lat,lon)_YYYYMMDD_HHMMSS.txt
+│
+├── experiment_1/                          # 논문 배치 실험 파이프라인
+│   ├── generate_coords.py                # 한국 육지 좌표 1000개 생성
+│   ├── batch_runner.py                   # 시나리오 생성 + 시뮬레이션 배치 처리
+│   ├── visualize_coords.py               # 배치 실험 결과 지도·히스토그램 시각화
+│   ├── ctprvn.shp / .shx / .dbf         # 한국 행정구역 shapefile
+│   ├── coords_korea.csv                  # (생성됨) 좌표 CSV
+│   ├── coords_map.html                   # (생성됨) 결과 시각화 지도
+│   └── progress.json                     # (생성됨) 실험 진행 상태
 │
 ├── requirements.txt                       # Python 패키지 의존성
 ├── MCI_대시보드_관련_정보.pdf              # 대시보드 참고 문서
@@ -689,6 +699,53 @@ SurvivalProb = f(rescue_time, severity_class)
 - Yellow: 중간 민감도
 - Green: 시간 영향 적음
 - Black: 사망 (기여분 0)
+```
+
+---
+
+## 배치 실험 파이프라인 (experiment_1)
+
+논문 실험용 배치 자동화 워크플로우입니다. 한국 육지 경계 내 랜덤 좌표 1000개에 대해 시나리오 생성 → 시뮬레이션 → 결과 시각화를 자동으로 처리합니다. 상세 사용법은 [`experiment_1/README.md`](experiment_1/README.md)를 참조하세요.
+
+### 전체 흐름
+
+```
+Step 1. 좌표 생성
+  python experiment_1/generate_coords.py --n 1000 --seed 0
+  → experiment_1/coords_korea.csv (1000개 한국 육지 좌표)
+
+Step 2. 배치 실험 (매일 동일 명령 실행, progress.json에서 자동 이어서 처리)
+  python experiment_1/batch_runner.py --kakao-api-key YOUR_KEY --experiment-id exp_korea_random_1000
+
+Step 3. 결과 시각화
+  python experiment_1/visualize_coords.py
+  → experiment_1/coords_map.html (인터랙티브 지도 + 히스토그램)
+```
+
+### visualize_coords.py 기능
+
+- **단일 HTML 출력**: Reward / Time / PDR 3개 지표를 JavaScript 버튼으로 전환
+- **컬러맵**: RdYlGn (빨강↔초록), P5~P95 백분위수 클리핑으로 상대 비교 최적화
+- **이상치 강조**: 상위·하위 N개 좌표를 별도 색상(파랑/보라)으로 표시
+- **지도 타일**: OpenStreetMap
+- **히스토그램**: Freedman-Diaconis 빈 크기 (min 60, max 120개 빈), 이상치 빈 별도 색상, rug plot
+- **이상치 목록**: 접을 수 있는 `<details>` 패널로 좌표 및 인덱스 표시
+
+```bash
+python experiment_1/visualize_coords.py [옵션]
+  --clip-pct FLOAT   컬러맵 클리핑 백분위수 (기본: 5.0 → 5th~95th)
+  --outlier-n INT    양쪽 이상치 개수 (기본: 3)
+  --out PATH         출력 HTML 경로 (기본: experiment_1/coords_map.html)
+```
+
+### stat.txt 구조
+
+시뮬레이션 결과 `results_*_stat.txt`는 320행 구성:
+```
+64룰 × 5블록 = 320행
+블록 순서: Reward → Time → PDR → RewardWOG → PDRWOG
+각 행: rule_name  mean  std  95%CI_half
+시각화 값 = 블록별 64개 mean의 평균 (mean of means)
 ```
 
 ---

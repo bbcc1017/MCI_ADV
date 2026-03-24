@@ -11,9 +11,10 @@ Streamlit 대시보드와 **독립적으로** 동작하는 논문 실험용 배�
 experiment_1/
 ├── generate_coords.py          # 좌표 생성기 (shapefile PIP 필터링)
 ├── batch_runner.py             # 배치 실험 러너 (시나리오 생성 + 시뮬레이션)
+├── visualize_coords.py         # 배치 결과 지도·히스토그램 시각화
 ├── ctprvn.shp / .shx / .dbf   # 한국 행정구역 shapefile (좌표 생성 시 사용)
-├── coords_korea.csv       # (생성됨) 좌표 CSV
-├── coords_map.html             # (생성됨) 좌표 시각화 지도
+├── coords_korea.csv            # (생성됨) 좌표 CSV
+├── coords_map.html             # (생성됨) 결과 시각화 지도 (단일 HTML)
 └── progress.json               # (생성됨) 실험 진행 상태
 ```
 
@@ -78,8 +79,8 @@ python experiment_1/batch_runner.py \
 python experiment_1/batch_runner.py \
     --kakao-api-key YOUR_KEY \
     --experiment-id exp_batch_research \
-    --daily-limit 4900 \
-    --calls-per-coord 55 \
+    --daily-limit 5000 \
+    --calls-per-coord 40 \
     --incident-size 30 \
     --amb-count 30 \
     --uav-count 3 \
@@ -87,12 +88,12 @@ python experiment_1/batch_runner.py \
     --uav-velocity 80 \
     --total-samples 10 \
     --random-seed 0 \
-    --amb-handover-time 0.0 \
-    --uav-handover-time 0.0 \
+    --amb-handover-time 10.0 \
+    --uav-handover-time 15.0 \
     --is-use-time true \
     --duration-coeff 1.0 \
-    --hospital-max-send-coeff "1.1,1.0" \
-    --departure-time 202603181400
+    --hospital-max-send-coeff "1.0,1.0" \
+    --departure-time 202603311400
 ```
 
 ### 파라미터 설명
@@ -131,7 +132,7 @@ python experiment_1/batch_runner.py \
 
 | 인수 | 기본값 | 설명 |
 |------|--------|------|
-| `--hospital-max-send-coeff` | 내부 기본값 | 병원 전송계수 `"1.1,1.0"` 형식 |
+| `--hospital-max-send-coeff` | 내부 기본값 | 병원 전송계수 `"1.0,1.0"` 형식 |
 | `--buffer-ratio` | 내부 기본값 | 후보 병원 버퍼 배수 |
 | `--util-by-tier` | 내부 기본값 | 등급별 이용률 `"1:0.90,11:0.75,etc:0.60"` 형식 |
 
@@ -141,8 +142,8 @@ python experiment_1/batch_runner.py \
 |------|--------|------|
 | `--kakao-api-key` | — | **(필수)** Kakao REST API 키 |
 | `--departure-time` | 현재 시간 | Kakao 출발시간 `YYYYMMDDHHmm` 형식 (선택) |
-| `--daily-limit` | `4900` | 하루 최대 API 호출 수 (Kakao 일일 한도: 5000) |
-| `--calls-per-coord` | `55` | 좌표 1개당 예상 API 호출 수 |
+| `--daily-limit` | `5000` | 하루 최대 API 호출 수 (Kakao 일일 한도: 5000) |
+| `--calls-per-coord` | `40` | 좌표 1개당 예상 API 호출 수 |
 | `--max-retries` | `2` | 실패 좌표 최대 재시도 횟수 |
 
 ---
@@ -281,3 +282,48 @@ results/exp_batch_research/(lat,lon)/
 ```
 experiment_logs/(lat,lon)_YYYYMMDD_HHMMSS.txt
 ```
+
+---
+
+## Step 3 — 결과 시각화
+
+```bash
+python experiment_1/visualize_coords.py
+```
+
+완료 후 `experiment_1/coords_map.html`이 생성됩니다. 브라우저로 열면 인터랙티브 지도와 히스토그램을 확인할 수 있습니다.
+
+### 기능
+
+- **단일 HTML**: Reward / Time / PDR 3개 지표를 상단 버튼으로 전환
+- **지도 (Leaflet.js, OpenStreetMap 타일)**
+  - RdYlGn 컬러맵: Reward·PDRWOG는 높을수록 초록, Time·PDR은 낮을수록 초록
+  - P5~P95 백분위수 클리핑: 극단값에 의한 색상 포화 방지
+  - 이상치 강조: 상위·하위 N개 좌표를 별도 색상(파랑/보라)으로 표시
+  - 시나리오 생성 실패 좌표: 검은색 마커
+  - 하단 이상치 목록: `<details>` 패널로 접기/펼치기
+- **히스토그램 (matplotlib)**
+  - Freedman-Diaconis 빈 크기 (min 60, max 120개 빈)
+  - 이상치 구간 빈을 별도 색상으로 칠하고 rug plot 추가
+  - 평균·표준편차 통계 박스
+
+### 옵션
+
+| 인수 | 기본값 | 설명 |
+|------|--------|------|
+| `--clip-pct` | `5.0` | 컬러맵 클리핑 백분위수 (5 → P5~P95, 0이면 비활성) |
+| `--outlier-n` | `3` | 양쪽 이상치 개수 (3 → 상위 3·하위 3) |
+| `--out` | `experiment_1/coords_map.html` | 출력 HTML 경로 |
+| `--progress` | `experiment_1/progress.json` | 진행 상태 파일 |
+| `--coords` | `experiment_1/coords_korea.csv` | 좌표 CSV |
+| `--results-dir` | 자동 탐지 | results/ 폴더 경로 |
+
+### stat.txt 구조
+
+```
+320행 = 64룰 × 5블록  (순서: Reward → Time → PDR → RewardWOG → PDRWOG)
+각 행: rule_name  mean  std  95%CI_half
+시각화 값 = 블록별 64개 mean의 평균 (mean of means)
+```
+
+이상치 기준: 각 블록 평균값 기준 상위/하위 N개 (지표 방향 고려: Reward은 낮은 쪽이 열악, PDR/Time은 높은 쪽이 열악).
