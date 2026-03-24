@@ -414,7 +414,7 @@ def build_histograms(data: dict, out_path: Path, ranges: dict, clip_pct: float, 
 
     fig.tight_layout(rect=[0, 0.08, 1, 0.95])
     hist_path = out_path.with_name(out_path.stem + "_hist.png")
-    fig.savefig(str(hist_path), dpi=150, bbox_inches="tight")
+    fig.savefig(str(hist_path), dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"  히스토그램 저장: {hist_path}")
 
