@@ -212,7 +212,7 @@ class EventManager():
 
     def default_transportation_GB(self, mode):
         # Rule1: Ver250724
-        # 1. 1등급 병원은 제외
+        # 1. Tier3(상급종합) 병원은 제외
         # 2. 가까운 순서대로 이송 (현장에서부터 거리순으로 hospital index 지정됨을 가정)
         # 3. max_send - p_sent > 0인 경우에만 이송 (최대 보내려고 생각했던 환자 수 - 실제 보낸 환자 수)
         # 4. 만족되는 병원 없으면 등급 상관 없이 가장 가까운 병원으로 이송
@@ -228,7 +228,7 @@ class EventManager():
                 destination = h_idx + 1
                 break
         if destination is None:
-            for h_idx in self.properties['hospital']['hos_tier1_idx']:
+            for h_idx in self.properties['hospital']['hos_tier3_idx']:
                 if mode == 1 and h_idx not in helipad_idx:
                     continue
                 if idle_capa[h_idx] > 0:
@@ -236,7 +236,7 @@ class EventManager():
                     break
         return destination
 
-    def diversion_rule(self, c_hos, pass_to_tier1, pass_to_tier2, mode):
+    def diversion_rule(self, c_hos, pass_to_tier3, pass_to_tier2, mode):
         # Rule1: Ver250724
         # 1. 보낼 수 있는 병원 등급 중 가까운 순서대로 이송
         # 2. max_send - p_sent > 0인 경우에만 이송 (최대 보내려고 생각했던 환자 수 - 실제 보낸 환자 수)
@@ -255,7 +255,7 @@ class EventManager():
             if mode == 1 and h_idx not in helipad_idx:
                 continue
             h_tier = self.properties['hospital']['hos_tier'][h_idx]
-            can_admit = (pass_to_tier1 and h_tier==1) or (pass_to_tier2 and h_tier==2)
+            can_admit = (pass_to_tier3 and h_tier==3) or (pass_to_tier2 and h_tier==2)
             if can_admit and idle_capa[h_idx] > 0 and n_occupied_arr[h_idx] < max_capa_arr[h_idx]:
                 destination = h_idx + 1
                 break
@@ -266,8 +266,8 @@ class EventManager():
 
     def sample_service_time(self, h_tier, p_class):
         #   if service time 9999이면 n_idle -= 1, definite cared로 변경, 추가 event 생성 없음
-        if h_tier == 1:
-            service_mean = self.properties['patient']['patient_info']['treat_tier1_mean'][p_class]
+        if h_tier == 3:
+            service_mean = self.properties['patient']['patient_info']['treat_tier3_mean'][p_class]
         elif h_tier == 2:
             service_mean = self.properties['patient']['patient_info']['treat_tier2_mean'][p_class]
         if isinstance(service_mean, str):
@@ -426,8 +426,8 @@ class EventManager():
         destination = 0 # ambulance return 목적지; 기본값 = 현장
         handover_time = 0  # 환자 내리는 시간; 기본값 = 0
         # 0. tier 맞게 왔는지 확인. 처치 불가하면 처치 가능한 곳으로 이동
-        if (h_tier == 1 and not p_info['treat_tier1'][p_class]) or (h_tier == 2 and not p_info['treat_tier2'][p_class]):
-            destination = self.diversion_rule(h_idx, pass_to_tier1=p_info['treat_tier1'][p_class],
+        if (h_tier == 3 and not p_info['treat_tier3'][p_class]) or (h_tier == 2 and not p_info['treat_tier2'][p_class]):
+            destination = self.diversion_rule(h_idx, pass_to_tier3=p_info['treat_tier3'][p_class],
                                               pass_to_tier2=p_info['treat_tier2'][p_class],
                                               mode=0)
             # 환자 보낸 기록 상태 변경
@@ -448,7 +448,7 @@ class EventManager():
             # event log 추가
             # log['p_admit'].append((self.time, p_class))
         else:
-            destination = self.diversion_rule(h_idx, pass_to_tier1=p_info['treat_tier1'][p_class],
+            destination = self.diversion_rule(h_idx, pass_to_tier3=p_info['treat_tier3'][p_class],
                                               pass_to_tier2=p_info['treat_tier2'][p_class],
                                               mode=0)
             # 환자 보낸 기록 상태 변경
@@ -483,8 +483,8 @@ class EventManager():
         destination = 0 # uav return 목적지; 기본값 = 현장
         handover_time = 0  # 환자 내리는 시간; 기본값 = 0
         # 0. tier 맞게 왔는지 확인. 처치 불가하면 처치 가능한 곳으로 이동
-        if (h_tier == 1 and not p_info['treat_tier1'][p_class]) or (h_tier == 2 and not p_info['treat_tier2'][p_class]):
-            destination = self.diversion_rule(h_idx, pass_to_tier1=p_info['treat_tier1'][p_class],
+        if (h_tier == 3 and not p_info['treat_tier3'][p_class]) or (h_tier == 2 and not p_info['treat_tier2'][p_class]):
+            destination = self.diversion_rule(h_idx, pass_to_tier3=p_info['treat_tier3'][p_class],
                                               pass_to_tier2=p_info['treat_tier2'][p_class],
                                               mode=1)
             # 환자 보낸 기록 상태 변경
@@ -505,7 +505,7 @@ class EventManager():
             # event log 추가
             # log['p_admit'].append((self.time, p_class))
         else:
-            destination = self.diversion_rule(h_idx, pass_to_tier1=p_info['treat_tier1'][p_class],
+            destination = self.diversion_rule(h_idx, pass_to_tier3=p_info['treat_tier3'][p_class],
                                               pass_to_tier2=p_info['treat_tier2'][p_class],
                                               mode=1)
             # 환자 보낸 기록 상태 변경

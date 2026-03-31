@@ -436,7 +436,7 @@ run_setting:
 
 #### patient_info.csv
 ```csv
-type,ratio,rescue_param_alpha,rescue_param_beta,treat_tier1,treat_tier2,treat_tier1_mean,treat_tier2_mean
+type,ratio,rescue_param_alpha,rescue_param_beta,treat_tier3,treat_tier2,treat_tier3_mean,treat_tier2_mean
 Red,0.1,6,5,True,False,40,INF
 Yellow,0.3,2,13,True,True,20,30
 Green,0.5,1,22,True,True,10,15
@@ -444,9 +444,9 @@ Black,0.1,0,0,True,True,0,0
 ```
 - ratio: 환자 비율 (합계=1.0)
 - rescue_param_alpha/beta: 구조 시간 베타 분포 파라미터
-- treat_tier1: 상급종합병원 치료 가능 여부
+- treat_tier3: 상급종합병원(Tier3) 치료 가능 여부
 - treat_tier2: 일반병원 치료 가능 여부
-- treat_tier1/2_mean: 치료 시간 지수분포 평균 (분)
+- treat_tier3/2_mean: 치료 시간 지수분포 평균 (분)
 
 #### hospital_info_road.csv
 ```csv

@@ -103,10 +103,10 @@ class ScenarioGenerator:
         self.patient_config = {
             "ratio": {"Red": 0.1, "Yellow": 0.3, "Green": 0.5, "Black": 0.1},
             "rescue_param": {"Red": (6, 5), "Yellow": (2, 13), "Green": (1, 22), "Black": (0, 0)},
-            "treat_tier1": {"Red": True, "Yellow": True, "Green": True, "Black": True},
+            "treat_tier3": {"Red": True, "Yellow": True, "Green": True, "Black": True},
             "treat_tier2": {"Red": False, "Yellow": True, "Green": True, "Black": True},
-            "treat_tier1_mean": {"Red": 40, "Yellow": 20, "Green": 10, "Black": 0},
-            "treat_tier2_mean": {"Red": 60, "Yellow": 30, "Green": 15, "Black": 0}
+            "treat_tier3_mean": {"Red": 40, "Yellow": 20, "Green": 10, "Black": 0},
+            "treat_tier2_mean": {"Red": float('inf'), "Yellow": 30, "Green": 15, "Black": 0}
         }
         
         # 후보군 확장 배수 (AMB road distance 호출 수 완화)
@@ -436,22 +436,22 @@ class ScenarioGenerator:
         conditions = [df['종별코드'] == 1, df['종별코드'] == 11]; values = [3, 2]
         df['operating_rooms'] = np.select(conditions, values, default=1)
         df["eff"] = df["operating_rooms"] + df["capa"]
-        df["is_tier1"] = (df["종별코드"].astype(str).astype(float).astype(int) == 1).astype(int)
+        df["is_tier3"] = (df["종별코드"].astype(str).astype(float).astype(int) == 1).astype(int)
         
         # ---------- (3) 전역 상급 용량 점검 (불가능 사전 감지) ----------
-        total_tier1_capa_all = int(df.loc[df["is_tier1"]==1, "capa"].sum())
+        total_tier3_capa_all = int(df.loc[df["is_tier3"]==1, "capa"].sum())
         total_capa_all = int(df["capa"].sum())
-        if total_tier1_capa_all < U:
-            print(f"  ⚠️ 전역 상급 용량 부족: Tier1_capa_all={total_tier1_capa_all} < U={U}. 최선 선택으로 진행(전원 실패 가능).")
+        if total_tier3_capa_all < U:
+            print(f"  ⚠️ 전역 상급 용량 부족: Tier3_capa_all={total_tier3_capa_all} < U={U}. 최선 선택으로 진행(전원 실패 가능).")
         
         # --- (4) 후보군 확장: 기존 코드와 동일 ---
         # 가까운 병원들을 포함한 넉넉한 후보군(df_cand)
         df_sorted = df.sort_values("euclidean_distance").reset_index(drop=True)
-        sum_capa = 0; sum_capa_tier1 = 0; cand_idx = []; 
+        sum_capa = 0; sum_capa_tier3 = 0; cand_idx = []; 
         for i, row in df_sorted.iterrows():
             cand_idx.append(i)
             sum_capa += int(row["eff"])
-            if row["is_tier1"] == 1: sum_capa_tier1 += int(row["eff"]); 
+            if row["is_tier3"] == 1: sum_capa_tier3 += int(row["eff"]); 
             if (sum_capa >= N * buffer_ratio): break
         if not cand_idx:
             cand_idx = list(range(len(df_sorted)))
@@ -462,32 +462,32 @@ class ScenarioGenerator:
 
         # ================================================================= #
         # 위에서 선택된 목록에 최소 조건을 만족하는지 확인하고 부족할 시 추가
-        # 규칙 1: 상급종합병원(Tier 1) 최소 2개 보장
-        final_tier1 = df_selected[df_selected["is_tier1"] == 1]
-        num_to_ensure_tier1 = 2 - len(final_tier1)
-        if num_to_ensure_tier1 > 0:
-            print(f"  INFO: 최종 목록의 상급병원이 {len(final_tier1)}개. 최소 2개를 위해 '추가'합니다.")
+        # 규칙 1: 상급종합병원(Tier 3) 최소 2개 보장
+        final_tier3 = df_selected[df_selected["is_tier3"] == 1]
+        num_to_ensure_tier3 = 2 - len(final_tier3)
+        if num_to_ensure_tier3 > 0:
+            print(f"  INFO: 최종 목록의 상급병원이 {len(final_tier3)}개. 최소 2개를 위해 '추가'합니다.")
             # 전체 병원 목록에서 아직 선택되지 않은 가장 가까운 상급병원을 찾아서 최소 2개가 될때까지 추가
-            candidates = df_sorted[(df_sorted["is_tier1"] == 1) & (~df_sorted.index.isin(df_selected.index))]
+            candidates = df_sorted[(df_sorted["is_tier3"] == 1) & (~df_sorted.index.isin(df_selected.index))]
             if not candidates.empty:
-                hospitals_to_add = candidates.head(num_to_ensure_tier1)
+                hospitals_to_add = candidates.head(num_to_ensure_tier3)
                 df_selected = pd.concat([df_selected, hospitals_to_add])
 
-        # 규칙 2: 상급종합병원이 환자 40% 수용 용량 보장 (Tier 1 기준, 환자수가 많을때 최소 red환자 10% 이상 + 확률분포 고려한 비율)
+        # 규칙 2: 상급종합병원이 환자 40% 수용 용량 보장 (Tier 3 기준, 환자수가 많을때 최소 red환자 10% 이상 + 확률분포 고려한 비율)
         target_capa = N * 0.4
-        current_capa = df_selected[df_selected["is_tier1"] == 1]["eff"].sum()
+        current_capa = df_selected[df_selected["is_tier3"] == 1]["eff"].sum()
         while current_capa < target_capa:
             print(f"  INFO: 상급병원 용량이 {current_capa}/{target_capa}. 용량을 위해 '추가'합니다.")
-            candidates = df_sorted[(df_sorted["is_tier1"] == 1) & (~df_sorted.index.isin(df_selected.index))]
+            candidates = df_sorted[(df_sorted["is_tier3"] == 1) & (~df_sorted.index.isin(df_selected.index))]
             if candidates.empty: print("  WARNING: 추가할 상급병원이 더 이상 없습니다."); break
             hospital_to_add = candidates.head(1)
             df_selected = pd.concat([df_selected, hospital_to_add])
-            current_capa = df_selected[df_selected["is_tier1"] == 1]["eff"].sum()
+            current_capa = df_selected[df_selected["is_tier3"] == 1]["eff"].sum()
 
         # 규칙 3: 그 외 병원(Tier 2 등) 최소 1개 보장 (우연히 가장 가까이 있는 병원이 상급종합병원뿐일때 64개의 룰 중 실패하는 룰이 존재하므로)
-        if len(df_selected[df_selected["is_tier1"] == 0]) == 0:
+        if len(df_selected[df_selected["is_tier3"] == 0]) == 0:
             print("  INFO: 최종 목록에 Tier 2 병원이 없음. 시뮬레이션 오류 방지를 위해 '추가'합니다.")
-            candidates = df_sorted[(df_sorted["is_tier1"] == 0) & (~df_sorted.index.isin(df_selected.index))]
+            candidates = df_sorted[(df_sorted["is_tier3"] == 0) & (~df_sorted.index.isin(df_selected.index))]
             if not candidates.empty:
                 df_selected = pd.concat([df_selected, candidates.head(1)])
 
@@ -534,17 +534,17 @@ class ScenarioGenerator:
             uav_n = int(max(0, uav_count))
 
             if uav_n > 0:
-                # 5-1: Red UAV 이송용 헬기장+Tier1 병원 최소 1개 보장
-                helipad_tier1_hospitals = df_selected[
+                # 5-1: Red UAV 이송용 헬기장+Tier3 병원 최소 1개 보장
+                helipad_tier3_hospitals = df_selected[
                     (df_selected["헬기장 여부"] == 1) &
-                    (df_selected["is_tier1"] == 1)
+                    (df_selected["is_tier3"] == 1)
                 ]
 
-                if len(helipad_tier1_hospitals) == 0:
-                    print("  INFO: Red UAV 이송용 헬기장+Tier1 병원이 없음. 추가 중...")
+                if len(helipad_tier3_hospitals) == 0:
+                    print("  INFO: Red UAV 이송용 헬기장+Tier3 병원이 없음. 추가 중...")
                     candidates = df_sorted[
                         (df_sorted["헬기장 여부"] == 1) &
-                        (df_sorted["is_tier1"] == 1) &
+                        (df_sorted["is_tier3"] == 1) &
                         (~df_sorted.index.isin(df_selected.index))
                     ]
 
@@ -554,21 +554,21 @@ class ScenarioGenerator:
                         added_name = hospital_to_add['요양기관명'].values[0]
                         print(f"    → 추가됨: {added_name}")
                     else:
-                        print("  ⚠️ 경고: 전체 데이터에 헬기장+Tier1 병원 없음. Red UAV 이송 불가!")
+                        print("  ⚠️ 경고: 전체 데이터에 헬기장+Tier3 병원 없음. Red UAV 이송 불가!")
                 else:
-                    print(f"  ✓ 헬기장+Tier1 병원 {len(helipad_tier1_hospitals)}개 (Red UAV 이송 가능)")
+                    print(f"  ✓ 헬기장+Tier3 병원 {len(helipad_tier3_hospitals)}개 (Red UAV 이송 가능)")
 
                 # 5-2: Yellow UAV 이송용 헬기장+Tier2 병원 최소 1개 보장
                 helipad_tier2_hospitals = df_selected[
                     (df_selected["헬기장 여부"] == 1) &
-                    (df_selected["is_tier1"] == 0)
+                    (df_selected["is_tier3"] == 0)
                 ]
 
                 if len(helipad_tier2_hospitals) == 0:
                     print("  INFO: Yellow UAV 이송용 헬기장+Tier2 병원이 없음. 추가 중...")
                     candidates = df_sorted[
                         (df_sorted["헬기장 여부"] == 1) &
-                        (df_sorted["is_tier1"] == 0) &
+                        (df_sorted["is_tier3"] == 0) &
                         (~df_sorted.index.isin(df_selected.index))
                     ]
 
@@ -587,7 +587,7 @@ class ScenarioGenerator:
             print("  ⚠️ '헬기장 여부' 컬럼이 원본 데이터에 없습니다. 헬기장+Tier 교집합 보장 로직을 건너뜁니다.")
 
         df_euc = df_selected.sort_values("euclidean_distance").reset_index(drop=True).copy()
-        print(f" 최종 생성된 병원: {len(df_euc)}곳 (상급: {df_euc['is_tier1'].sum()}곳, 종합 등: {len(df_euc) - df_euc['is_tier1'].sum()}곳)")
+        print(f" 최종 생성된 병원: {len(df_euc)}곳 (상급: {df_euc['is_tier3'].sum()}곳, 종합 등: {len(df_euc) - df_euc['is_tier3'].sum()}곳)")
 
         # ---------- (6) EUC 파일은 나중에 road 순서로 저장 (인덱스 일치 보장) ----------
         # ★ CRITICAL: distance_Hos2Site_euc.csv는 road 순서를 따라야 h_states와 인덱스가 일치
@@ -773,9 +773,9 @@ class ScenarioGenerator:
                 "ratio": self.patient_config["ratio"][t],
                 "rescue_param_alpha": α,
                 "rescue_param_beta": β,
-                "treat_tier1": self.patient_config["treat_tier1"][t],
+                "treat_tier3": self.patient_config["treat_tier3"][t],
                 "treat_tier2": self.patient_config["treat_tier2"][t],
-                "treat_tier1_mean": self.patient_config["treat_tier1_mean"][t],
+                "treat_tier3_mean": self.patient_config["treat_tier3_mean"][t],
                 "treat_tier2_mean": self.patient_config["treat_tier2_mean"][t]
             })
         df = pd.DataFrame(rows)

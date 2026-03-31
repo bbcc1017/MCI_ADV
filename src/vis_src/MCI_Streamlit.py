@@ -1885,12 +1885,12 @@ with tabs[0]:
                             print(f"⚠️ UAV 병원 '{name}' 좌표 없음")
                 else:
                     print("⚠️ uav_info.csv 구 형식 (2컬럼) - 업데이트 필요")
-                    # 폴백: tier1 사용
+                    # 폴백: tier3 사용
                     if not hinfo_df.empty and {"Grade Code","Hospital Name"}.issubset(hinfo_df.columns):
                         tmp = hinfo_df.copy()
                         tmp["Grade Code"] = pd.to_numeric(tmp["Grade Code"], errors="coerce")
                         for _, rr in tmp[tmp["Grade Code"]==1].iterrows():
-                            name = str(rr.get("Hospital Name","Tier1")).strip()
+                            name = str(rr.get("Hospital Name","Tier3")).strip()
                             if name in xl_coord:
                                 y, x = xl_coord[name]
                                 uav_dispatch_latlons.append((y, x, name, 1))
@@ -1899,12 +1899,12 @@ with tabs[0]:
         else:
             print(f"⚠️ uav_info.csv 없음: {uav_info_path}")
 
-        # 데이터가 없으면 tier1 폴백
+        # 데이터가 없으면 tier3 폴백
         if not uav_dispatch_latlons and not hinfo_df.empty and {"Grade Code","Hospital Name"}.issubset(hinfo_df.columns):
             tmp = hinfo_df.copy()
             tmp["Grade Code"] = pd.to_numeric(tmp["Grade Code"], errors="coerce")
             for _, rr in tmp[tmp["Grade Code"]==1].iterrows():
-                name = str(rr.get("Hospital Name","Tier1")).strip()
+                name = str(rr.get("Hospital Name","Tier3")).strip()
                 if name in xl_coord:
                     y, x = xl_coord[name]
                     uav_dispatch_latlons.append((y, x, name, 1))
