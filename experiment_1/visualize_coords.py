@@ -1,14 +1,14 @@
 """
 visualize_coords.py
-배치 실험 결과 지도 시각화 - 단일 HTML, Reward / Time / PDR 버튼 전환
+Batch experiment results map visualization - single HTML, Reward / Time / PDR button toggle
 
-stat.txt 구조:
-  320행 = 64룰 × 5블록 순서: Reward → Time → PDR → RewardWOG → PDRWOG
-  각 행: rule_name  mean  std  95%CI_half  (2칸 이상 공백 구분)
-  시각화 값 = 각 블록 64개 mean의 평균 (mean of means)
+stat.txt structure:
+  320 rows = 64 rules × 5 blocks order: Reward → Time → PDR → RewardWOG → PDRWOG
+  Each row: rule_name  mean  std  95%CI_half  (2+ space delimited)
+  Visualization value = mean of 64 means per block (mean of means)
 
-지표 방향: Reward 높을수록 좋음 / Time·PDR 낮을수록 좋음
-시나리오 생성 실패 좌표는 검은색 마커로 표시.
+Metric direction: Reward higher is better / Time·PDR lower is better
+Coordinates with failed scenario generation are shown as black markers.
 
 Usage:
     python experiment_1/visualize_coords.py
@@ -31,16 +31,18 @@ _PROJECT_ROOT = _SCRIPT_DIR.parent
 # ---------------------------------------------------------------------------
 
 def parse_args():
-    p = argparse.ArgumentParser(description="배치 실험 결과 지도 시각화")
+    p = argparse.ArgumentParser(description="Batch experiment results map visualization")
     p.add_argument("--progress",    default="experiment_1/progress.json")
     p.add_argument("--coords",      default="experiment_1/coords_korea.csv")
     p.add_argument("--results-dir", default=None)
     p.add_argument("--out",         default="",
-                   help="출력 HTML 경로 (기본: experiment_1/coords_map.html)")
+                   help="Output HTML path (default: experiment_1/coords_map.html)")
     p.add_argument("--clip-pct",    type=float, default=5.0,
-                   help="컬러맵 클리핑 백분위수 (기본: 5 → 5th~95th percentile 범위 사용, 0이면 비활성)")
+                   help="Colormap clipping percentile (default: 5 → 5th~95th percentile range, 0 to disable)")
     p.add_argument("--outlier-n",   type=int,   default=3,
-                   help="양쪽 이상치 개수 (기본: 3 → 상위 3개·하위 3개 강조, 0이면 비활성)")
+                   help="Number of outliers on each side (default: 3 → highlight top/bottom 3, 0 to disable)")
+    p.add_argument("--hist-format", choices=["png", "pdf"], default="pdf",
+                   help="Histogram output format (default: pdf — vector, ideal for papers)")
     return p.parse_args()
 
 
@@ -195,8 +197,8 @@ def compute_ranges(data: dict, clip_pct: float) -> dict:
             vmin, vmax = true_min, true_max
             clip_str = "min~max"
         ranges[metric] = (vmin, vmax, true_min, true_max)
-        print(f"  {label}: 컬러범위 {clip_str} = [{vmin:.4f}, {vmax:.4f}]  "
-              f"(전체 [{true_min:.4f}, {true_max:.4f}])")
+        print(f"  {label}: color range {clip_str} = [{vmin:.4f}, {vmax:.4f}]  "
+              f"(full [{true_min:.4f}, {true_max:.4f}])")
     return ranges
 
 
@@ -236,7 +238,7 @@ def compute_color(val: float, vmin: float, vmax: float, high_is_good: bool) -> s
     try:
         import matplotlib.pyplot as plt
     except ImportError:
-        print("[ERROR] matplotlib 필요: pip install matplotlib")
+        print("[ERROR] matplotlib required: pip install matplotlib")
         sys.exit(1)
 
     t = 0.5 if vmax == vmin else (val - vmin) / (vmax - vmin)
@@ -252,36 +254,24 @@ def compute_color(val: float, vmin: float, vmax: float, high_is_good: bool) -> s
 # ---------------------------------------------------------------------------
 
 HIST_CONFIG = [
-    ("reward", "Reward",     True,  "RdYlGn",  "높을수록 좋음"),
-    ("time",   "Time (min)", False, "RdYlGn_r", "낮을수록 좋음"),
-    ("pdr",    "PDR",        False, "RdYlGn_r", "낮을수록 좋음"),
+    ("reward", "Reward",     True,  "RdYlGn",   "Higher is better"),
+    ("time",   "Time (min)", False, "RdYlGn_r",  "Lower is better"),
+    ("pdr",    "PDR",        False, "RdYlGn_r",  "Lower is better"),
 ]
 
 
-def build_histograms(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier_n: int):
-    """각 지표별 히스토그램 서브플롯 이미지 생성"""
+def build_histograms(data: dict, out_path: Path, ranges: dict, clip_pct: float,
+                     outlier_n: int, hist_fmt: str = "pdf"):
+    """Generate histogram subplot image for each metric."""
     try:
         import matplotlib.pyplot as plt
         import matplotlib.ticker as ticker
-        import matplotlib.font_manager as fm
         import numpy as np
     except ImportError:
-        print("[ERROR] matplotlib / numpy 필요: pip install matplotlib numpy")
+        print("[ERROR] matplotlib / numpy required: pip install matplotlib numpy")
         sys.exit(1)
 
-    # 한글 폰트 설정 (Windows: Malgun Gothic, macOS: AppleGothic, Linux: NanumGothic)
-    import platform
-    _system = platform.system()
-    if _system == "Windows":
-        plt.rcParams["font.family"] = "Malgun Gothic"
-    elif _system == "Darwin":
-        plt.rcParams["font.family"] = "AppleGothic"
-    else:
-        # Linux: 설치된 나눔 계열 폰트 탐색
-        _nanum = [f.name for f in fm.fontManager.ttflist if "Nanum" in f.name]
-        if _nanum:
-            plt.rcParams["font.family"] = _nanum[0]
-    plt.rcParams["axes.unicode_minus"] = False  # 마이너스 기호 깨짐 방지
+    plt.rcParams["axes.unicode_minus"] = False
 
     fig, axes = plt.subplots(1, 3, figsize=(17, 5.5))
     fig.suptitle("MCI Simulation - Metric Distributions across Coordinates",
@@ -290,7 +280,7 @@ def build_histograms(data: dict, out_path: Path, ranges: dict, clip_pct: float, 
     for ax, (metric, label, high_is_good, cmap_name, direction) in zip(axes, HIST_CONFIG):
         vals = [v[metric] for v in data.values() if v[metric] is not None]
         if not vals:
-            ax.text(0.5, 0.5, "데이터 없음", ha="center", va="center",
+            ax.text(0.5, 0.5, "No data", ha="center", va="center",
                     transform=ax.transAxes)
             ax.set_title(label)
             continue
@@ -367,8 +357,8 @@ def build_histograms(data: dict, out_path: Path, ranges: dict, clip_pct: float, 
 
         # 제목: label + 방향 안내
         ax.set_title(f"{label}  ({direction})", fontsize=11, fontweight="bold", pad=8)
-        ax.set_xlabel("값", fontsize=9)
-        ax.set_ylabel("빈도 (count)", fontsize=9)
+        ax.set_xlabel("Value", fontsize=9)
+        ax.set_ylabel("Frequency", fontsize=9)
 
         ax.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.5)
         ax.spines[["top", "right"]].set_visible(False)
@@ -401,22 +391,25 @@ def build_histograms(data: dict, out_path: Path, ranges: dict, clip_pct: float, 
         if clip_pct > 0:
             legend_handles.append(
                 Line2D([], [], color="#555555", linewidth=1.1, linestyle=":",
-                       label=f"P{clip_pct:.0f}/P{100-clip_pct:.0f} 클리핑"))
+                       label=f"P{clip_pct:.0f}/P{100-clip_pct:.0f} clipping"))
         if outlier_n > 0:
             legend_handles += [
                 Line2D([], [], color=OUTLIER_GOOD, linewidth=1.5, linestyle="--",
-                       label=f"★ 우수 이상치 (상위 {outlier_n}개)"),
+                       label=f"★ Top Outliers (top {outlier_n})"),
                 Line2D([], [], color=OUTLIER_BAD,  linewidth=1.5, linestyle="--",
-                       label=f"▼ 열악 이상치 (하위 {outlier_n}개)"),
+                       label=f"▼ Bottom Outliers (bottom {outlier_n})"),
             ]
         ax.legend(handles=legend_handles, fontsize=8, loc="lower center",
                   bbox_to_anchor=(0.5, -0.30), ncol=3, frameon=True)
 
     fig.tight_layout(rect=[0, 0.08, 1, 0.95])
-    hist_path = out_path.with_name(out_path.stem + "_hist.png")
-    fig.savefig(str(hist_path), dpi=300, bbox_inches="tight")
+    hist_path = out_path.with_name(out_path.stem + f"_hist.{hist_fmt}")
+    if hist_fmt == "pdf":
+        fig.savefig(str(hist_path), bbox_inches="tight")
+    else:
+        fig.savefig(str(hist_path), dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print(f"  히스토그램 저장: {hist_path}")
+    print(f"  Histogram saved: {hist_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +434,7 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
     try:
         import folium
     except ImportError:
-        print("[ERROR] folium 필요: pip install folium")
+        print("[ERROR] folium required: pip install folium")
         sys.exit(1)
 
     # 지도 중심
@@ -471,16 +464,16 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
                     "lat": v["lat"], "lon": v["lon"],
                     "color": "#222222",
                     "radius": 5, "opacity": 0.7, "weight": 1,
-                    "popup": f"coord_id={cid}<br>({v['lat']:.6f}, {v['lon']:.6f})<br>데이터 없음",
-                    "tooltip": f"ID:{cid} | 데이터 없음",
+                    "popup": f"coord_id={cid}<br>({v['lat']:.6f}, {v['lon']:.6f})<br>No data",
+                    "tooltip": f"ID:{cid} | No data",
                 })
             else:
                 if cid in good_ids:
-                    color, tag = OUTLIER_GOOD, " ★우수"
+                    color, tag = OUTLIER_GOOD, " ★Top"
                     good_list.append({"cid": cid, "lat": v["lat"],
                                       "lon": v["lon"], "val": val})
                 elif cid in bad_ids:
-                    color, tag = OUTLIER_BAD, " ▼열악"
+                    color, tag = OUTLIER_BAD, " ▼Bottom"
                     bad_list.append({"cid": cid, "lat": v["lat"],
                                      "lon": v["lon"], "val": val})
                 else:
@@ -503,17 +496,17 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
                       reverse=not high_is_good)
 
         no_data = sum(1 for mk in markers if mk["color"] == "#222222")
-        print(f"  {label}: 유효={len(valid_vals)}, 없음={no_data}, "
-              f"우수이상치={len(good_ids)}, 열악이상치={len(bad_ids)}")
+        print(f"  {label}: valid={len(valid_vals)}, no_data={no_data}, "
+              f"top_outliers={len(good_ids)}, bottom_outliers={len(bad_ids)}")
 
         if high_is_good:
             gradient    = GRAD_HIGH
-            left_label  = f"{vmin:.3f} (나쁨)"
-            right_label = f"{vmax:.3f} (좋음)"
+            left_label  = f"{vmin:.3f} (Bad)"
+            right_label = f"{vmax:.3f} (Good)"
         else:
             gradient    = GRAD_LOW
-            left_label  = f"{vmin:.3f} (좋음)"
-            right_label = f"{vmax:.3f} (나쁨)"
+            left_label  = f"{vmin:.3f} (Good)"
+            right_label = f"{vmax:.3f} (Bad)"
 
         js_data[metric] = {
             "markers":      markers,
@@ -536,7 +529,7 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
     data_json = json.dumps(js_data, ensure_ascii=False)
 
     custom_html = f"""
-<!-- ===== MCI 시각화 커스텀 UI ===== -->
+<!-- ===== MCI Custom Visualization UI ===== -->
 <style>
   #mci-buttons {{
     position: fixed; top: 80px; right: 10px; z-index: 9999;
@@ -605,7 +598,7 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
 </style>
 
 <div id="mci-buttons">
-  <b>시각화 모드</b>
+  <b>Visualization Mode</b>
   <button class="mci-btn active" id="btn-reward" onclick="mciSwitch('reward')">Reward</button>
   <button class="mci-btn"        id="btn-time"   onclick="mciSwitch('time')">Time</button>
   <button class="mci-btn"        id="btn-pdr"    onclick="mciSwitch('pdr')">PDR</button>
@@ -633,8 +626,11 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
       </summary>
       <div class="cb-detail-body" id="list-bad"></div>
     </details>
-    <div class="cb-nodata">
-      <span class="cb-dot" style="background:#222222;"></span>데이터 없음
+    <div class="cb-nodata" id="cb-nodata-row">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
+        <input type="checkbox" id="nodata-toggle" checked onchange="mciToggleNoData()">
+        <span class="cb-dot" style="background:#222222;"></span>No Data
+      </label>
     </div>
   </div>
 </div>
@@ -643,6 +639,7 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
 (function() {{
   var modesData = {data_json};
   var currentLayer = null;
+  var currentMode  = 'reward';
 
   function getMap() {{
     return window["{map_var}"];
@@ -650,7 +647,7 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
 
   function buildRows(items, valLabel) {{
     if (!items || items.length === 0)
-      return '<div style="color:#999;padding:2px 0;">없음</div>';
+      return '<div style="color:#999;padding:2px 0;">None</div>';
     return items.map(function(it) {{
       return '<div class="cb-detail-row">'
         + '<span class="cb-idx">#' + it.cid + '</span>'
@@ -664,14 +661,18 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
     var mapObj = getMap();
     if (!mapObj) return;
 
+    currentMode = mode;
+
     if (currentLayer) {{
       mapObj.removeLayer(currentLayer);
       currentLayer = null;
     }}
 
     var d = modesData[mode];
+    var showNoData = document.getElementById('nodata-toggle').checked;
     var lg = L.layerGroup();
     d.markers.forEach(function(mk) {{
+      if (!showNoData && mk.color === '#222222') return;
       L.circleMarker([mk.lat, mk.lon], {{
         radius:      mk.radius,
         color:       mk.color,
@@ -683,27 +684,31 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
     lg.addTo(mapObj);
     currentLayer = lg;
 
-    // 컬러바
+    // colorbar
     document.getElementById('cb-title').textContent = d.label;
     document.getElementById('cb-gradient').style.background = d.gradient;
     document.getElementById('cb-left').textContent  = d.left_label;
     document.getElementById('cb-right').textContent = d.right_label;
 
-    // 이상치 범례 + 접힘 목록
+    // outlier legend + collapsible list
     document.getElementById('dot-good').style.background = d.outlier_good_color;
     document.getElementById('dot-bad').style.background  = d.outlier_bad_color;
     document.getElementById('cb-good-label').textContent =
-      '★ 우수 이상치 (' + d.good_outlier + '개)';
+      '★ Top Outliers (' + d.good_outlier + ')';
     document.getElementById('cb-bad-label').textContent =
-      '▼ 열악 이상치 (' + d.bad_outlier + '개)';
+      '▼ Bottom Outliers (' + d.bad_outlier + ')';
     document.getElementById('list-good').innerHTML = buildRows(d.good_list, d.label);
     document.getElementById('list-bad').innerHTML  = buildRows(d.bad_list,  d.label);
 
-    // 버튼 스타일
+    // button style
     ['reward','time','pdr'].forEach(function(m) {{
       document.getElementById('btn-' + m).className =
         'mci-btn' + (m === mode ? ' active' : '');
     }});
+  }};
+
+  window.mciToggleNoData = function() {{
+    window.mciSwitch(currentMode);
   }};
 
   function init() {{
@@ -722,7 +727,7 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     m.save(str(out_path))
-    print(f"\n  저장 완료: {out_path}")
+    print(f"\n  Saved: {out_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -734,7 +739,7 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     print(f"\n{'='*50}")
-    print(f"  MCI 결과 지도 시각화 (단일 HTML)")
+    print(f"  MCI Results Map Visualization (single HTML)")
     print(f"{'='*50}")
 
     coords_path   = resolve(args.coords)
@@ -748,23 +753,24 @@ def main():
     else:
         results_dir = find_results_dir(progress)
         if results_dir is None:
-            print("[ERROR] results 폴더 자동 탐색 실패. --results-dir 옵션으로 지정하세요.")
+            print("[ERROR] Auto-detection of results folder failed. Use --results-dir option.")
             sys.exit(1)
-    print(f"  results 폴더: {results_dir}")
+    print(f"  results dir: {results_dir}")
 
     out_path = resolve(args.out) if args.out else _SCRIPT_DIR / "coords_map.html"
 
-    print("  데이터 수집 중...")
+    print("  Collecting data...")
     data = collect_data(coords, progress, results_dir)
 
-    print("  컬러맵 범위 계산 중...")
+    print("  Computing colormap ranges...")
     ranges = compute_ranges(data, args.clip_pct)
 
-    print("  지도 생성 중...")
+    print("  Building map...")
     build_map(data, out_path, ranges, args.clip_pct, args.outlier_n)
 
-    print("  히스토그램 생성 중...")
-    build_histograms(data, out_path, ranges, args.clip_pct, args.outlier_n)
+    print("  Building histograms...")
+    build_histograms(data, out_path, ranges, args.clip_pct, args.outlier_n,
+                     hist_fmt=args.hist_format)
 
     print(f"{'='*50}\n")
 

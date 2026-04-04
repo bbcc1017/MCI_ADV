@@ -177,7 +177,6 @@ class ScenarioGenerator:
             "origin": f"{start[1]},{start[0]}",  # lon,lat 순서
             "destination": f"{end[1]},{end[0]}",
             "priority": "TIME",  # 최단시간 우선
-            "avoid": "ferries",  # 페리 항로 제외 (섬→육지 해상 경로 차단)
             "car_fuel": "GASOLINE",
             "car_hipass": "false",
             "alternatives": "false",
@@ -1042,8 +1041,8 @@ if __name__ == "__main__":
     parser.add_argument("--kakao_api_key", type=str, default=None, help="카카오 모빌리티 REST API 키")
     parser.add_argument("--departure_time", type=str, default=None, help="출발시간 (YYYYMMDDHHMM 형식, 예: 202512241800)")
     parser.add_argument("--is_use_time", type=str, default="true", help="API duration 사용 여부 (true/false)")
-    parser.add_argument("--amb_handover_time", type=float, default=0.0, help="구급차 환자 인계시간 (분)")
-    parser.add_argument("--uav_handover_time", type=float, default=0.0, help="UAV 환자 인계시간 (분)")
+    parser.add_argument("--amb_handover_time", type=float, default=10.0, help="구급차 환자 인계시간 (분)")
+    parser.add_argument("--uav_handover_time", type=float, default=15.0, help="UAV 환자 인계시간 (분)")
     parser.add_argument("--duration_coeff", type=float, default=1.0, help="API duration 시간가중치 (기본값: 1.0)")
 
     args = parser.parse_args()

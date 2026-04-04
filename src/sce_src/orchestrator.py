@@ -476,24 +476,10 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
         pass
     try:
         if uav_csv and os.path.isfile(uav_csv) and pd is not None:
-            # UAV 대수: 전체 UAV CSV 행 수를 상급종합병원 수로 나눔
+            # Current uav_info.csv schema stores exactly one row per UAV.
+            # Use the row count directly for summary reporting.
             uav_df = pd.read_csv(uav_csv, encoding="utf-8-sig")
-            total_uav_count = len(uav_df)
-
-            # 상급종합병원 수 계산 (hospital_info에서 종별코드=1)
-            hosp_info_csv = _resolve(hosp.get("info_path"))
-            if hosp_info_csv and os.path.isfile(hosp_info_csv):
-                hosp_df = pd.read_csv(hosp_info_csv, encoding="utf-8-sig")
-                if "종별코드" in hosp_df.columns:
-                    tertiary_hospital_count = (hosp_df["종별코드"] == 1).sum()
-                    if tertiary_hospital_count > 0:
-                        meta["UAV수"] = total_uav_count // tertiary_hospital_count
-                    else:
-                        meta["UAV수"] = total_uav_count
-                else:
-                    meta["UAV수"] = total_uav_count
-            else:
-                meta["UAV수"] = total_uav_count
+            meta["UAV수"] = len(uav_df)
     except Exception:
         pass
 

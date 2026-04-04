@@ -319,11 +319,14 @@
       "finished_at": "2026-03-19 12:55:36"
     },
     "39": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.2006546,126.59869548) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.2006546, \"longitude\"",
-      "finished_at": "2026-03-24 13:22:18"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.2006546,126.59869548)\\config_(34.2006546,126.59869548).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.9,
+      "sim_elapsed_sec": 6.4,
+      "finished_at": "2026-04-04 17:51:12",
+      "note": "merged from fail rerun no-ferry (fail_cid=14)"
     },
     "40": {
       "status": "done",
@@ -353,11 +356,14 @@
       "finished_at": "2026-03-19 12:56:36"
     },
     "43": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.26387767,126.56955375) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.26387767, \"longitud",
-      "finished_at": "2026-03-24 13:22:23"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.26387767,126.56955375)\\config_(36.26387767,126.56955375).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 16.1,
+      "sim_elapsed_sec": 7.9,
+      "finished_at": "2026-04-03 13:27:28",
+      "note": "merged from fail rerun no-ferry (fail_cid=15)"
     },
     "44": {
       "status": "done",
@@ -448,11 +454,14 @@
       "finished_at": "2026-03-19 13:00:00"
     },
     "54": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.73595232,125.89692003) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.73595232, \"longitud",
-      "finished_at": "2026-03-24 13:22:24"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.73595232,125.89692003)\\config_(34.73595232,125.89692003).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.9,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 17:51:32",
+      "note": "merged from fail rerun no-ferry (fail_cid=17)"
     },
     "55": {
       "status": "done",
@@ -516,11 +525,14 @@
       "finished_at": "2026-03-19 13:01:59"
     },
     "62": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.4743084,126.04224114) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.4743084, \"longitude\"",
-      "finished_at": "2026-03-24 13:22:25"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.4743084,126.04224114)\\config_(34.4743084,126.04224114).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 11.5,
+      "sim_elapsed_sec": 6.2,
+      "finished_at": "2026-04-04 17:51:50",
+      "note": "merged from fail rerun no-ferry (fail_cid=19)"
     },
     "63": {
       "status": "failed",
@@ -725,11 +737,14 @@
       "finished_at": "2026-03-19 13:08:08"
     },
     "87": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.9082046,126.99186891) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.9082046, \"longitude\"",
-      "finished_at": "2026-03-24 13:22:36"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.9082046,126.99186891)\\config_(35.9082046,126.99186891).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.6,
+      "sim_elapsed_sec": 8.1,
+      "finished_at": "2026-04-03 13:27:55",
+      "note": "merged from fail rerun no-ferry (fail_cid=27)"
     },
     "88": {
       "status": "done",
@@ -741,11 +756,14 @@
       "finished_at": "2026-03-19 13:08:35"
     },
     "89": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.61972925,126.05722772) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.61972925, \"longitud",
-      "finished_at": "2026-03-24 13:22:37"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.61972925,126.05722772)\\config_(34.61972925,126.05722772).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.0,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 17:52:12",
+      "note": "merged from fail rerun no-ferry (fail_cid=28)"
     },
     "90": {
       "status": "done",
@@ -1063,11 +1081,14 @@
       "finished_at": "2026-03-20 13:13:54"
     },
     "127": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.37971909,126.7456076) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.37971909, \"longitude",
-      "finished_at": "2026-03-24 13:22:47"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.37971909,126.7456076)\\config_(33.37971909,126.7456076).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 11.9,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 17:52:36",
+      "note": "merged from fail rerun no-ferry (fail_cid=38)"
     },
     "128": {
       "status": "done",
@@ -1109,11 +1130,14 @@
       "finished_at": "2026-03-20 13:14:43"
     },
     "133": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.7498847,126.81188064) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.7498847, \"longitude\"",
-      "finished_at": "2026-03-24 13:22:55"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.7498847,126.81188064)\\config_(35.7498847,126.81188064).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.0,
+      "sim_elapsed_sec": 8.1,
+      "finished_at": "2026-04-03 13:28:31",
+      "note": "merged from fail rerun no-ferry (fail_cid=42)"
     },
     "134": {
       "status": "failed",
@@ -1268,11 +1292,14 @@
       "finished_at": "2026-03-20 13:33:45"
     },
     "152": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.08940541,126.83589385) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.08940541, \"longitud",
-      "finished_at": "2026-03-24 13:23:00"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.08940541,126.83589385)\\config_(36.08940541,126.83589385).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 20.7,
+      "sim_elapsed_sec": 7.5,
+      "finished_at": "2026-04-03 13:29:02",
+      "note": "merged from fail rerun no-ferry (fail_cid=48)"
     },
     "153": {
       "status": "done",
@@ -1336,11 +1363,14 @@
       "finished_at": "2026-03-20 13:36:01"
     },
     "160": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.96237441,126.95607215) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.96237441, \"longitud",
-      "finished_at": "2026-03-24 13:23:05"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.96237441,126.95607215)\\config_(35.96237441,126.95607215).yaml",
+      "sim_ok": false,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.3,
+      "sim_elapsed_sec": 2.4,
+      "finished_at": "2026-04-03 13:29:17",
+      "note": "merged from fail rerun no-ferry (fail_cid=50)"
     },
     "161": {
       "status": "done",
@@ -1411,11 +1441,14 @@
       "finished_at": "2026-03-20 13:38:12"
     },
     "169": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.95422218,126.28691343) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.95422218, \"longitud",
-      "finished_at": "2026-03-24 13:23:07"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.95422218,126.28691343)\\config_(34.95422218,126.28691343).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 15.1,
+      "sim_elapsed_sec": 8.0,
+      "finished_at": "2026-04-04 17:53:05",
+      "note": "merged from fail rerun no-ferry (fail_cid=53)"
     },
     "170": {
       "status": "failed",
@@ -1425,11 +1458,14 @@
       "finished_at": "2026-03-24 13:23:07"
     },
     "171": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.46641117,126.59783895) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.46641117, \"longitud",
-      "finished_at": "2026-03-24 13:23:14"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.46641117,126.59783895)\\config_(33.46641117,126.59783895).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.6,
+      "sim_elapsed_sec": 7.8,
+      "finished_at": "2026-04-04 17:53:28",
+      "note": "merged from fail rerun no-ferry (fail_cid=55)"
     },
     "172": {
       "status": "done",
@@ -1586,11 +1622,14 @@
       "finished_at": "2026-03-24 13:23:16"
     },
     "190": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.18815301,126.60129463) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.18815301, \"longitud",
-      "finished_at": "2026-03-24 13:23:17"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.18815301,126.60129463)\\config_(34.18815301,126.60129463).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.1,
+      "sim_elapsed_sec": 8.1,
+      "finished_at": "2026-04-04 17:53:53",
+      "note": "merged from fail rerun no-ferry (fail_cid=60)"
     },
     "191": {
       "status": "done",
@@ -1686,11 +1725,14 @@
       "finished_at": "2026-03-20 14:17:40"
     },
     "202": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.47167675,126.40575655) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.47167675, \"longitud",
-      "finished_at": "2026-03-24 13:23:23"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.47167675,126.40575655)\\config_(33.47167675,126.40575655).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.9,
+      "sim_elapsed_sec": 8.1,
+      "finished_at": "2026-04-04 17:54:15",
+      "note": "merged from fail rerun no-ferry (fail_cid=64)"
     },
     "203": {
       "status": "done",
@@ -1752,11 +1794,14 @@
       "finished_at": "2026-03-24 13:23:24"
     },
     "210": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.52287016,126.57537702) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.52287016, \"longitud",
-      "finished_at": "2026-03-24 13:23:34"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.52287016,126.57537702)\\config_(34.52287016,126.57537702).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.3,
+      "sim_elapsed_sec": 8.3,
+      "finished_at": "2026-04-04 17:54:37",
+      "note": "merged from fail rerun no-ferry (fail_cid=67)"
     },
     "211": {
       "status": "done",
@@ -1768,11 +1813,14 @@
       "finished_at": "2026-03-20 14:20:15"
     },
     "212": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.57765664,127.25969434) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.57765664, \"longitud",
-      "finished_at": "2026-03-24 13:23:45"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.57765664,127.25969434)\\config_(34.57765664,127.25969434).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.5,
+      "sim_elapsed_sec": 7.0,
+      "finished_at": "2026-04-04 17:54:58",
+      "note": "merged from fail rerun no-ferry (fail_cid=68)"
     },
     "213": {
       "status": "failed",
@@ -1955,11 +2003,14 @@
       "finished_at": "2026-03-20 16:19:03"
     },
     "235": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.78233593,125.9699426) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.78233593, \"longitude",
-      "finished_at": "2026-03-24 13:23:50"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.78233593,125.9699426)\\config_(34.78233593,125.9699426).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.5,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 17:55:22",
+      "note": "merged from fail rerun no-ferry (fail_cid=78)"
     },
     "236": {
       "status": "failed",
@@ -2039,11 +2090,14 @@
       "finished_at": "2026-03-20 16:21:33"
     },
     "245": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.64334645,126.72469021) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.64334645, \"longitud",
-      "finished_at": "2026-03-24 13:24:03"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.64334645,126.72469021)\\config_(34.64334645,126.72469021).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.2,
+      "sim_elapsed_sec": 6.4,
+      "finished_at": "2026-04-04 17:55:42",
+      "note": "merged from fail rerun no-ferry (fail_cid=81)"
     },
     "246": {
       "status": "done",
@@ -2137,11 +2191,14 @@
       "finished_at": "2026-03-24 13:24:05"
     },
     "257": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.29434095,126.62259938) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.29434095, \"longitud",
-      "finished_at": "2026-03-24 13:24:09"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.29434095,126.62259938)\\config_(36.29434095,126.62259938).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.5,
+      "sim_elapsed_sec": 7.8,
+      "finished_at": "2026-04-03 13:30:42",
+      "note": "merged from fail rerun no-ferry (fail_cid=86)"
     },
     "258": {
       "status": "done",
@@ -2248,11 +2305,14 @@
       "finished_at": "2026-03-21 21:45:23"
     },
     "270": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.66441022,126.72202057) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.66441022, \"longitud",
-      "finished_at": "2026-03-24 13:24:18"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.66441022,126.72202057)\\config_(35.66441022,126.72202057).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 16.7,
+      "sim_elapsed_sec": 7.8,
+      "finished_at": "2026-04-03 13:31:08",
+      "note": "merged from fail rerun no-ferry (fail_cid=89)"
     },
     "271": {
       "status": "done",
@@ -2305,18 +2365,24 @@
       "finished_at": "2026-03-21 21:46:49"
     },
     "277": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.96374266,126.55270477) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.96374266, \"longitud",
-      "finished_at": "2026-03-24 13:24:21"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.96374266,126.55270477)\\config_(35.96374266,126.55270477).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.0,
+      "sim_elapsed_sec": 7.8,
+      "finished_at": "2026-04-03 13:31:31",
+      "note": "merged from fail rerun no-ferry (fail_cid=92)"
     },
     "278": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.35431943,126.54458553) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.35431943, \"longitud",
-      "finished_at": "2026-03-24 13:24:32"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.35431943,126.54458553)\\config_(34.35431943,126.54458553).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.7,
+      "sim_elapsed_sec": 6.2,
+      "finished_at": "2026-04-04 17:56:06",
+      "note": "merged from fail rerun no-ferry (fail_cid=93)"
     },
     "279": {
       "status": "done",
@@ -2387,11 +2453,14 @@
       "finished_at": "2026-03-24 13:24:33"
     },
     "287": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.54338332,126.83835912) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.54338332, \"longitud",
-      "finished_at": "2026-03-24 13:24:46"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.54338332,126.83835912)\\config_(34.54338332,126.83835912).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.1,
+      "sim_elapsed_sec": 6.2,
+      "finished_at": "2026-04-04 17:56:28",
+      "note": "merged from fail rerun no-ferry (fail_cid=96)"
     },
     "288": {
       "status": "done",
@@ -2532,11 +2601,14 @@
       "finished_at": "2026-03-21 21:54:01"
     },
     "304": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.7507046,126.68480936) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.7507046, \"longitude\"",
-      "finished_at": "2026-03-24 13:24:53"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.7507046,126.68480936)\\config_(35.7507046,126.68480936).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.5,
+      "sim_elapsed_sec": 7.8,
+      "finished_at": "2026-04-03 13:32:20",
+      "note": "merged from fail rerun no-ferry (fail_cid=100)"
     },
     "305": {
       "status": "done",
@@ -2742,11 +2814,14 @@
       "finished_at": "2026-03-21 22:01:03"
     },
     "328": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.06092525,126.84322585) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.06092525, \"longitud",
-      "finished_at": "2026-03-24 13:24:55"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.06092525,126.84322585)\\config_(36.06092525,126.84322585).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 16.2,
+      "sim_elapsed_sec": 7.6,
+      "finished_at": "2026-04-03 13:32:45",
+      "note": "merged from fail rerun no-ferry (fail_cid=103)"
     },
     "329": {
       "status": "done",
@@ -3075,11 +3150,14 @@
       "finished_at": "2026-03-24 13:25:00"
     },
     "367": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.41777205,126.11504249) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.41777205, \"longitud",
-      "finished_at": "2026-03-24 13:25:09"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.41777205,126.11504249)\\config_(34.41777205,126.11504249).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.1,
+      "sim_elapsed_sec": 6.2,
+      "finished_at": "2026-04-04 17:56:54",
+      "note": "merged from fail rerun no-ferry (fail_cid=112)"
     },
     "368": {
       "status": "done",
@@ -3100,11 +3178,14 @@
       "finished_at": "2026-03-21 22:13:31"
     },
     "370": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.33901156,127.05589896) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.33901156, \"longitud",
-      "finished_at": "2026-03-24 13:25:10"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.33901156,127.05589896)\\config_(34.33901156,127.05589896).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.1,
+      "sim_elapsed_sec": 6.2,
+      "finished_at": "2026-04-04 17:57:13",
+      "note": "merged from fail rerun no-ferry (fail_cid=113)"
     },
     "371": {
       "status": "done",
@@ -3134,11 +3215,14 @@
       "finished_at": "2026-03-21 22:14:36"
     },
     "374": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.50589821,126.63427044) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.50589821, \"longitud",
-      "finished_at": "2026-03-24 13:25:15"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.50589821,126.63427044)\\config_(33.50589821,126.63427044).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.2,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 17:57:31",
+      "note": "merged from fail rerun no-ferry (fail_cid=114)"
     },
     "375": {
       "status": "done",
@@ -3236,11 +3320,14 @@
       "finished_at": "2026-03-21 22:17:52"
     },
     "386": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.53752778,127.71875801) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.53752778, \"longitud",
-      "finished_at": "2026-03-24 13:25:17"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.53752778,127.71875801)\\config_(34.53752778,127.71875801).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.6,
+      "sim_elapsed_sec": 6.3,
+      "finished_at": "2026-04-04 17:57:54",
+      "note": "merged from fail rerun no-ferry (fail_cid=117)"
     },
     "387": {
       "status": "done",
@@ -3297,11 +3384,14 @@
       "finished_at": "2026-03-21 22:20:05"
     },
     "393": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.5525802,126.92878331) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.5525802, \"longitude\"",
-      "finished_at": "2026-03-24 13:25:28"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.5525802,126.92878331)\\config_(34.5525802,126.92878331).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.4,
+      "sim_elapsed_sec": 6.3,
+      "finished_at": "2026-04-04 17:58:12",
+      "note": "merged from fail rerun no-ferry (fail_cid=118)"
     },
     "394": {
       "status": "done",
@@ -3598,11 +3688,14 @@
       "finished_at": "2026-03-22 10:43:54"
     },
     "428": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.51672087,126.27041878) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.51672087, \"longitud",
-      "finished_at": "2026-03-24 13:25:40"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.51672087,126.27041878)\\config_(34.51672087,126.27041878).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 11.4,
+      "sim_elapsed_sec": 6.3,
+      "finished_at": "2026-04-04 17:58:34",
+      "note": "merged from fail rerun no-ferry (fail_cid=125)"
     },
     "429": {
       "status": "done",
@@ -3639,11 +3732,14 @@
       "finished_at": "2026-03-22 10:45:02"
     },
     "433": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.00983337,126.94489686) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.00983337, \"longitud",
-      "finished_at": "2026-03-24 13:25:45"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.00983337,126.94489686)\\config_(36.00983337,126.94489686).yaml",
+      "sim_ok": false,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.8,
+      "sim_elapsed_sec": 2.3,
+      "finished_at": "2026-04-03 13:33:50",
+      "note": "merged from fail rerun no-ferry (fail_cid=127)"
     },
     "434": {
       "status": "done",
@@ -3698,11 +3794,14 @@
       "finished_at": "2026-03-22 10:47:10"
     },
     "440": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.30083485,126.23592655) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.30083485, \"longitud",
-      "finished_at": "2026-03-24 13:25:51"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.30083485,126.23592655)\\config_(33.30083485,126.23592655).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.9,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 17:58:54",
+      "note": "merged from fail rerun no-ferry (fail_cid=129)"
     },
     "441": {
       "status": "done",
@@ -3746,11 +3845,14 @@
       "finished_at": "2026-03-22 10:48:18"
     },
     "446": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.06298532,127.03786785) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.06298532, \"longitud",
-      "finished_at": "2026-03-24 13:26:07"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.06298532,127.03786785)\\config_(36.06298532,127.03786785).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 20.6,
+      "sim_elapsed_sec": 7.7,
+      "finished_at": "2026-04-03 13:34:26",
+      "note": "merged from fail rerun no-ferry (fail_cid=132)"
     },
     "447": {
       "status": "failed",
@@ -3923,25 +4025,34 @@
       "finished_at": "2026-03-22 10:54:00"
     },
     "467": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.22568311,126.63863137) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.22568311, \"longitud",
-      "finished_at": "2026-03-24 13:26:13"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.22568311,126.63863137)\\config_(36.22568311,126.63863137).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.0,
+      "sim_elapsed_sec": 7.7,
+      "finished_at": "2026-04-03 13:34:50",
+      "note": "merged from fail rerun no-ferry (fail_cid=138)"
     },
     "468": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.33885814,126.61960734) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.33885814, \"longitud",
-      "finished_at": "2026-03-24 13:26:19"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.33885814,126.61960734)\\config_(36.33885814,126.61960734).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.1,
+      "sim_elapsed_sec": 7.8,
+      "finished_at": "2026-04-03 13:35:12",
+      "note": "merged from fail rerun no-ferry (fail_cid=139)"
     },
     "469": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.37530081,126.34010618) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.37530081, \"longitud",
-      "finished_at": "2026-03-24 13:26:24"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.37530081,126.34010618)\\config_(33.37530081,126.34010618).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 11.4,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 17:59:15",
+      "note": "merged from fail rerun no-ferry (fail_cid=140)"
     },
     "470": {
       "status": "done",
@@ -3978,11 +4089,14 @@
       "finished_at": "2026-03-22 10:55:14"
     },
     "474": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.68265525,126.87984903) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.68265525, \"longitud",
-      "finished_at": "2026-03-24 13:26:34"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.68265525,126.87984903)\\config_(34.68265525,126.87984903).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 11.6,
+      "sim_elapsed_sec": 6.4,
+      "finished_at": "2026-04-04 17:59:34",
+      "note": "merged from fail rerun no-ferry (fail_cid=142)"
     },
     "475": {
       "status": "done",
@@ -4200,11 +4314,14 @@
       "finished_at": "2026-03-22 11:02:50"
     },
     "500": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.6115573,126.45802153) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.6115573, \"longitude\"",
-      "finished_at": "2026-03-24 13:26:48"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.6115573,126.45802153)\\config_(34.6115573,126.45802153).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.2,
+      "sim_elapsed_sec": 6.2,
+      "finished_at": "2026-04-04 17:59:57",
+      "note": "merged from fail rerun no-ferry (fail_cid=148)"
     },
     "501": {
       "status": "failed",
@@ -4284,11 +4401,14 @@
       "finished_at": "2026-03-22 11:05:30"
     },
     "510": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.12379819,126.51472858) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.12379819, \"longitud",
-      "finished_at": "2026-03-24 13:26:49"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.12379819,126.51472858)\\config_(34.12379819,126.51472858).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.7,
+      "sim_elapsed_sec": 7.4,
+      "finished_at": "2026-04-04 18:00:19",
+      "note": "merged from fail rerun no-ferry (fail_cid=151)"
     },
     "511": {
       "status": "done",
@@ -4325,11 +4445,14 @@
       "finished_at": "2026-03-22 11:06:33"
     },
     "515": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.68816001,126.93297272) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.68816001, \"longitud",
-      "finished_at": "2026-03-24 13:27:00"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.68816001,126.93297272)\\config_(34.68816001,126.93297272).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.4,
+      "sim_elapsed_sec": 8.3,
+      "finished_at": "2026-04-04 18:00:40",
+      "note": "merged from fail rerun no-ferry (fail_cid=153)"
     },
     "516": {
       "status": "done",
@@ -4357,11 +4480,14 @@
       "finished_at": "2026-03-22 11:07:34"
     },
     "519": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.6393678,126.63474757) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.6393678, \"longitude\"",
-      "finished_at": "2026-03-24 13:27:09"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.6393678,126.63474757)\\config_(35.6393678,126.63474757).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 16.4,
+      "sim_elapsed_sec": 7.7,
+      "finished_at": "2026-04-03 13:36:20",
+      "note": "merged from fail rerun no-ferry (fail_cid=155)"
     },
     "520": {
       "status": "done",
@@ -4632,11 +4758,14 @@
       "finished_at": "2026-03-24 13:27:14"
     },
     "552": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.51535939,127.74477443) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.51535939, \"longitud",
-      "finished_at": "2026-03-24 13:27:15"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.51535939,127.74477443)\\config_(34.51535939,127.74477443).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 15.3,
+      "sim_elapsed_sec": 7.9,
+      "finished_at": "2026-04-04 18:01:09",
+      "note": "merged from fail rerun no-ferry (fail_cid=166)"
     },
     "553": {
       "status": "done",
@@ -4673,11 +4802,14 @@
       "finished_at": "2026-03-23 11:21:32"
     },
     "557": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.71039954,126.27913316) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.71039954, \"longitud",
-      "finished_at": "2026-03-24 13:27:25"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.71039954,126.27913316)\\config_(34.71039954,126.27913316).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.2,
+      "sim_elapsed_sec": 8.0,
+      "finished_at": "2026-04-04 18:01:30",
+      "note": "merged from fail rerun no-ferry (fail_cid=168)"
     },
     "558": {
       "status": "failed",
@@ -4789,11 +4921,14 @@
       "finished_at": "2026-03-24 13:27:36"
     },
     "571": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.20818024,126.75887275) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.20818024, \"longitud",
-      "finished_at": "2026-03-24 13:27:39"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.20818024,126.75887275)\\config_(36.20818024,126.75887275).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.8,
+      "sim_elapsed_sec": 8.0,
+      "finished_at": "2026-04-03 13:37:11",
+      "note": "merged from fail rerun no-ferry (fail_cid=173)"
     },
     "572": {
       "status": "done",
@@ -4878,11 +5013,14 @@
       "finished_at": "2026-03-24 13:27:41"
     },
     "582": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.87623944,126.71821236) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.87623944, \"longitud",
-      "finished_at": "2026-03-24 13:27:44"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.87623944,126.71821236)\\config_(35.87623944,126.71821236).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 18.0,
+      "sim_elapsed_sec": 7.9,
+      "finished_at": "2026-04-03 13:37:40",
+      "note": "merged from fail rerun no-ferry (fail_cid=178)"
     },
     "583": {
       "status": "done",
@@ -5084,11 +5222,14 @@
       "finished_at": "2026-03-23 11:34:12"
     },
     "606": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.35704183,126.22383463) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.35704183, \"longitud",
-      "finished_at": "2026-03-24 13:27:52"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.35704183,126.22383463)\\config_(33.35704183,126.22383463).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.3,
+      "sim_elapsed_sec": 7.7,
+      "finished_at": "2026-04-04 18:02:08",
+      "note": "merged from fail rerun no-ferry (fail_cid=183)"
     },
     "607": {
       "status": "done",
@@ -5188,11 +5329,14 @@
       "finished_at": "2026-03-23 11:37:55"
     },
     "618": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.18769602,126.71369109) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.18769602, \"longitud",
-      "finished_at": "2026-03-24 13:27:55"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.18769602,126.71369109)\\config_(36.18769602,126.71369109).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.8,
+      "sim_elapsed_sec": 8.1,
+      "finished_at": "2026-04-03 13:38:12",
+      "note": "merged from fail rerun no-ferry (fail_cid=185)"
     },
     "619": {
       "status": "done",
@@ -5303,11 +5447,14 @@
       "finished_at": "2026-03-23 11:42:15"
     },
     "631": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.03576598,126.90603174) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.03576598, \"longitud",
-      "finished_at": "2026-03-24 13:27:59"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.03576598,126.90603174)\\config_(36.03576598,126.90603174).yaml",
+      "sim_ok": false,
+      "attempts": 1,
+      "gen_elapsed_sec": 15.6,
+      "sim_elapsed_sec": 2.4,
+      "finished_at": "2026-04-03 13:38:30",
+      "note": "merged from fail rerun no-ferry (fail_cid=186)"
     },
     "632": {
       "status": "failed",
@@ -5487,11 +5634,14 @@
       "finished_at": "2026-03-23 11:47:34"
     },
     "653": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.64397849,126.13656968) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.64397849, \"longitud",
-      "finished_at": "2026-03-24 13:28:03"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.64397849,126.13656968)\\config_(34.64397849,126.13656968).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.0,
+      "sim_elapsed_sec": 7.8,
+      "finished_at": "2026-04-04 18:02:33",
+      "note": "merged from fail rerun no-ferry (fail_cid=193)"
     },
     "654": {
       "status": "done",
@@ -5569,11 +5719,14 @@
       "finished_at": "2026-03-24 13:28:04"
     },
     "663": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.8856785,126.88803554) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.8856785, \"longitude\"",
-      "finished_at": "2026-03-24 13:28:08"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.8856785,126.88803554)\\config_(35.8856785,126.88803554).yaml",
+      "sim_ok": false,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.3,
+      "sim_elapsed_sec": 2.4,
+      "finished_at": "2026-04-03 13:38:51",
+      "note": "merged from fail rerun no-ferry (fail_cid=197)"
     },
     "664": {
       "status": "failed",
@@ -5712,11 +5865,14 @@
       "finished_at": "2026-03-24 13:28:10"
     },
     "680": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.30401545,126.62351659) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.30401545, \"longitud",
-      "finished_at": "2026-03-24 13:28:17"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.30401545,126.62351659)\\config_(36.30401545,126.62351659).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 15.7,
+      "sim_elapsed_sec": 7.9,
+      "finished_at": "2026-04-03 13:39:17",
+      "note": "merged from fail rerun no-ferry (fail_cid=202)"
     },
     "681": {
       "status": "done",
@@ -5970,11 +6126,14 @@
       "finished_at": "2026-03-23 12:49:18"
     },
     "710": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.18475472,126.59282953) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.18475472, \"longitud",
-      "finished_at": "2026-03-24 13:28:23"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.18475472,126.59282953)\\config_(36.18475472,126.59282953).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.7,
+      "sim_elapsed_sec": 8.0,
+      "finished_at": "2026-04-03 13:39:43",
+      "note": "merged from fail rerun no-ferry (fail_cid=208)"
     },
     "711": {
       "status": "done",
@@ -6013,11 +6172,14 @@
       "finished_at": "2026-03-23 12:50:52"
     },
     "715": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.96292131,126.77448912) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.96292131, \"longitud",
-      "finished_at": "2026-03-24 13:28:24"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.96292131,126.77448912)\\config_(35.96292131,126.77448912).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.2,
+      "sim_elapsed_sec": 8.0,
+      "finished_at": "2026-04-03 13:40:05",
+      "note": "merged from fail rerun no-ferry (fail_cid=209)"
     },
     "716": {
       "status": "done",
@@ -6054,11 +6216,14 @@
       "finished_at": "2026-03-24 13:28:25"
     },
     "720": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.99240378,126.75803655) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.99240378, \"longitud",
-      "finished_at": "2026-03-24 13:28:26"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.99240378,126.75803655)\\config_(35.99240378,126.75803655).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.6,
+      "sim_elapsed_sec": 7.8,
+      "finished_at": "2026-04-03 13:40:27",
+      "note": "merged from fail rerun no-ferry (fail_cid=211)"
     },
     "721": {
       "status": "done",
@@ -6186,11 +6351,14 @@
       "finished_at": "2026-03-23 12:55:40"
     },
     "736": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.08921094,126.6526849) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.08921094, \"longitude",
-      "finished_at": "2026-03-24 13:28:30"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.08921094,126.6526849)\\config_(36.08921094,126.6526849).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.6,
+      "sim_elapsed_sec": 7.9,
+      "finished_at": "2026-04-03 13:40:52",
+      "note": "merged from fail rerun no-ferry (fail_cid=217)"
     },
     "737": {
       "status": "done",
@@ -6245,18 +6413,24 @@
       "finished_at": "2026-03-23 12:57:28"
     },
     "743": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.30963146,126.68020865) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.30963146, \"longitud",
-      "finished_at": "2026-03-24 13:28:36"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.30963146,126.68020865)\\config_(33.30963146,126.68020865).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.4,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 18:03:02",
+      "note": "merged from fail rerun no-ferry (fail_cid=219)"
     },
     "744": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.9013179,126.89929339) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.9013179, \"longitude\"",
-      "finished_at": "2026-03-24 13:28:40"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.9013179,126.89929339)\\config_(35.9013179,126.89929339).yaml",
+      "sim_ok": false,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.2,
+      "sim_elapsed_sec": 2.3,
+      "finished_at": "2026-04-03 13:41:14",
+      "note": "merged from fail rerun no-ferry (fail_cid=220)"
     },
     "745": {
       "status": "done",
@@ -6481,11 +6655,14 @@
       "finished_at": "2026-03-24 13:28:43"
     },
     "771": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (37.67515097,125.71548176) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 37.67515097, \"longitud",
-      "finished_at": "2026-03-24 13:28:43"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(37.67515097,125.71548176)\\config_(37.67515097,125.71548176).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 36.5,
+      "sim_elapsed_sec": 7.9,
+      "finished_at": "2026-04-04 18:03:50",
+      "note": "merged from fail rerun no-ferry (fail_cid=227)"
     },
     "772": {
       "status": "done",
@@ -6587,11 +6764,14 @@
       "finished_at": "2026-03-23 13:08:31"
     },
     "783": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.52672747,126.8508507) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.52672747, \"longitude",
-      "finished_at": "2026-03-24 13:28:56"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.52672747,126.8508507)\\config_(34.52672747,126.8508507).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.1,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 18:04:10",
+      "note": "merged from fail rerun no-ferry (fail_cid=228)"
     },
     "784": {
       "status": "failed",
@@ -6617,11 +6797,14 @@
       "finished_at": "2026-03-23 13:09:04"
     },
     "787": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.58056042,126.37811469) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.58056042, \"longitud",
-      "finished_at": "2026-03-24 13:29:07"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.58056042,126.37811469)\\config_(34.58056042,126.37811469).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 11.9,
+      "sim_elapsed_sec": 6.4,
+      "finished_at": "2026-04-04 18:04:30",
+      "note": "merged from fail rerun no-ferry (fail_cid=231)"
     },
     "788": {
       "status": "done",
@@ -6724,11 +6907,14 @@
       "finished_at": "2026-03-24 13:29:09"
     },
     "800": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.52691863,126.80396872) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.52691863, \"longitud",
-      "finished_at": "2026-03-24 13:29:16"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.52691863,126.80396872)\\config_(33.52691863,126.80396872).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.2,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 18:04:51",
+      "note": "merged from fail rerun no-ferry (fail_cid=236)"
     },
     "801": {
       "status": "failed",
@@ -6774,11 +6960,14 @@
       "finished_at": "2026-03-23 13:13:36"
     },
     "806": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.29267091,126.6450852) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.29267091, \"longitude",
-      "finished_at": "2026-03-24 13:29:22"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.29267091,126.6450852)\\config_(33.29267091,126.6450852).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 17.2,
+      "sim_elapsed_sec": 6.1,
+      "finished_at": "2026-04-04 18:05:15",
+      "note": "merged from fail rerun no-ferry (fail_cid=238)"
     },
     "807": {
       "status": "failed",
@@ -6806,11 +6995,14 @@
       "finished_at": "2026-03-23 13:14:27"
     },
     "810": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.54485957,126.73645261) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.54485957, \"longitud",
-      "finished_at": "2026-03-24 13:29:34"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.54485957,126.73645261)\\config_(34.54485957,126.73645261).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.3,
+      "sim_elapsed_sec": 6.3,
+      "finished_at": "2026-04-04 18:05:34",
+      "note": "merged from fail rerun no-ferry (fail_cid=240)"
     },
     "811": {
       "status": "done",
@@ -6854,11 +7046,14 @@
       "finished_at": "2026-03-24 13:29:35"
     },
     "816": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.46137558,126.55317153) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.46137558, \"longitud",
-      "finished_at": "2026-03-24 13:29:41"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.46137558,126.55317153)\\config_(33.46137558,126.55317153).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.1,
+      "sim_elapsed_sec": 6.0,
+      "finished_at": "2026-04-04 18:05:55",
+      "note": "merged from fail rerun no-ferry (fail_cid=243)"
     },
     "817": {
       "status": "done",
@@ -6888,11 +7083,14 @@
       "finished_at": "2026-03-23 13:16:45"
     },
     "820": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (33.46026668,126.35790826) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 33.46026668, \"longitud",
-      "finished_at": "2026-03-24 13:29:46"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(33.46026668,126.35790826)\\config_(33.46026668,126.35790826).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.3,
+      "sim_elapsed_sec": 6.2,
+      "finished_at": "2026-04-04 18:06:13",
+      "note": "merged from fail rerun no-ferry (fail_cid=244)"
     },
     "821": {
       "status": "done",
@@ -7001,11 +7199,14 @@
       "finished_at": "2026-03-23 13:20:51"
     },
     "833": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.46169618,126.34673813) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.46169618, \"longitud",
-      "finished_at": "2026-03-24 13:29:57"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.46169618,126.34673813)\\config_(34.46169618,126.34673813).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 11.8,
+      "sim_elapsed_sec": 6.3,
+      "finished_at": "2026-04-04 18:06:32",
+      "note": "merged from fail rerun no-ferry (fail_cid=246)"
     },
     "834": {
       "status": "done",
@@ -7227,11 +7428,14 @@
       "finished_at": "2026-03-24 13:29:59"
     },
     "859": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (38.04375055,127.74354748) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 38.04375055, \"longitud",
-      "finished_at": "2026-03-24 13:29:59"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(38.04375055,127.74354748)\\config_(38.04375055,127.74354748).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.7,
+      "sim_elapsed_sec": 8.0,
+      "finished_at": "2026-04-03 13:42:59",
+      "note": "merged from fail rerun no-ferry (fail_cid=250)"
     },
     "860": {
       "status": "done",
@@ -7304,11 +7508,14 @@
       "finished_at": "2026-03-24 12:58:59"
     },
     "868": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (36.23217644,126.80581647) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 36.23217644, \"longitud",
-      "finished_at": "2026-03-24 13:30:04"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(36.23217644,126.80581647)\\config_(36.23217644,126.80581647).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 14.7,
+      "sim_elapsed_sec": 7.9,
+      "finished_at": "2026-04-03 13:43:23",
+      "note": "merged from fail rerun no-ferry (fail_cid=252)"
     },
     "869": {
       "status": "done",
@@ -7481,11 +7688,14 @@
       "finished_at": "2026-03-23 14:01:30"
     },
     "889": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.73049284,126.65877454) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.73049284, \"longitud",
-      "finished_at": "2026-03-24 13:30:14"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.73049284,126.65877454)\\config_(35.73049284,126.65877454).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 15.8,
+      "sim_elapsed_sec": 7.8,
+      "finished_at": "2026-04-03 13:43:49",
+      "note": "merged from fail rerun no-ferry (fail_cid=258)"
     },
     "890": {
       "status": "failed",
@@ -7677,11 +7887,14 @@
       "finished_at": "2026-03-23 14:07:12"
     },
     "913": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.61485969,126.93420287) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.61485969, \"longitud",
-      "finished_at": "2026-03-24 13:30:29"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.61485969,126.93420287)\\config_(34.61485969,126.93420287).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.2,
+      "sim_elapsed_sec": 6.3,
+      "finished_at": "2026-04-04 18:07:01",
+      "note": "merged from fail rerun no-ferry (fail_cid=268)"
     },
     "914": {
       "status": "done",
@@ -7709,11 +7922,14 @@
       "finished_at": "2026-03-24 13:30:30"
     },
     "917": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.48765226,126.83423039) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.48765226, \"longitud",
-      "finished_at": "2026-03-24 13:30:42"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.48765226,126.83423039)\\config_(34.48765226,126.83423039).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 13.2,
+      "sim_elapsed_sec": 6.2,
+      "finished_at": "2026-04-04 18:07:21",
+      "note": "merged from fail rerun no-ferry (fail_cid=270)"
     },
     "918": {
       "status": "done",
@@ -7904,11 +8120,14 @@
       "finished_at": "2026-03-23 14:15:51"
     },
     "940": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.59382599,126.73135452) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.59382599, \"longitud",
-      "finished_at": "2026-03-24 13:30:54"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.59382599,126.73135452)\\config_(34.59382599,126.73135452).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 11.4,
+      "sim_elapsed_sec": 6.4,
+      "finished_at": "2026-04-04 18:07:42",
+      "note": "merged from fail rerun no-ferry (fail_cid=276)"
     },
     "941": {
       "status": "done",
@@ -8077,11 +8296,14 @@
       "finished_at": "2026-03-23 14:21:03"
     },
     "961": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.76565517,126.63935045) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.76565517, \"longitud",
-      "finished_at": "2026-03-24 13:31:03"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.76565517,126.63935045)\\config_(35.76565517,126.63935045).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 15.6,
+      "sim_elapsed_sec": 7.7,
+      "finished_at": "2026-04-03 13:44:58",
+      "note": "merged from fail rerun no-ferry (fail_cid=284)"
     },
     "962": {
       "status": "done",
@@ -8118,11 +8340,14 @@
       "finished_at": "2026-03-23 14:22:11"
     },
     "966": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (35.37038611,127.52064577) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 35.37038611, \"longitud",
-      "finished_at": "2026-03-24 13:31:04"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(35.37038611,127.52064577)\\config_(35.37038611,127.52064577).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.2,
+      "sim_elapsed_sec": 7.6,
+      "finished_at": "2026-04-03 13:45:18",
+      "note": "merged from fail rerun no-ferry (fail_cid=286)"
     },
     "967": {
       "status": "done",
@@ -8232,11 +8457,14 @@
       "finished_at": "2026-03-24 13:31:07"
     },
     "980": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.71331253,126.82002902) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.71331253, \"longitud",
-      "finished_at": "2026-03-24 13:31:17"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.71331253,126.82002902)\\config_(34.71331253,126.82002902).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 12.0,
+      "sim_elapsed_sec": 6.4,
+      "finished_at": "2026-04-04 18:08:08",
+      "note": "merged from fail rerun no-ferry (fail_cid=292)"
     },
     "981": {
       "status": "failed",
@@ -8296,11 +8524,14 @@
       "finished_at": "2026-03-23 14:27:04"
     },
     "988": {
-      "status": "failed",
-      "step": "generate",
-      "attempts": 4,
-      "error": "RuntimeError: CONFIG_PATH not found in generator stdout.\n[stdout]\n✅ 모든 필수 데이터 파일 확인 완료\n📁 프로젝트 경로: C:\\Users\\User\\MCI_ADV\n🆔 실험 ID: exp_korea_random_1000_dep_202603311400\nbuffer_ratio=1.5\nbuffer_ratio=1.5\n\n📍 좌표 (34.66763108,126.98797329) 시나리오 생성 시작...\nCOORDINATE_INFO:{\"latitude\": 34.66763108, \"longitud",
-      "finished_at": "2026-03-24 13:31:33"
+      "status": "done",
+      "config_path": "C:\\Users\\User\\MCI_ADV\\scenarios\\exp_korea_random_1000_dep_202603311400\\(34.66763108,126.98797329)\\config_(34.66763108,126.98797329).yaml",
+      "sim_ok": true,
+      "attempts": 1,
+      "gen_elapsed_sec": 15.6,
+      "sim_elapsed_sec": 6.4,
+      "finished_at": "2026-04-04 18:08:32",
+      "note": "merged from fail rerun no-ferry (fail_cid=296)"
     },
     "989": {
       "status": "done",

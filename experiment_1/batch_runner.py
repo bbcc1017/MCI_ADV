@@ -100,10 +100,10 @@ def parse_args():
                    help="랜덤 시드 (기본: 42)")
 
     # ── 이송 시간 파라미터 ────────────────────────────────────────────────
-    p.add_argument("--amb-handover-time", type=float, default=0.0,
-                   help="구급차 환자 인계시간 분 (기본: 0.0)")
-    p.add_argument("--uav-handover-time", type=float, default=0.0,
-                   help="UAV 환자 인계시간 분 (기본: 0.0)")
+    p.add_argument("--amb-handover-time", type=float, default=10.0,
+                   help="구급차 환자 인계시간 분 (기본: 10.0)")
+    p.add_argument("--uav-handover-time", type=float, default=15.0,
+                   help="UAV 환자 인계시간 분 (기본: 15.0)")
     p.add_argument("--is-use-time",    type=str,   default="true",
                    help="Kakao API duration 사용 여부 true/false (기본: true)")
     p.add_argument("--duration-coeff", type=float, default=1.0,
