@@ -82,7 +82,7 @@ class ScenarioGenerator:
         else:
             base_exp_id = datetime.now().strftime("%Y%m%d%H%M")
 
-        if departure_time:
+        if departure_time and f"_dep_{departure_time}" not in base_exp_id:
             self.experiment_id = f"exp_{base_exp_id}_dep_{departure_time}"
         else:
             self.experiment_id = f"exp_{base_exp_id}"

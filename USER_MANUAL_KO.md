@@ -414,9 +414,11 @@ python experiment_1/visualize_coords.py \
   --clip-pct 2 --outlier-n 5
 ```
 
-출력물:
-- `coords_map.html`: 색상으로 구분된 결과가 표시된 인터랙티브 Folium 지도
-- `coords_map_hist.pdf`: 주요 지표 분포 히스토그램
+출력물 (`scenarios/{experiment_id}/` 폴더에 저장):
+- `coords_map.html`: 인터랙티브 결과 지도 (Reward/Time/PDR 전환, OpenStreetMap/CartoDB 타일 전환)
+- `coords_map_hist.pdf/png`: 주요 지표 분포 히스토그램
+- `coords_map_rule_heatmap.pdf/png`: 64개 규칙 성능 히트맵 (3지표 × 4패널)
+- `coords_map_rule_effects.pdf/png`: 요인별 주효과 그래프 (Best level 표시, Effect size 박스)
 
 ### 9.3 Progress JSON 구조
 ```json

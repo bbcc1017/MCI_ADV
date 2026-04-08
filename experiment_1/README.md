@@ -11,14 +11,11 @@ Streamlit 대시보드와 **독립적으로** 동작하는 논문 실험용 배�
 experiment_1/
 ├── generate_coords.py          # 좌표 생성기 (shapefile PIP 필터링)
 ├── batch_runner.py             # 배치 실험 러너 (시나리오 생성 + 시뮬레이션)
-├── visualize_coords.py         # 배치 결과 지도·히스토그램 시각화
-├── ctprvn.shp / .shx / .dbf   # 한국 행정구역 shapefile (좌표 생성 시 사용)
-├── coords_korea.csv            # (생성됨) 좌표 CSV
-├── coords_map.html             # (생성됨) 결과 시각화 지도 (단일 HTML)
-└── progress.json               # (생성됨) 실험 진행 상태
+├── visualize_coords.py         # 배치 결과 지도·히스토그램·규칙분석 시각화
+└── ctprvn.shp / .shx / .dbf   # 한국 행정구역 shapefile (좌표 생성 시 사용)
 ```
 
-> `coords_korea.csv`, `coords_map.html`, `progress.json`은 실행 후 자동 생성됩니다.
+시각화 산출물(`coords_map.html`, `coords_map_hist.*`, `coords_map_rule_heatmap.*`, `coords_map_rule_effects.*`)과 실험 데이터(`coords.csv`, `progress.json`)는 `scenarios/{experiment_id}/` 폴더에 저장됩니다.
 
 ---
 
@@ -93,7 +90,7 @@ python experiment_1/batch_runner.py \
     --is-use-time true \
     --duration-coeff 1.0 \
     --hospital-max-send-coeff "1.0,1.0" \
-    --departure-time 202603311400
+    --departure-time 202604071400
 ```
 
 ### 파라미터 설명
@@ -291,21 +288,34 @@ experiment_logs/(lat,lon)_YYYYMMDD_HHMMSS.txt
 python experiment_1/visualize_coords.py
 ```
 
-완료 후 `experiment_1/coords_map.html`이 생성됩니다. 브라우저로 열면 인터랙티브 지도와 히스토그램을 확인할 수 있습니다.
+완료 후 `scenarios/{experiment_id}/` 폴더에 시각화 파일들이 생성됩니다. 대시보드 BatchExperiment 페이지에서도 동일한 결과를 확인할 수 있습니다.
+
+### 산출물
+
+| 파일 | 설명 |
+|------|------|
+| `coords_map.html` | 인터랙티브 결과 지도 (단일 HTML) |
+| `coords_map_hist.pdf/png` | 지표별 히스토그램 |
+| `coords_map_rule_heatmap.pdf/png` | 64개 규칙 성능 히트맵 |
+| `coords_map_rule_effects.pdf/png` | 요인별 주효과(Main Effects) 그래프 |
 
 ### 기능
 
-- **단일 HTML**: Reward / Time / PDR 3개 지표를 상단 버튼으로 전환
-- **지도 (Leaflet.js, OpenStreetMap 타일)**
-  - RdYlGn 컬러맵: Reward·PDRWOG는 높을수록 초록, Time·PDR은 낮을수록 초록
+- **결과 지도 (Leaflet.js)**
+  - Reward / Time / PDR 3개 지표를 상단 버튼으로 전환
+  - **지도 타일 전환**: OpenStreetMap / CartoDB 두 가지 타일 선택 가능
+  - RdYlGn 컬러맵: Reward는 높을수록 초록, Time·PDR은 낮을수록 초록
   - P5~P95 백분위수 클리핑: 극단값에 의한 색상 포화 방지
   - 이상치 강조: 상위·하위 N개 좌표를 별도 색상(파랑/보라)으로 표시
-  - 시나리오 생성 실패 좌표: 검은색 마커
-  - 하단 이상치 목록: `<details>` 패널로 접기/펼치기
+  - 시나리오 생성 실패 좌표: 검은색 마커 (토글로 표시/숨김)
+  - 좌측 범례: 컬러바 + 이상치 목록(`<details>` 패널 접기/펼치기)
+  - 줌 세밀 조절 (0.5단계 줌)
 - **히스토그램 (matplotlib)**
   - Freedman-Diaconis 빈 크기 (min 60, max 120개 빈)
   - 이상치 구간 빈을 별도 색상으로 칠하고 rug plot 추가
   - 평균·표준편차 통계 박스
+- **규칙 히트맵**: 3지표 × 4패널(Priority×HosSelect) 매트릭스, 각 패널은 4×4(Red Mode×Yellow Mode) 히트맵
+- **주효과 그래프**: 4개 요인(Priority, HosSelect, Red Mode, Yellow Mode)별 marginal mean 막대그래프, Best level 빨간 테두리 + ★ 표시, Effect size 박스
 
 ### 옵션
 
@@ -317,6 +327,7 @@ python experiment_1/visualize_coords.py
 | `--progress` | `experiment_1/progress.json` | 진행 상태 파일 |
 | `--coords` | `experiment_1/coords_korea.csv` | 좌표 CSV |
 | `--results-dir` | 자동 탐지 | results/ 폴더 경로 |
+| `--hist-format` | `pdf` | 히스토그램 출력 포맷 (`pdf` 또는 `png`) |
 
 ### stat.txt 구조
 

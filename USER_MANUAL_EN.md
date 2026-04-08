@@ -414,9 +414,11 @@ python experiment_1/visualize_coords.py \
   --clip-pct 2 --outlier-n 5
 ```
 
-Outputs:
-- `coords_map.html`: Interactive Folium map with color-coded results
-- `coords_map_hist.pdf`: Histogram distributions of key metrics
+Outputs (saved in `scenarios/{experiment_id}/`):
+- `coords_map.html`: Interactive result map (Reward/Time/PDR toggle, OpenStreetMap/CartoDB tile switch)
+- `coords_map_hist.pdf/png`: Histogram distributions of key metrics
+- `coords_map_rule_heatmap.pdf/png`: 64-rule performance heatmap (3 metrics × 4 panels)
+- `coords_map_rule_effects.pdf/png`: Factor main effects chart (Best level marker, effect size box)
 
 ### 9.3 Progress JSON Structure
 ```json

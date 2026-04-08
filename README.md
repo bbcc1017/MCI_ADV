@@ -52,7 +52,8 @@ MCI_ADV/
 │       ├── MCI_Streamlit.py              # 메인 대시보드
 │       └── pages/
 │           ├── Generate.py               # 시나리오 생성 UI
-│           └── ResultsCompare.py         # 결과 비교 페이지
+│           ├── ResultsCompare.py         # 결과 비교 페이지
+│           └── BatchExperiment.py        # 배치 실험 대시보드 (5단계 워크플로우)
 │
 ├── scenarios/                             # 시나리오 데이터
 │   ├── 안전센터와 소방서.csv               # 소방서/119안전센터 마스터 (필수)
@@ -86,11 +87,8 @@ MCI_ADV/
 ├── experiment_1/                          # 논문 배치 실험 파이프라인
 │   ├── generate_coords.py                # 한국 육지 좌표 1000개 생성
 │   ├── batch_runner.py                   # 시나리오 생성 + 시뮬레이션 배치 처리
-│   ├── visualize_coords.py               # 배치 실험 결과 지도·히스토그램 시각화
-│   ├── ctprvn.shp / .shx / .dbf         # 한국 행정구역 shapefile
-│   ├── coords_korea.csv                  # (생성됨) 좌표 CSV
-│   ├── coords_map.html                   # (생성됨) 결과 시각화 지도
-│   └── progress.json                     # (생성됨) 실험 진행 상태
+│   ├── visualize_coords.py               # 배치 결과 지도·히스토그램·규칙분석 시각화
+│   └── ctprvn.shp / .shx / .dbf         # 한국 행정구역 shapefile
 │
 ├── requirements.txt                       # Python 패키지 의존성
 ├── MCI_대시보드_관련_정보.pdf              # 대시보드 참고 문서
@@ -719,23 +717,28 @@ Step 2. 배치 실험 (매일 동일 명령 실행, progress.json에서 자동 �
 
 Step 3. 결과 시각화
   python experiment_1/visualize_coords.py
-  → experiment_1/coords_map.html (인터랙티브 지도 + 히스토그램)
+  → scenarios/{experiment_id}/ 에 시각화 파일 생성
 ```
+
+> 시각화 산출물(`coords_map.html`, 히스토그램, 규칙 히트맵, 주효과 그래프)은 `scenarios/{experiment_id}/` 폴더에 저장되며, 대시보드 BatchExperiment 페이지에서도 확인 가능합니다.
 
 ### visualize_coords.py 기능
 
-- **단일 HTML 출력**: Reward / Time / PDR 3개 지표를 JavaScript 버튼으로 전환
+- **결과 지도 (단일 HTML)**: Reward / Time / PDR 3개 지표를 JavaScript 버튼으로 전환
+- **지도 타일 전환**: OpenStreetMap / CartoDB 두 가지 타일 선택 가능
 - **컬러맵**: RdYlGn (빨강↔초록), P5~P95 백분위수 클리핑으로 상대 비교 최적화
 - **이상치 강조**: 상위·하위 N개 좌표를 별도 색상(파랑/보라)으로 표시
-- **지도 타일**: OpenStreetMap
-- **히스토그램**: Freedman-Diaconis 빈 크기 (min 60, max 120개 빈), 이상치 빈 별도 색상, rug plot
 - **이상치 목록**: 접을 수 있는 `<details>` 패널로 좌표 및 인덱스 표시
+- **히스토그램**: Freedman-Diaconis 빈 크기 (min 60, max 120개 빈), 이상치 빈 별도 색상, rug plot
+- **규칙 히트맵**: 64개 규칙의 3지표 × 4패널(Priority×HosSelect) 매트릭스, 각 패널 4×4(Red Mode×Yellow Mode)
+- **주효과 그래프**: 4개 요인별 marginal mean 막대그래프, Best level 빨간 테두리 + ★ 표시, Effect size 박스
 
 ```bash
 python experiment_1/visualize_coords.py [옵션]
   --clip-pct FLOAT   컬러맵 클리핑 백분위수 (기본: 5.0 → 5th~95th)
   --outlier-n INT    양쪽 이상치 개수 (기본: 3)
   --out PATH         출력 HTML 경로 (기본: experiment_1/coords_map.html)
+  --hist-format FMT  히스토그램 포맷 pdf|png (기본: pdf)
 ```
 
 ### stat.txt 구조

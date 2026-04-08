@@ -55,7 +55,7 @@ try:
     from visualize_coords import (
         load_coords as viz_load_coords,
         collect_data, compute_ranges, build_map, build_histograms,
-        find_results_dir,
+        find_results_dir, build_rule_analysis,
     )
     from orchestrator import Orchestrator
 except ImportError as e:
@@ -114,6 +114,22 @@ def _now_kst_departure() -> str:
     return datetime.now(KST).strftime("%Y%m%d%H%M")
 
 
+def _build_full_exp_id(base_name: str, departure_time: str) -> str:
+    """Compute the full experiment folder name with dep suffix.
+    Mirrors make_csv_yaml_dynamic.py logic so the folder name matches exactly.
+    """
+    import re as _re
+    base = base_name.strip()
+    if base.startswith("exp_"):
+        base = base[4:]
+    base = _re.sub(r"\s+", "_", base).strip("_")
+    if not base:
+        base = datetime.now(KST).strftime("%Y%m%d%H%M")
+    if departure_time and departure_time.strip():
+        return f"exp_{base}_dep_{departure_time.strip()}"
+    return f"exp_{base}"
+
+
 def _make_args(**kwargs) -> SimpleNamespace:
     """Create an args namespace compatible with process_coord()."""
     defaults = dict(
@@ -136,6 +152,31 @@ def _scenario_dir(experiment_id: str) -> Path:
     return REPO_ROOT / "scenarios" / experiment_id
 
 
+def _list_scenario_folders() -> list[str]:
+    """List existing experiment folders under scenarios/, sorted newest first."""
+    sce_root = REPO_ROOT / "scenarios"
+    if not sce_root.exists():
+        return []
+    folders = [
+        d.name for d in sorted(sce_root.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)
+        if d.is_dir()
+    ]
+    return folders
+
+
+def _experiment_selectbox(label: str, key: str) -> str | None:
+    """Render a selectbox of existing scenario folders. Returns selected name or None."""
+    folders = _list_scenario_folders()
+    if not folders:
+        st.info("No experiment folders found in `scenarios/`.")
+        return None
+    return st.selectbox(label, folders, key=key)
+
+
+# Sentinel used to skip the rest of an expander when no folder is selected.
+_SKIP = "__SKIP__"
+
+
 # ===========================================================================
 # PAGE START
 # ===========================================================================
@@ -156,19 +197,25 @@ if not _IMPORTS_OK:
 # ===========================================================================
 
 with st.expander("Step 1: Generate Random Coordinates", expanded=False):
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         n_coords = st.number_input("Number of coordinates", min_value=1, max_value=50000,
                                    value=1000, step=100, key="s1_n")
         seed_val = st.number_input("Random seed", min_value=0, value=0, key="s1_seed")
     with col2:
         shp_input = st.text_input("SHP file", value="ctprvn.shp", key="s1_shp")
-        s1_exp_id = st.text_input("Experiment ID (for folder)", value="exp_batch_research",
-                                  key="s1_expid")
+        s1_base_name = st.text_input("Experiment name", value="batch_research",
+                                     key="s1_expid")
+    with col3:
+        s1_dep_time = st.text_input("Departure time (YYYYMMDDHHmm)",
+                                    value=_now_kst_departure(), key="s1_dep",
+                                    help="Kakao API routing time. Included in folder name.")
 
-    # CSV path is derived from experiment_id: scenarios/<exp_id>/coords.csv
+    s1_exp_id = _build_full_exp_id(s1_base_name, s1_dep_time)
+
+    # CSV path is derived from full experiment_id: scenarios/<exp_id>/coords.csv
     csv_path = _scenario_dir(s1_exp_id) / "coords.csv"
-    st.caption(f"Output: `{csv_path}`")
+    st.caption(f"Folder: `scenarios/{s1_exp_id}/`")
 
     if csv_path.exists():
         st.info(f"`coords.csv` already exists in this experiment folder. "
@@ -186,30 +233,31 @@ with st.expander("Step 1: Generate Random Coordinates", expanded=False):
             save_csv(pts, str(csv_path))
             map_out = csv_path.parent / "coords_preview.html"
             save_map(pts, str(map_out))
-            st.success(f"Generated **{len(pts)}** coordinates → `{csv_path}`")
+            st.success(f"Generated **{len(pts)}** coordinates → `scenarios/{s1_exp_id}/`")
 
 # ===========================================================================
 # STEP 2 — View Coordinates
 # ===========================================================================
 
 with st.expander("Step 2: View Coordinates", expanded=False):
-    s2_exp_id = st.text_input("Experiment ID", value="exp_batch_research", key="s2_expid")
-    coords_csv_path = _scenario_dir(s2_exp_id) / "coords.csv"
+    s2_exp_id = _experiment_selectbox("Experiment Folder", key="s2_expid")
+    if s2_exp_id is not None:
+        coords_csv_path = _scenario_dir(s2_exp_id) / "coords.csv"
 
-    if not coords_csv_path.exists():
-        st.info(f"No `coords.csv` found in `scenarios/{s2_exp_id}/`. Complete **Step 1** first.")
-    else:
-        tab_table, tab_map = st.tabs(["Table", "Map"])
-        with tab_table:
-            df = pd.read_csv(coords_csv_path)
-            st.metric("Total coordinates", len(df))
-            st.dataframe(df, use_container_width=True, height=400)
-        with tab_map:
-            preview_html = coords_csv_path.parent / "coords_preview.html"
-            if not preview_html.exists():
-                pts_for_map = list(zip(df["latitude"].tolist(), df["longitude"].tolist()))
-                save_map(pts_for_map, str(preview_html))
-            _embed_html(preview_html, height=550)
+        if not coords_csv_path.exists():
+            st.info(f"No `coords.csv` found in `scenarios/{s2_exp_id}/`. Complete **Step 1** first.")
+        else:
+            tab_table, tab_map = st.tabs(["Table", "Map"])
+            with tab_table:
+                df = pd.read_csv(coords_csv_path)
+                st.metric("Total coordinates", len(df))
+                st.dataframe(df, use_container_width=True, height=400)
+            with tab_map:
+                preview_html = coords_csv_path.parent / "coords_preview.html"
+                if not preview_html.exists():
+                    pts_for_map = list(zip(df["latitude"].tolist(), df["longitude"].tolist()))
+                    save_map(pts_for_map, str(preview_html))
+                _embed_html(preview_html, height=550)
 
 
 # ===========================================================================
@@ -223,17 +271,24 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
     st.subheader("Experiment & API Settings")
     col_e1, col_e2, col_e3 = st.columns(3)
     with col_e1:
-        experiment_id = st.text_input("Experiment ID", value="exp_batch_research", key="s3_expid")
+        experiment_id = _experiment_selectbox("Experiment Folder", key="s3_expid")
         kakao_key = st.text_input("Kakao API Key", type="password", key="s3_kakao")
     with col_e2:
         daily_limit = st.number_input("Daily API limit", value=5000, key="s3_dlimit")
         calls_per_coord = st.number_input("Est. API calls per coord", value=40, key="s3_cpc")
     with col_e3:
         max_retries = st.number_input("Max retries per coord", value=2, key="s3_retry")
+
+    # departure_time: 폴더명에서 자동 추출
+    import re as _re
+    _dep_match = _re.search(r"_dep_(\d{12})", experiment_id or "")
+    departure_time = _dep_match.group(1) if _dep_match else ""
+    if departure_time:
+        st.caption(f"Departure time (from folder name): `{departure_time}`")
+    else:
         departure_time = st.text_input("Departure time (YYYYMMDDHHmm)",
                                        value=_now_kst_departure(), key="s3_dep",
-                                       help="Kakao API routing time. Default: current KST. "
-                                            "Leave empty for real-time routing.")
+                                       help="Folder has no dep suffix. Enter manually.")
 
     st.divider()
 
@@ -267,6 +322,9 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
                                              value="", key="s3_util")
 
     # --- Progress file & coords file paths (derived from experiment_id) ---
+    if experiment_id is None:
+        st.info("Select an experiment folder above.")
+        experiment_id = "__none__"  # prevent NameError below; won't match any path
     sce_dir = _scenario_dir(experiment_id)
     progress_path = str(sce_dir / "progress.json")
     coords_csv_path = sce_dir / "coords.csv"
@@ -425,52 +483,55 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
 # ===========================================================================
 
 with st.expander("Step 4: Progress Dashboard", expanded=False):
-    s4_exp_id = st.text_input("Experiment ID", value="exp_batch_research", key="s4_expid")
-    progress_file = _scenario_dir(s4_exp_id) / "progress.json"
-
-    if not progress_file.exists():
-        st.info(f"No progress file found at `scenarios/{s4_exp_id}/progress.json`.")
+    s4_exp_id = _experiment_selectbox("Experiment Folder", key="s4_expid")
+    if s4_exp_id is None:
+        st.info("No experiment folders found.")
     else:
-        with open(progress_file, encoding="utf-8") as f:
-            prog = json.load(f)
+        progress_file = _scenario_dir(s4_exp_id) / "progress.json"
 
-        stats = calc_stats(prog)
-        total = max(stats["total"], 1)
-
-        col1, col2, col3, col4, col5, col6 = st.columns(6)
-        col1.metric("Total", stats["total"])
-        col2.metric("Done", stats["done"])
-        col3.metric("Sim OK", stats["sim_ok"])
-        col4.metric("Sim Fail", stats["sim_fail"])
-        col5.metric("Failed", stats["failed"])
-        col6.metric("Pending", stats["pending"])
-
-        st.progress(stats["done"] / total)
-        st.caption(f"Completion: {stats['done']/total*100:.1f}% — "
-                   f"Today API: {stats['today_calls']} calls")
-
-        # Status filter
-        filter_status = st.multiselect(
-            "Filter by status", ["done", "failed", "pending", "running", "abandoned"],
-            default=["done", "failed", "pending"], key="s4_filter"
-        )
-
-        rows = []
-        for cid, v in sorted(prog.get("statuses", {}).items(), key=lambda x: int(x[0])):
-            st_val = v.get("status", "pending")
-            if st_val in filter_status:
-                rows.append({
-                    "coord_id": int(cid),
-                    "status": st_val,
-                    "sim_ok": v.get("sim_ok", ""),
-                    "attempts": v.get("attempts", 0),
-                    "finished_at": v.get("finished_at", ""),
-                    "error": v.get("error", v.get("sim_error", ""))[:80],
-                })
-        if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, height=400)
+        if not progress_file.exists():
+            st.info(f"No progress file found at `scenarios/{s4_exp_id}/progress.json`.")
         else:
-            st.caption("No entries match the selected filter.")
+            with open(progress_file, encoding="utf-8") as f:
+                prog = json.load(f)
+
+            stats = calc_stats(prog)
+            total = max(stats["total"], 1)
+
+            col1, col2, col3, col4, col5, col6 = st.columns(6)
+            col1.metric("Total", stats["total"])
+            col2.metric("Done", stats["done"])
+            col3.metric("Sim OK", stats["sim_ok"])
+            col4.metric("Sim Fail", stats["sim_fail"])
+            col5.metric("Failed", stats["failed"])
+            col6.metric("Pending", stats["pending"])
+
+            st.progress(stats["done"] / total)
+            st.caption(f"Completion: {stats['done']/total*100:.1f}% — "
+                       f"Today API: {stats['today_calls']} calls")
+
+            # Status filter
+            filter_status = st.multiselect(
+                "Filter by status", ["done", "failed", "pending", "running", "abandoned"],
+                default=["done", "failed", "pending"], key="s4_filter"
+            )
+
+            rows = []
+            for cid, v in sorted(prog.get("statuses", {}).items(), key=lambda x: int(x[0])):
+                st_val = v.get("status", "pending")
+                if st_val in filter_status:
+                    rows.append({
+                        "coord_id": int(cid),
+                        "status": st_val,
+                        "sim_ok": v.get("sim_ok", ""),
+                        "attempts": v.get("attempts", 0),
+                        "finished_at": v.get("finished_at", ""),
+                        "error": v.get("error", v.get("sim_error", ""))[:80],
+                    })
+            if rows:
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, height=400)
+            else:
+                st.caption("No entries match the selected filter.")
 
 
 # ===========================================================================
@@ -478,76 +539,113 @@ with st.expander("Step 4: Progress Dashboard", expanded=False):
 # ===========================================================================
 
 with st.expander("Step 5: Visualize Results", expanded=False):
-    s5_exp_id = st.text_input("Experiment ID", value="exp_batch_research", key="s5_expid")
-    s5_sce_dir = _scenario_dir(s5_exp_id)
-    progress_file = s5_sce_dir / "progress.json"
-    coords_csv_path = s5_sce_dir / "coords.csv"
-
-    if not progress_file.exists() or not coords_csv_path.exists():
-        st.info(f"Need both `coords.csv` and `progress.json` in `scenarios/{s5_exp_id}/`. "
-                "Complete **Steps 1-3** first.")
+    s5_exp_id = _experiment_selectbox("Experiment Folder", key="s5_expid")
+    if s5_exp_id is None:
+        st.info("No experiment folders found.")
     else:
-        col_v1, col_v2, col_v3 = st.columns(3)
-        with col_v1:
-            clip_pct = st.slider("Clip percentile", 0.0, 20.0, 5.0, 0.5, key="s5_clip")
-        with col_v2:
-            outlier_n = st.number_input("Outlier count (each side)", value=3, min_value=0,
-                                        key="s5_outlier")
-        with col_v3:
-            hist_fmt = st.radio("Histogram format", ["pdf", "png"], horizontal=True, key="s5_fmt")
+        s5_sce_dir = _scenario_dir(s5_exp_id)
+        progress_file = s5_sce_dir / "progress.json"
+        coords_csv_path = s5_sce_dir / "coords.csv"
 
-        viz_dir = s5_sce_dir
-        viz_out_path = viz_dir / "coords_map.html"
+        if not progress_file.exists() or not coords_csv_path.exists():
+            st.info(f"Need both `coords.csv` and `progress.json` in `scenarios/{s5_exp_id}/`. "
+                    "Complete **Steps 1-3** first.")
+        else:
+            col_v1, col_v2, col_v3 = st.columns(3)
+            with col_v1:
+                clip_pct = st.slider("Clip percentile", 0.0, 20.0, 5.0, 0.5, key="s5_clip")
+            with col_v2:
+                outlier_n = st.number_input("Outlier count (each side)", value=3, min_value=0,
+                                            key="s5_outlier")
+            with col_v3:
+                hist_fmt = st.radio("Histogram format", ["pdf", "png"], horizontal=True,
+                                    key="s5_fmt")
 
-        if st.button("Generate Visualization", key="s5_gen"):
-            with st.spinner("Collecting data and building visualizations..."):
-                coords = viz_load_coords(coords_csv_path)
-                with open(progress_file, encoding="utf-8") as f:
-                    prog = json.load(f)
-                results_dir = find_results_dir(prog)
-                if results_dir is None:
-                    st.error("Could not auto-detect results directory. "
-                             "Make sure simulations have completed successfully.")
+            viz_dir = s5_sce_dir
+            viz_out_path = viz_dir / "coords_map.html"
+
+            if st.button("Generate Visualization", key="s5_gen"):
+                with st.spinner("Collecting data and building visualizations..."):
+                    coords = viz_load_coords(coords_csv_path)
+                    with open(progress_file, encoding="utf-8") as f:
+                        prog = json.load(f)
+                    results_dir = find_results_dir(prog)
+                    if results_dir is None:
+                        st.error("Could not auto-detect results directory. "
+                                 "Make sure simulations have completed successfully.")
+                    else:
+                        data = collect_data(coords, prog, results_dir)
+                        ranges = compute_ranges(data, clip_pct)
+                        build_map(data, viz_out_path, ranges, clip_pct, outlier_n)
+                        build_histograms(data, viz_out_path, ranges, clip_pct, outlier_n,
+                                         hist_fmt)
+                        build_rule_analysis(prog, results_dir, viz_out_path)
+                        st.success("Visualization generated!")
+
+            # Display results
+            tab_map, tab_hist, tab_heatmap, tab_effects = st.tabs([
+                "Results Map", "Histogram", "Rule Heatmap", "Factor Main Effects"
+            ])
+            with tab_map:
+                if viz_out_path.exists():
+                    _embed_html(viz_out_path, height=700)
                 else:
-                    data = collect_data(coords, prog, results_dir)
-                    ranges = compute_ranges(data, clip_pct)
-                    build_map(data, viz_out_path, ranges, clip_pct, outlier_n)
-                    build_histograms(data, viz_out_path, ranges, clip_pct, outlier_n, hist_fmt)
-                    st.success("Visualization generated!")
+                    st.caption("No map generated yet. Click **Generate Visualization** above.")
+            with tab_hist:
+                hist_png = viz_dir / "coords_map_hist.png"
+                hist_pdf = viz_dir / "coords_map_hist.pdf"
+                if hist_png.exists():
+                    st.image(str(hist_png), use_container_width=True)
+                if hist_pdf.exists():
+                    try:
+                        from PIL import Image
+                        import fitz  # PyMuPDF
 
-        # Display results
-        tab_map, tab_hist = st.tabs(["Results Map", "Histogram"])
-        with tab_map:
-            if viz_out_path.exists():
-                _embed_html(viz_out_path, height=700)
-            else:
-                st.caption("No map generated yet. Click **Generate Visualization** above.")
-        with tab_hist:
-            hist_png = viz_dir / "coords_map_hist.png"
-            hist_pdf = viz_dir / "coords_map_hist.pdf"
-            # Show preview for whichever format exists
-            if hist_png.exists():
-                st.image(str(hist_png), use_container_width=True)
-            if hist_pdf.exists():
-                # PDF preview: convert to image for inline display
-                try:
-                    from PIL import Image
-                    import fitz  # PyMuPDF
-
-                    doc = fitz.open(str(hist_pdf))
-                    page = doc[0]
-                    pix = page.get_pixmap(dpi=200)
-                    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                    st.image(img, caption="Histogram (PDF preview)", use_container_width=True)
-                    doc.close()
-                except ImportError:
-                    # Fallback: render via matplotlib backend if PyMuPDF not available
-                    st.info("Install `PyMuPDF` (`pip install pymupdf`) for inline PDF preview.")
-                st.download_button(
-                    "Download Histogram (PDF)",
-                    hist_pdf.read_bytes(),
-                    file_name="coords_map_hist.pdf",
-                    mime="application/pdf",
-                )
-            if not hist_png.exists() and not hist_pdf.exists():
-                st.caption("No histogram generated yet. Click **Generate Visualization** above.")
+                        doc = fitz.open(str(hist_pdf))
+                        page = doc[0]
+                        pix = page.get_pixmap(dpi=200)
+                        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                        st.image(img, caption="Histogram (PDF preview)",
+                                 use_container_width=True)
+                        doc.close()
+                    except ImportError:
+                        st.info("Install `PyMuPDF` (`pip install pymupdf`) for inline PDF "
+                                "preview.")
+                    st.download_button(
+                        "Download Histogram (PDF)",
+                        hist_pdf.read_bytes(),
+                        file_name="coords_map_hist.pdf",
+                        mime="application/pdf",
+                    )
+                if not hist_png.exists() and not hist_pdf.exists():
+                    st.caption("No histogram generated yet. Click **Generate Visualization** "
+                               "above.")
+            with tab_heatmap:
+                heatmap_png = viz_dir / "coords_map_rule_heatmap.png"
+                heatmap_pdf = viz_dir / "coords_map_rule_heatmap.pdf"
+                if heatmap_png.exists():
+                    st.image(str(heatmap_png), use_container_width=True)
+                if heatmap_pdf.exists():
+                    st.download_button(
+                        "Download Rule Heatmap (PDF)",
+                        heatmap_pdf.read_bytes(),
+                        file_name="rule_heatmap.pdf",
+                        mime="application/pdf",
+                    )
+                if not heatmap_png.exists() and not heatmap_pdf.exists():
+                    st.caption("No rule heatmap yet. Click **Generate Visualization** above.")
+            with tab_effects:
+                effects_png = viz_dir / "coords_map_rule_effects.png"
+                effects_pdf = viz_dir / "coords_map_rule_effects.pdf"
+                if effects_png.exists():
+                    st.image(str(effects_png), use_container_width=True)
+                if effects_pdf.exists():
+                    st.download_button(
+                        "Download Main Effects (PDF)",
+                        effects_pdf.read_bytes(),
+                        file_name="rule_effects.pdf",
+                        mime="application/pdf",
+                    )
+                if not effects_png.exists() and not effects_pdf.exists():
+                    st.caption("No main effects chart yet. Click **Generate Visualization** "
+                               "above.")
