@@ -75,6 +75,11 @@ class RunManager():
         self.env.set_seed(rng)
 
     def run(self, env, rules, totalSamples):
+        def safe_pdr(saved_reward, preventable_reward):
+            if preventable_reward <= 0:
+                return 0.0
+            return 1 - saved_reward / preventable_reward
+
         results_rew = np.zeros((len(rules), totalSamples), dtype=float)
         results_time = np.zeros((len(rules), totalSamples), dtype=float)
         results_pdr = np.zeros((len(rules), totalSamples), dtype=float)
@@ -132,9 +137,10 @@ class RunManager():
                 # print("{}-{}번째 시뮬레이션 끝".format(iter,r_idx))
                 results_rew[r_idx, iter - 1] = cumul_reward
                 results_time[r_idx, iter - 1] = info['time']
-                results_pdr[r_idx, iter - 1] = 1 - cumul_reward / env.preventable
+                results_pdr[r_idx, iter - 1] = safe_pdr(cumul_reward, env.preventable)
                 results_rewWOG[r_idx, iter - 1] = cumul_reward - total_Green
-                results_pdrWOG[r_idx, iter - 1] = 1 - (cumul_reward - total_Green) / (env.preventable - total_Green)
+                results_pdrWOG[r_idx, iter - 1] = safe_pdr(cumul_reward - total_Green,
+                                                           env.preventable - total_Green)
                 # results_preventable[r_idx, iter - 1] = env.preventable
 
         stat_rew = np.zeros((len(rules), 3), dtype=float)

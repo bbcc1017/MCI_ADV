@@ -129,6 +129,8 @@ class Universal_Rule(Rule):
 
         red_exist = self.obs['p_wait'][0][0]
         yellow_exist = self.obs['p_wait'][1][0]
+        if not red_exist and not yellow_exist:
+            return action
         # num_D 원인 추적 디버깅 (ReSTART에서만)
         if self.priority == "ReSTART":
             import sys
@@ -231,6 +233,8 @@ class Universal_Rule(Rule):
         # 3. Mode selection
         available_UAV = self.obs['uav_wait'][0]
         available_Amb = self.obs['amb_wait'][0]
+        if not available_UAV and not available_Amb:
+            return action
         isSTAY = False
         if action[0] == 0: # Red selected
             if self.mode_R == "OnlyUAV":

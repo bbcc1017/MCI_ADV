@@ -52,6 +52,18 @@ class ScenarioManager():
         incident_type = cfg_patient['incident_type']
         try:
             patient_info = pd.read_csv(cfg_patient['info_path'])
+            required_cols = [
+                'ratio',
+                'rescue_param_alpha',
+                'rescue_param_beta',
+                'treat_tier3',
+                'treat_tier2',
+                'treat_tier3_mean',
+                'treat_tier2_mean',
+            ]
+            missing_cols = [col for col in required_cols if col not in patient_info.columns]
+            if missing_cols:
+                raise KeyError(f"patient_info.csv missing required columns: {missing_cols}")
             if incident_type is not None:
                 raise NotImplementedError("사고 type 정보 반영은 아직 구현 전입니다.")
             assert math.isclose(patient_info['ratio'].sum(), 1.0), "환자 비율 합은 1이어야 합니다."

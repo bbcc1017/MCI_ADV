@@ -32,6 +32,16 @@ class MCIEnvironment_gym(gym.Env):
 
     def step(self, action):
         info = {}
+        if self.ev_manager.check_termination():
+            reward = self.pending_terminal_reward
+            self.pending_terminal_reward = 0.0
+            if self.rule_test:
+                obs = self.en_manager.get_full_obs()
+            else:
+                obs = self.en_manager.get_obs()
+            obs['time'] = self.ev_manager.time
+            info['time'] = self.ev_manager.time
+            return obs, reward, True, False, info
         self.n_step += 1
         if self.n_step > self.max_steps: # 최대 결정 회수 넘어갈 시 강제 종료
             print("OVERTIME")
@@ -48,6 +58,7 @@ class MCIEnvironment_gym(gym.Env):
         return obs, reward, terminated, False, info
 
     def reset(self, seed = None):
+        self.pending_terminal_reward = 0.0
         info = {}
         self.n_step = 0 # Decision 횟수
 
@@ -56,6 +67,8 @@ class MCIEnvironment_gym(gym.Env):
         # EventManager 초기화
         init_log = self.ev_manager.start()
         self.preventable = self.computePreventable(init_log)
+        if self.ev_manager.check_termination():
+            self.pending_terminal_reward = self.logToReward(init_log)
         # observation 생성
         if self.rule_test:
             obs = self.en_manager.get_full_obs()

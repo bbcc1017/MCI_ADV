@@ -617,13 +617,13 @@ def build_rule_heatmaps(rule_data: dict, out_path: Path):
             ax.set_xticklabels(["OnlyUAV", "Both\nUAVFirst", "Both\nAMBFirst", "OnlyAMB"],
                                fontsize=7.5)
             ax.set_yticks(range(4))
-            ax.set_yticklabels(["OnlyUAV", "Both_UAVFirst", "Both_AMBFirst", "OnlyAMB"],
+            ax.set_yticklabels(["OnlyUAV", "Both\nUAVFirst", "Both\nAMBFirst", "OnlyAMB"],
                                fontsize=7.5)
 
             if row == len(metrics) - 1:
-                ax.set_xlabel("Yellow Mode", fontsize=9, fontweight="bold")
+                ax.set_xlabel("Yellow Transport Mode", fontsize=9, fontweight="bold")
             if col == 0:
-                ax.set_ylabel("Red Mode", fontsize=9, fontweight="bold")
+                ax.set_ylabel("Red Transport Mode", fontsize=9, fontweight="bold")
 
             # Panel title
             ax.set_title(f"{pri} × {hos}", fontsize=10, fontweight="bold", pad=6)
@@ -653,9 +653,39 @@ def build_rule_heatmaps(rule_data: dict, out_path: Path):
 # 요인별 주효과 시각화
 # ---------------------------------------------------------------------------
 
+def _compute_eta_squared(rule_data: dict, factors_info, metrics):
+    """
+    Balanced full factorial ANOVA: SS decomposition for η² per factor × metric.
+    η² = SS_factor / SS_total  (proportion of total variance explained by the factor)
+    """
+    import numpy as np
+
+    eta_sq = {}  # (fname, metric) -> float
+    for mk, _, _ in metrics:
+        all_means = np.array([r[mk] for r in rule_data.values()])
+        grand_mean = all_means.mean()
+        ss_total = float(np.sum((all_means - grand_mean) ** 2))
+
+        for fname, _, levels in factors_info:
+            if ss_total == 0:
+                eta_sq[(fname, mk)] = 0.0
+                continue
+            ss_factor = 0.0
+            for lev in levels:
+                group = [r[mk] for r in rule_data.values()
+                         if r["factors"][fname] == lev]
+                n_k = len(group)
+                lev_mean = np.mean(group)
+                ss_factor += n_k * (lev_mean - grand_mean) ** 2
+            eta_sq[(fname, mk)] = float(ss_factor / ss_total)
+
+    return eta_sq
+
+
 def build_main_effects(rule_data: dict, out_path: Path):
     """
     Main effects plot: for each factor, show marginal mean per level across metrics.
+    Effect size: ANOVA η² (eta-squared) from balanced full factorial SS decomposition.
     """
     import matplotlib.pyplot as plt
     import numpy as np
@@ -668,8 +698,10 @@ def build_main_effects(rule_data: dict, out_path: Path):
         ("yellow_mode", "Yellow Transport Mode", MODE_LEVELS),
     ]
 
-    # Compute marginal means: for each factor level, average across all rules with that level
-    # Use per-scenario values for proper CI calculation
+    # η² via ANOVA SS decomposition
+    eta_sq = _compute_eta_squared(rule_data, factors_info, metrics)
+
+    # Marginal means for plotting
     marginal = {}
     for fname, flabel, levels in factors_info:
         marginal[fname] = {}
@@ -678,14 +710,29 @@ def build_main_effects(rule_data: dict, out_path: Path):
                         if r["factors"][fname] == lev]
             marginal[fname][lev] = {}
             for mk, _, _ in metrics:
-                # Aggregate: mean of means across matching rules
-                all_vals = []
-                for r in matching:
-                    all_vals.append(r[mk])
+                all_vals = [r[mk] for r in matching]
                 marginal[fname][lev][mk] = {
                     "mean": float(np.mean(all_vals)),
                     "std":  float(np.std(all_vals)),
                 }
+
+    # Print η² summary table
+    print("\n  ANOVA η² (eta-squared) — proportion of variance explained:")
+    header = f"  {'Factor':<22}"
+    for mk, ml, _ in metrics:
+        header += f"  {ml:>12}"
+    print(header)
+    for fname, flabel, _ in factors_info:
+        row = f"  {flabel:<22}"
+        for mk, _, _ in metrics:
+            row += f"  {eta_sq[(fname, mk)]:>11.4f}"
+        print(row)
+    # Total
+    row_total = f"  {'Σ main effects':<22}"
+    for mk, _, _ in metrics:
+        s = sum(eta_sq[(fn, mk)] for fn, _, _ in factors_info)
+        row_total += f"  {s:>11.4f}"
+    print(row_total)
 
     fig, axes = plt.subplots(len(metrics), len(factors_info),
                               figsize=(20, 11), sharey="row")
@@ -719,24 +766,22 @@ def build_main_effects(rule_data: dict, out_path: Path):
             bars[best_idx].set_edgecolor("#D32F2F")
             bars[best_idx].set_linewidth(3.5)
             bars[best_idx].set_linestyle("solid")
-            # Add star above best bar
             bx = bars[best_idx].get_x() + bars[best_idx].get_width() / 2
             by = bars[best_idx].get_height()
             ax.annotate("★ Best", xy=(bx, by), fontsize=8, fontweight="bold",
                         color="#D32F2F", ha="center", va="bottom",
                         xytext=(0, 14), textcoords="offset points")
 
-            # Effect size annotation (max - min)
-            effect = max(means) - min(means)
-            pct_effect = effect / np.mean(means) * 100
+            # η² annotation (ANOVA-based)
+            eta = eta_sq[(fname, mk)]
             ax.text(0.98, 0.95,
-                    f"Effect: {effect:.3f}\n({pct_effect:.1f}%)",
+                    f"η² = {eta:.4f}\n({eta*100:.1f}%)",
                     transform=ax.transAxes, fontsize=9, fontweight="bold",
                     ha="right", va="top",
                     bbox=dict(boxstyle="round,pad=0.4", facecolor="#FFEBEE",
                               edgecolor="#D32F2F", linewidth=1.5, alpha=0.95))
 
-            short_levels = [l.replace("Both_", "B_") for l in levels]
+            short_levels = [l.replace("Both_", "Both\n") for l in levels]
             ax.set_xticks(x)
             ax.set_xticklabels(short_levels, fontsize=8.5, rotation=0)
             ax.grid(axis="y", linestyle="--", linewidth=0.4, alpha=0.5, zorder=0)
@@ -752,8 +797,8 @@ def build_main_effects(rule_data: dict, out_path: Path):
             pad = max(val_range * 0.5, np.mean(means) * 0.005)
             ax.set_ylim(min(means) - pad, max(means) + pad * 1.5)
 
-    fig.suptitle("Factor Main Effects — Marginal Mean across 772 Scenarios\n"
-                 "(★ red border = best level, red box = effect size)",
+    fig.suptitle("Factor Main Effects — Marginal Mean across Scenarios\n"
+                 "(★ best level, η² = ANOVA eta-squared)",
                  fontsize=14, fontweight="bold", y=0.98)
     fig.tight_layout(rect=[0, 0, 1, 0.94])
 
