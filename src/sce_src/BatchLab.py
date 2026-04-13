@@ -334,6 +334,27 @@ with col_key:
     )
     if cloud_key:
         st.caption("Loaded from Streamlit secrets.")
+
+    # ── Road data provider (Kakao API ↔ OSRM) ─────────────
+    is_use_time = st.checkbox(
+        "Use Kakao Mobility API duration (real-time traffic)",
+        value=True,
+        key="batch_is_use_time",
+        help=(
+            "✅ Checked → Calls the Kakao Mobility API. Duration (minutes) for the given "
+            "departure time is saved to CSV and used by the simulator as "
+            "'duration × duration_coeff'. **Requires a Kakao REST API key.**\n\n"
+            "⬜ Unchecked → Calls the open-source OSRM service. Both distance and duration "
+            "are saved with the same schema, but the **first simulation runs in "
+            "distance/velocity mode**. No API key needed — recommended for external "
+            "reviewers and public code environments. If you later re-run the same "
+            "scenario folder with is_use_time=True, the stored OSRM duration is used."
+        ),
+    )
+    if not is_use_time:
+        st.caption("ℹ️ OSRM mode: no Kakao key required. The OSRM URL comes from the "
+                   "`MCI_OSRM_URL` environment variable, or the default demo server.")
+
 with col_time:
     c1, c2 = st.columns(2)
     with c1:
@@ -343,11 +364,11 @@ with col_time:
     departure_time_str = f"{st.session_state.batch_departure_date.strftime('%Y%m%d')}{st.session_state.batch_departure_time.strftime('%H%M')}"
     st.caption(f"API param: departure_time = {departure_time_str}")
 
-c3, c4 = st.columns(2)
-with c3:
-    is_use_time = st.checkbox("Use API travel time (ambulance)", value=True)
-with c4:
-    duration_coeff = st.number_input("duration_coeff (API travel time scaler)", min_value=0.1, max_value=10.0, value=1.0, step=0.1)
+duration_coeff = st.number_input(
+    "duration_coeff (API travel time scaler)",
+    min_value=0.1, max_value=10.0, value=1.0, step=0.1,
+    help="Coefficient multiplied with the API duration when is_use_time=True. Ignored in OSRM mode (is_use_time=False)."
+)
 
 
 # -------------------------------------------------
@@ -462,12 +483,12 @@ with p1:
     buffer_ratio = st.number_input("buffer_ratio", min_value=1.0, value=1.5, step=0.1, format="%.2f")
 with p2:
     amb_velocity = st.number_input("ambulance velocity (km/h)", min_value=1, value=40, step=1)
-    amb_handover_time = st.number_input("ambulance handover_time (min)", min_value=0.0, value=0.0, step=0.1)
-    hospital_max_send_coeff = st.text_input("hospital max_send_coeff", value="1.0,1.0", help="Comma separated")
-    total_samples = st.number_input("totalSamples", min_value=1, value=10, step=1)
+    amb_handover_time = st.number_input("ambulance handover_time (min)", min_value=0.0, value=10.0, step=0.1)
+    hospital_max_send_coeff = st.text_input("hospital max_send_coeff", value="1,1", help="Comma separated")
+    total_samples = st.number_input("totalSamples", min_value=1, value=30, step=1)
 with p3:
     uav_velocity = st.number_input("UAV velocity (km/h)", min_value=1, value=80, step=1)
-    uav_handover_time = st.number_input("UAV handover_time (min)", min_value=0.0, value=0.0, step=0.1)
+    uav_handover_time = st.number_input("UAV handover_time (min)", min_value=0.0, value=15.0, step=0.1)
     random_seed = st.number_input("random_seed", min_value=0, value=0, step=1)
     preset_name = st.text_input("Preset name", value="preset-1")
 

@@ -23,7 +23,7 @@ Usage (매일 동일 명령, progress.json에서 자동 이어서 실행):
         --daily-limit 4900 --calls-per-coord 55 \
         --incident-size 30 --amb-count 30 --uav-count 3 \
         --amb-velocity 40 --uav-velocity 80 \
-        --total-samples 10 --random-seed 42
+        --total-samples 30 --random-seed 42
 
 진행 현황만 확인:
     python experiment_1/batch_runner.py --status \
@@ -94,8 +94,8 @@ def parse_args():
                    help="구급차 평균 속도 km/h (기본: 40)")
     p.add_argument("--uav-velocity",   type=int,   default=80,
                    help="UAV 평균 속도 km/h (기본: 80)")
-    p.add_argument("--total-samples",  type=int,   default=10,
-                   help="시뮬레이션 반복 횟수 (기본: 10)")
+    p.add_argument("--total-samples",  type=int,   default=30,
+                   help="시뮬레이션 반복 횟수 (기본: 30)")
     p.add_argument("--random-seed",    type=int,   default=42,
                    help="랜덤 시드 (기본: 42)")
 
@@ -105,9 +105,11 @@ def parse_args():
     p.add_argument("--uav-handover-time", type=float, default=15.0,
                    help="UAV 환자 인계시간 분 (기본: 15.0)")
     p.add_argument("--is-use-time",    type=str,   default="true",
-                   help="Kakao API duration 사용 여부 true/false (기본: true)")
+                   help="true: 카카오 API duration 사용 / false: OSRM 정적 거리(distance/velocity) 기반 (기본: true)")
     p.add_argument("--duration-coeff", type=float, default=1.0,
                    help="API duration 시간 가중치 (기본: 1.0)")
+    p.add_argument("--osrm-url",       type=str,   default=None,
+                   help="OSRM HTTP API base URL (is_use_time=false일 때 사용. 기본: env MCI_OSRM_URL 또는 https://router.project-osrm.org)")
 
     # ── 병원 할당 파라미터 ────────────────────────────────────────────────
     p.add_argument("--hospital-max-send-coeff", type=str, default=None,
@@ -328,6 +330,8 @@ def process_coord(
     extra_args["amb_handover_time"] = args.amb_handover_time
     extra_args["uav_handover_time"] = args.uav_handover_time
     extra_args["duration_coeff"]    = args.duration_coeff
+    if args.osrm_url:
+        extra_args["osrm_url"]      = args.osrm_url
     # 병원 할당 파라미터 (None이면 전달하지 않음 → make_csv 내부 기본값 사용)
     if args.hospital_max_send_coeff is not None:
         extra_args["hospital_max_send_coeff"] = args.hospital_max_send_coeff

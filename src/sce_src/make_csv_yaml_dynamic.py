@@ -32,6 +32,20 @@ def save_route_json(meta: dict, payload: Optional[dict], out_path: str):
 # [ADD END] ─────────────────────────────────────────────────────────
 
 
+def str2bool(v):
+    """argparse용 문자열→bool 변환. True/False가 아닌 값은 ArgumentTypeError."""
+    if isinstance(v, bool):
+        return v
+    if v is None:
+        return False
+    s = str(v).strip().lower()
+    if s in ("true", "1", "yes", "y", "t"):
+        return True
+    if s in ("false", "0", "no", "n", "f", ""):
+        return False
+    raise argparse.ArgumentTypeError(f"Boolean value expected, got: {v!r}")
+
+
 def parse_util_map(text: str):
     """
     "1:0.90,11:0.75,etc:0.60" -> {1:0.9, 11:0.75, "etc":0.6}
@@ -63,14 +77,24 @@ def parse_util_map(text: str):
 class ScenarioGenerator:
     """동적 파라미터 기반 시나리오 생성 클래스 (크로스 환경 호환)"""
 
-    def __init__(self, base_path, experiment_id=None, kakao_api_key=None, departure_time=None):
-        # 실제 Kakao API 호출 횟수 카운터
+    def __init__(self, base_path, experiment_id=None, kakao_api_key=None, departure_time=None,
+                 osrm_url=None, road_provider=None, is_use_time=True):
+        # 실제 도로 API 호출 횟수 카운터 (Kakao + OSRM 공통)
         self.api_call_count = 0
         # 프로젝트 경로 절대화
         self.base_path = os.path.abspath(base_path)
 
-        # experiment_id 생성: exp_<id>_dep_<YYYYMMDDHHMM> 형식
-        # 이미 "exp_" 접두사가 있으면 제거 (중복 방지)
+        # 도로 데이터 공급자 결정 (experiment_id 접미사 결정에 필요)
+        # 우선순위: 명시적 road_provider > is_use_time 플래그
+        is_use_time = bool(is_use_time) if not isinstance(is_use_time, str) else str2bool(is_use_time)
+        if road_provider is None:
+            road_provider = "kakao" if is_use_time else "osrm"
+        self.road_provider = road_provider
+
+        # experiment_id 생성:
+        #   - kakao 모드 + departure_time → exp_<base>_dep_<YYYYMMDDHHMM>
+        #   - osrm  모드                  → exp_<base>_osrm
+        #   - 이미 적절한 접미사가 붙어 있으면 그대로 존중 (idempotent)
         if experiment_id:
             base_exp_id = str(experiment_id).strip()
             if base_exp_id.startswith("exp_"):
@@ -82,14 +106,28 @@ class ScenarioGenerator:
         else:
             base_exp_id = datetime.now().strftime("%Y%m%d%H%M")
 
-        if departure_time and f"_dep_{departure_time}" not in base_exp_id:
-            self.experiment_id = f"exp_{base_exp_id}_dep_{departure_time}"
-        else:
-            self.experiment_id = f"exp_{base_exp_id}"
+        if self.road_provider == "osrm":
+            # 동일 base가 카카오용 _dep_ 접미사를 달고 있다면 제거 후 _osrm 부착
+            base_exp_id = re.sub(r"_dep_\d{12}$", "", base_exp_id)
+            if base_exp_id.endswith("_osrm"):
+                self.experiment_id = f"exp_{base_exp_id}"
+            else:
+                self.experiment_id = f"exp_{base_exp_id}_osrm"
+        else:  # kakao
+            # 반대로 _osrm 접미사가 붙어 있으면 제거하고 _dep_ 부착
+            base_exp_id = re.sub(r"_osrm$", "", base_exp_id)
+            if departure_time and f"_dep_{departure_time}" not in base_exp_id:
+                self.experiment_id = f"exp_{base_exp_id}_dep_{departure_time}"
+            else:
+                self.experiment_id = f"exp_{base_exp_id}"
 
         # 카카오 API 키 설정
         self.kakao_api_key = kakao_api_key
         self.departure_time = departure_time  # YYYYMMDDHHMM 형식
+
+        # OSRM 백엔드 설정 (is_use_time=False일 때 사용)
+        self.osrm_url = (osrm_url
+                         or os.environ.get("MCI_OSRM_URL", "https://router.project-osrm.org"))
         
         # 데이터 파일 경로들 (절대경로로 설정)
         self.scenarios_path = os.path.join(self.base_path, "scenarios")
@@ -150,6 +188,17 @@ class ScenarioGenerator:
             raise FileNotFoundError("필수 데이터 파일들을 확인해주세요.")
         print("✅ 모든 필수 데이터 파일 확인 완료")
 
+    def get_road_distance(self, start, end, **kwargs):
+        """도로 거리/시간 디스패처. self.road_provider에 따라 kakao/osrm으로 위임.
+
+        Returns:
+            (distance_km, duration_min) 튜플
+        """
+        provider = (self.road_provider or "kakao").lower()
+        if provider == "osrm":
+            return self.get_road_distance_osrm(start, end, **kwargs)
+        return self.get_road_distance_kakao(start, end, **kwargs)
+
     def get_road_distance_kakao(self, start, end, max_retries=3, save_json_dir=None, route_type=None, source_index=None, name=None, start_label="start", goal_label="goal"):
         """카카오 모빌리티 API를 사용한 도로 거리 및 시간 계산 (재시도 로직 포함)
 
@@ -163,10 +212,10 @@ class ScenarioGenerator:
             (distance_km, duration_min) 튜플 - 거리(km)와 이송시간(분)
         """
         if not self.kakao_api_key:
-            # API 키 없으면 유클리드 거리 + 추정 시간 반환
-            dist_km = haversine(start, end)
-            estimated_duration_min = (dist_km / 40) * 60  # 40km/h 가정
-            return dist_km, estimated_duration_min
+            raise RuntimeError(
+                "카카오 API 키가 없습니다 (is_use_time=True 모드). "
+                "키가 없다면 is_use_time=False로 OSRM 백엔드를 사용하세요."
+            )
 
         url = "https://apis-navi.kakaomobility.com/v1/future/directions"
         headers = {
@@ -283,6 +332,111 @@ class ScenarioGenerator:
             f"일일 할당량이 소진되었습니다."
         )
 
+    def get_road_distance_osrm(self, start, end, max_retries=3, save_json_dir=None,
+                                route_type=None, source_index=None, name=None,
+                                start_label="start", goal_label="goal"):
+        """OSRM HTTP API(/route/v1/driving)를 사용한 도로 거리 및 시간 계산.
+
+        카카오 함수와 동일한 시그니처/반환값/JSON 저장 스키마를 사용한다.
+        OSRM은 정적 도로 그래프 기반이라 실시간 혼잡도/요금 정보가 없다.
+
+        Args:
+            start: (lat, lon) 튜플
+            end: (lat, lon) 튜플
+
+        Returns:
+            (distance_km, duration_min)
+        """
+        base = (self.osrm_url or "https://router.project-osrm.org").rstrip("/")
+        url = f"{base}/route/v1/driving/{start[1]},{start[0]};{end[1]},{end[0]}"
+        params = {
+            "overview": "full",
+            "geometries": "geojson",
+            "steps": "false",
+            "annotations": "false",
+            "alternatives": "false",
+        }
+        headers = {"Accept": "application/json"}
+
+        last_err = None
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=15)
+                if response.status_code == 200:
+                    data = response.json()
+
+                    code = data.get("code")
+                    routes = data.get("routes") or []
+                    if code != "Ok" or not routes:
+                        raise RuntimeError(
+                            f"OSRM 경로 없음 ({start} → {end}, code={code}): "
+                            f"도로가 연결되지 않는 구간이거나 OSRM 서버가 해당 영역을 커버하지 않습니다."
+                        )
+
+                    route = routes[0]
+                    distance_m = float(route.get("distance", 0))
+                    duration_s = float(route.get("duration", 0))
+                    distance_km = distance_m / 1000.0
+                    duration_min = duration_s / 60.0
+                    duration_sec = int(round(duration_s))
+
+                    if save_json_dir:
+                        now = datetime.now(KST).isoformat()
+                        meta = {
+                            "api_provider": "osrm",
+                            "route_type": route_type,
+                            "source_index": source_index,
+                            "name": name,
+                            # 좌표는 카카오와 동일하게 [lon, lat] 형식
+                            start_label: [start[1], start[0]],
+                            goal_label: [end[1], end[0]],
+                            "departure_time": "static",   # OSRM은 시각 개념 없음
+                            "priority": "shortest_time",
+                            "saved_at": now,
+                            "distance_km": round(distance_km, 3),
+                            "duration_min": round(duration_min, 2),
+                            "duration_sec": duration_sec,
+                            "toll_fare": 0,                # OSRM 미제공
+                            "taxi_fare": 0,                # OSRM 미제공
+                            "direction_note": f"{start_label}->{goal_label}",
+                        }
+                        fname = f"{(source_index if source_index is not None else 0):03d}_{slugify(name)}.json"
+                        out_path = os.path.join(save_json_dir, fname)
+                        ensure_dir(os.path.dirname(out_path))
+                        json_data = {"meta": meta, "payload": {"osrm_response": data}}
+                        with open(out_path, "w", encoding="utf-8") as f:
+                            json.dump(json_data, f, ensure_ascii=False, indent=2)
+
+                        print(f"  📦 [{route_type}] idx={(source_index or 0):03d} {name} → "
+                              f"{distance_km:.2f}km, {duration_min:.1f}min (OSRM)")
+
+                    self.api_call_count += 1
+                    return distance_km, duration_min
+
+                elif response.status_code == 429:
+                    print(f"  ⚠️ OSRM 호출 한도 초과 (429): 3초 대기 중...")
+                    time.sleep(3)
+                else:
+                    raise RuntimeError(
+                        f"OSRM 호출 실패 (status {response.status_code}): {start} → {end}"
+                    )
+
+            except RuntimeError:
+                raise
+            except Exception as e:
+                last_err = e
+                if attempt < max_retries - 1:
+                    print(f"  ⚠️ OSRM 호출 중 오류 ({attempt+1}/{max_retries}): {e}")
+                    time.sleep(2)
+                else:
+                    raise RuntimeError(
+                        f"OSRM 호출 실패 ({max_retries}회 재시도 초과): {e}"
+                    ) from e
+
+        raise RuntimeError(
+            f"OSRM 호출 실패 ({max_retries}회 재시도 후에도 실패): last_err={last_err}"
+        )
+
     def make_amb_info(self, latitude, longitude, incident_size, amb_count, save_folder):
         """구급차 정보 생성"""
         print(f"  🚑 구급차 정보 생성 중...")
@@ -344,7 +498,7 @@ class ScenarioGenerator:
             if key in cache:
                 dist_km, duration_min = cache[key]
             else:
-                dist_km, duration_min = self.get_road_distance_kakao(
+                dist_km, duration_min = self.get_road_distance(
                     start=coord, end=(latitude, longitude),  # center → site
                     save_json_dir=routes_dir, route_type="center2site",
                     source_index=j, name=row.get("기관명", f"center_{j}"),
@@ -605,7 +759,7 @@ class ScenarioGenerator:
 
         for j, (_, row) in enumerate(df_euc.iterrows()):
             end = (row["y좌표"], row["x좌표"])
-            road_km, duration_min = self.get_road_distance_kakao(
+            road_km, duration_min = self.get_road_distance(
                 start=(latitude, longitude), end=end,  # site → hospital
                 save_json_dir=routes_dir_hos, route_type="hos2site",
                 source_index=j, name=row.get("요양기관명", f"hospital_{j}"),
@@ -926,8 +1080,9 @@ entity_info:
     dispatch_distance_info: "{relative_folder}/amb_info_road.csv"
     velocity: {amb_velocity} # unit: km/h
     handover_time: {amb_handover_time} # unit: minutes
-    is_use_time: {str(is_use_time)} # True: API duration 사용, False: 거리/속도 기반 계산
+    is_use_time: {('True' if is_use_time else 'False')} # True: API duration 사용, False: 거리/속도 기반 계산
     duration_coeff: {duration_coeff} # API duration 시간가중치 (기본값: 1.0, 환경적 요인 반영시 조정)
+    road_provider: {self.road_provider or ('kakao' if is_use_time else 'osrm')} # 도로 데이터 공급자 (kakao | osrm) - 시나리오 생성 시 기록
   uav:
     load_data: True
     dispatch_distance_info: "{relative_folder}/uav_info.csv"
@@ -971,6 +1126,25 @@ run_setting:
             uav_handover_time: UAV 환자 인계시간 (분)
         Returns: 생성된 config 파일 경로
         """
+        # 방어적 bool 변환 (혹시 호출 측에서 문자열을 넘겨도 정상 동작)
+        is_use_time = bool(is_use_time) if not isinstance(is_use_time, str) else str2bool(is_use_time)
+
+        # road_provider는 __init__에서 is_use_time을 보고 이미 결정되어 있다.
+        # 다만 호출 시점 is_use_time과 __init__ 때 가정이 다르면 갱신하고 경고한다.
+        expected_provider = "kakao" if is_use_time else "osrm"
+        if expected_provider != self.road_provider:
+            print(f"  ⚠️ road_provider mismatch: __init__={self.road_provider}, "
+                  f"generate_scenario(is_use_time={is_use_time}) → {expected_provider}로 갱신")
+            self.road_provider = expected_provider
+
+        if self.road_provider == "kakao" and not self.kakao_api_key:
+            raise RuntimeError(
+                "is_use_time=True 모드는 --kakao_api_key가 필요합니다. "
+                "키가 없다면 is_use_time=False로 OSRM 백엔드를 사용하세요."
+            )
+        print(f"  🛣️ 도로 데이터 공급자: {self.road_provider}"
+              f"{' (' + self.osrm_url + ')' if self.road_provider == 'osrm' else ''}")
+
         print(f"""\n📍 좌표 ({latitude},{longitude}) 시나리오 생성 시작...""")
         start_time = time.time()
         folder_name = f"({latitude},{longitude})"
@@ -1028,7 +1202,7 @@ if __name__ == "__main__":
     parser.add_argument("--uav_count", type=int, default=3, help="UAV 수")
     parser.add_argument("--amb_velocity", type=int, default=40, help="구급차 속도")
     parser.add_argument("--uav_velocity", type=int, default=80, help="UAV 속도")
-    parser.add_argument("--total_samples", type=int, default=10, help="시뮬레이션 반복 수")
+    parser.add_argument("--total_samples", type=int, default=30, help="시뮬레이션 반복 수")
     parser.add_argument("--random_seed", type=int, default=0, help="랜덤 시드")
     parser.add_argument("--experiment_id", type=str, default=None, help="실험 ID")
     # 고급 옵션(ENV 또는 CLI 둘 다 허용)
@@ -1038,9 +1212,13 @@ if __name__ == "__main__":
     parser.add_argument("--hospital_max_send_coeff", type=str, default=None, help="전송계수 'a,b' 형식 (예: 1.1,1.0). 미입력시 ENV(MCI_MAX_SEND_COEFF) 또는 기본 1,1")
 
     # 카카오 API 관련 파라미터
-    parser.add_argument("--kakao_api_key", type=str, default=None, help="카카오 모빌리티 REST API 키")
+    parser.add_argument("--kakao_api_key", type=str, default=None, help="카카오 모빌리티 REST API 키 (is_use_time=true 모드 필수)")
     parser.add_argument("--departure_time", type=str, default=None, help="출발시간 (YYYYMMDDHHMM 형식, 예: 202512241800)")
-    parser.add_argument("--is_use_time", type=str, default="true", help="API duration 사용 여부 (true/false)")
+    parser.add_argument("--is_use_time", type=str2bool, default=True,
+                        help="True: 카카오 API duration 기반 / False: OSRM 정적 거리 기반(distance/velocity). 시뮬 재실행 시에도 OSRM duration을 활용 가능")
+    # OSRM 백엔드 (is_use_time=false일 때 사용)
+    parser.add_argument("--osrm_url", type=str, default=None,
+                        help="OSRM HTTP API base URL (기본: env MCI_OSRM_URL 또는 https://router.project-osrm.org)")
     parser.add_argument("--amb_handover_time", type=float, default=10.0, help="구급차 환자 인계시간 (분)")
     parser.add_argument("--uav_handover_time", type=float, default=15.0, help="UAV 환자 인계시간 (분)")
     parser.add_argument("--duration_coeff", type=float, default=1.0, help="API duration 시간가중치 (기본값: 1.0)")
@@ -1054,14 +1232,14 @@ if __name__ == "__main__":
         pass
 
     try:
-        # is_use_time 파싱 (문자열 "true"/"false" → bool)
-        is_use_time_bool = args.is_use_time.lower() in ("true", "1", "yes")
-
+        # args.is_use_time는 이미 str2bool로 파싱되어 bool
         generator = ScenarioGenerator(
             args.base_path,
             args.experiment_id,
             kakao_api_key=args.kakao_api_key,
-            departure_time=args.departure_time
+            departure_time=args.departure_time,
+            osrm_url=args.osrm_url,
+            is_use_time=args.is_use_time,
         )
 
         # CLI가 주어지면 ENV 기본값을 덮어씀
@@ -1091,7 +1269,7 @@ if __name__ == "__main__":
             args.incident_size, args.amb_count, args.uav_count,
             args.amb_velocity, args.uav_velocity,
             args.total_samples, args.random_seed,
-            is_use_time=is_use_time_bool,
+            is_use_time=args.is_use_time,
             amb_handover_time=args.amb_handover_time,
             uav_handover_time=args.uav_handover_time,
             duration_coeff=args.duration_coeff

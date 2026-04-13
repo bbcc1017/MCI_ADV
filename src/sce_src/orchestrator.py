@@ -431,6 +431,10 @@ def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
     else:
         meta["API_duration사용"] = None
 
+    # 도로 데이터 공급자 (kakao | osrm) - 시나리오 생성 시점 기록
+    # 구버전 시나리오는 항상 카카오를 썼으므로 미기재 시 kakao로 간주
+    meta["road_provider"] = amb.get("road_provider") or "kakao"
+
     # duration_coeff (API duration 시간가중치)
     duration_coeff_val = amb.get("duration_coeff")
     if duration_coeff_val is not None:
@@ -542,7 +546,7 @@ class Orchestrator:
     def generate_scenario(self, latitude: float, longitude: float,
                           incident_size: int = 30, amb_count: int = 30, uav_count: int = 3,
                           amb_velocity: int = 40, uav_velocity: int = 80,
-                          total_samples: int = 10, random_seed: int = 0,
+                          total_samples: int = 30, random_seed: int = 0,
                           exp_id: Optional[str] = None,
                           extra_env: Optional[Dict[str,str]] = None,
                           extra_args: Optional[Dict[str,Any]] = None) -> Dict[str,Any]:
