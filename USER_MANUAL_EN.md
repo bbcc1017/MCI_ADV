@@ -30,7 +30,9 @@ Version 1.0 | April 2026
 MCI_ADV is a simulation and analysis platform for optimizing patient transport in Mass Casualty Incidents (MCI). It evaluates 64 different dispatch policy combinations using ambulances (AMB) and unmanned aerial vehicles (UAV) to determine the optimal strategy for a given incident location.
 
 ### Key Features
-- **Scenario Generation**: Real-time/future traffic data via Kakao Mobility API
+- **Scenario Generation**: Two road-data backends supported
+  - **Kakao Mobility API** (`is_use_time=True`) — real-time/future traffic, requires a paid Korea-only key
+  - **OSRM** (`is_use_time=False`) — open-source routing engine, no Kakao key required. Static road graph only (time computed as `distance/velocity`). Recommended for external reviewers and public users.
 - **Simulation Engine**: Discrete event simulation with 64 rule combinations (Full Factorial Design)
 - **Statistical Analysis**: ANOVA, Tukey HSD, Games-Howell post-hoc tests
 - **Web Dashboard**: Interactive Streamlit-based UI with maps, analytics, and data editing
@@ -41,8 +43,8 @@ MCI_ADV is a simulation and analysis platform for optimizing patient transport i
 ```
 Coordinate Input → Scenario Generation → Simulation (64 rules x N samples) → Analysis & Visualization
        │                    │                        │                              │
-   (lat, lon)        Kakao API calls          Event-driven sim              ANOVA, Rankings
-                     CSV/YAML output          results_*.txt                 Folium maps
+   (lat, lon)        Kakao API or OSRM        Event-driven sim              ANOVA, Rankings
+                     CSV/YAML/JSON output     results_*.txt                 Folium maps
 ```
 
 ---
@@ -57,12 +59,20 @@ Coordinate Input → Scenario Generation → Simulation (64 rules x N samples) �
 ### Software
 - Python 3.9+
 - Windows 10/11, macOS, or Linux
-- Internet connection (for Kakao API calls)
+- Internet connection (for road-data API calls — Kakao or OSRM)
 
-### Required API Key
+### API Key / Routing Backend (choose one)
+
+**Option A — Kakao Mobility API (`is_use_time=True`)**
 - **Kakao REST API Key** with the following services enabled:
-  - Kakao Mobility (Directions API)
-  - Kakao Local (Keyword/Address Search)
+  - Kakao Mobility (Directions API) — road distance + real-time/future duration
+  - Kakao Local (Keyword/Address Search) — coordinate search / reverse-geocoding
+
+**Option B — OSRM backend (`is_use_time=False`)**
+- **No Kakao key required.** Recommended for external reviewers and public users.
+- Uses [OSRM](https://project-osrm.org/) HTTP API to fetch road distance + duration.
+- Defaults to the official demo server (`https://router.project-osrm.org`), but its fair-use policy limits sustained traffic — self-host with docker for production. See the "OSRM Backend" section in the project root `README.md`.
+- The coordinate search / reverse-geocoding UI may not work in this mode (depends on Kakao Local). Direct CSV-based batch entry works fine.
 
 ---
 
@@ -148,8 +158,8 @@ MCI_ADV/
 
 3. **Enter settings**:
    - Project path (auto-detected)
-   - Kakao REST API key
-   - Departure date/time
+   - Kakao REST API key (when `is_use_time` is checked) **or** OSRM URL (when unchecked)
+   - Departure date/time (Kakao mode only)
    - Incident coordinates (search or manual input)
 
 4. **Configure parameters**:
@@ -170,11 +180,21 @@ MCI_ADV/
 ### 5.2 Command Line (Single Coordinate)
 
 ```bash
-# Step 1: Generate scenario
+# Step 1: Generate scenario — Kakao mode
 python src/sce_src/make_csv_yaml_dynamic.py \
-  --lat 37.5665 --lon 126.9780 \
+  --base_path . \
+  --latitude 37.5665 --longitude 126.9780 \
+  --is_use_time true \
   --kakao_api_key YOUR_API_KEY \
   --departure_time 202604031400 \
+  --incident_size 30 --amb_count 30 --uav_count 3
+
+# Step 1 (alternative): Generate scenario — OSRM mode (no Kakao key)
+python src/sce_src/make_csv_yaml_dynamic.py \
+  --base_path . \
+  --latitude 37.5665 --longitude 126.9780 \
+  --is_use_time false \
+  --osrm_url http://localhost:5000 \
   --incident_size 30 --amb_count 30 --uav_count 3
 
 # Step 2: Run simulation
@@ -197,13 +217,13 @@ Filter hospitals within search radius
   ├── Tier 2 (종합):     grade code = 11
   └── Tier 1 (병원):     grade code = 21, 28, 29, 31
         ↓
-Kakao Mobility API → road distance & duration for each hospital
+Kakao Mobility API or OSRM → road distance & duration for each hospital
         ↓
 Load fire station data (안전센터와 소방서.csv)
         ↓
 Select 30 nearest fire stations (Euclidean distance)
         ↓
-Kakao Mobility API → road distance & duration for each station
+Kakao Mobility API or OSRM → road distance & duration for each station
         ↓
 Generate CSV files:
   ├── patient_info.csv      (severity distribution: Green/Yellow/Red)
@@ -232,7 +252,8 @@ Save route JSONs in routes/center2site/ and routes/hos2site/
 | `amb_handover_time` | 10.0 | AMB patient handover time (min) |
 | `uav_handover_time` | 15.0 | UAV patient handover time (min) |
 | `buffer_ratio` | 1.5 | Hospital search radius multiplier |
-| `is_use_time` | True | Use API-based transport time (vs distance/speed) |
+| `is_use_time` | True | True: Kakao API duration. False: OSRM static distance with `distance/velocity`. In False mode the OSRM duration is also persisted to CSV, so re-running the same scenario folder with `is_use_time=True` will reuse the OSRM-derived duration. |
+| `osrm_url` | (env `MCI_OSRM_URL` or `https://router.project-osrm.org`) | OSRM HTTP API base URL. Used only when `is_use_time=False`. The demo server has fair-use limits — self-hosting via docker is recommended. |
 | `duration_coeff` | 1.0 | Duration weight coefficient |
 | `total_samples` | 30 | Simulation repetitions per rule |
 | `random_seed` | 0 | Random seed for reproducibility |
@@ -390,6 +411,8 @@ python experiment_1/generate_coords.py \
 - Outputs CSV with `coord_id, lat, lon` and preview HTML map
 
 #### Step 2: Run Batch Processing
+
+**Kakao mode** (real-time traffic)
 ```bash
 python experiment_1/batch_runner.py \
   --coords experiment_1/coords_korea.csv \
@@ -397,6 +420,16 @@ python experiment_1/batch_runner.py \
   --experiment-id exp_korea_random_1000 \
   --departure-time 202603311400 \
   --daily-limit 4900 \
+  --total-samples 30
+```
+
+**OSRM mode** (open-source, no Kakao key)
+```bash
+python experiment_1/batch_runner.py \
+  --coords experiment_1/coords_korea.csv \
+  --is-use-time false \
+  --osrm-url http://localhost:5000 \
+  --experiment-id exp_korea_random_1000_osrm \
   --total-samples 30
 ```
 
@@ -486,7 +519,7 @@ Each patient's survival probability decreases over time based on severity:
 
 ## 12. API Configuration
 
-### 12.1 Kakao REST API Key Setup
+### 12.1 Kakao REST API Key Setup (`is_use_time=True` mode)
 
 1. Visit [Kakao Developers](https://developers.kakao.com/)
 2. Create an application
@@ -495,7 +528,7 @@ Each patient's survival probability decreases over time based on severity:
    - **Kakao Local** (Search API)
 4. Copy the **REST API Key**
 
-### 12.2 API Endpoints Used
+### 12.2 Kakao Endpoints Used
 
 | Endpoint | Purpose | Calls per Coordinate |
 |----------|---------|---------------------|
@@ -504,11 +537,45 @@ Each patient's survival probability decreases over time based on severity:
 | Local Keyword Search | Coordinate search (dashboard only) | 1 per search |
 | Local Address Search | Address lookup (dashboard only) | 1 per search |
 
-### 12.3 API Quota Management
+### 12.3 Kakao Quota Management
 - Kakao free tier: **5,000 calls/day**
 - Each coordinate requires approximately **50-80 API calls**
 - `batch_runner.py` tracks daily usage via `api_log` in progress.json
 - Configure `--daily-limit` (default: 4900) to leave safety margin
+
+### 12.4 OSRM Backend (`is_use_time=False` mode)
+
+When you don't have a Kakao key, or when publishing the project, use OSRM (an open-source routing engine).
+
+**Default behavior**: If the env var `MCI_OSRM_URL` is set it is used; otherwise the official demo server `https://router.project-osrm.org` is used. CLI/UI `--osrm_url` overrides explicitly.
+
+**Self-hosting (recommended for production)**:
+```bash
+# Download Korean OSM extract and pre-process
+wget https://download.geofabrik.de/asia/south-korea-latest.osm.pbf
+docker run -t -v "$(pwd):/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/south-korea-latest.osm.pbf
+docker run -t -v "$(pwd):/data" osrm/osrm-backend osrm-partition  /data/south-korea-latest.osrm
+docker run -t -v "$(pwd):/data" osrm/osrm-backend osrm-customize  /data/south-korea-latest.osrm
+
+# Start the routing server
+docker run -t -i -p 5000:5000 -v "$(pwd):/data" osrm/osrm-backend \
+  osrm-routed --algorithm mld /data/south-korea-latest.osrm
+
+# Use it
+export MCI_OSRM_URL=http://localhost:5000
+```
+
+**OSRM endpoints used**:
+| Endpoint | Purpose |
+|----------|---------|
+| `/route/v1/driving/{lon1},{lat1};{lon2},{lat2}` | Road distance + duration + GeoJSON polyline for hospitals/fire stations |
+
+A self-hosted OSRM instance has no external rate limit (only server resource limits). The `--daily-limit` flag remains for compatibility but is meaningless in OSRM mode.
+
+**Limitations**:
+- No real-time traffic data (static road graph)
+- No road congestion data → dashboard map renders single-color polylines
+- Coordinate search / reverse-geocoding UI depends on Kakao Local and is unavailable in OSRM mode. Use direct CSV batch input instead.
 
 ---
 
@@ -520,8 +587,10 @@ Each patient's survival probability decreases over time based on severity:
 |---------|-------|----------|
 | `RuntimeError` in scenario generation | Incident site has no nearby road (rc=102): mountain, sea, uninhabited island | Not a bug; coordinate is genuinely inaccessible by road. All 223/1000 failures in the batch experiment are this type. Fire station route issues: 0 cases. |
 | `Exception: Impossible to divert` | Code logic bug: UAV+Red patient can only go to helipad+Tier3 hospitals. When the only qualifying hospital (e.g., Wonkwang Univ. Hospital, capacity=16) is full, diversion fails even though non-helipad Tier3 hospitals have capacity. | Known edge case (5/1000 coords affected). Not a bed shortage — total Tier3 capacity (35) exceeds patient count (30). Fix requires fallback logic in `diversion_rule()`. |
-| API 401 Unauthorized | Invalid API key | Check key in Kakao Developer console |
-| API 429 Rate Limit | Daily quota exceeded | Wait 24h or increase quota |
+| API 401 Unauthorized | Invalid Kakao API key | Check key in Kakao Developer console. If no key is available, switch to `is_use_time=false` (OSRM backend). |
+| API 429 Rate Limit | Kakao daily quota exceeded | Wait 24h, increase quota, or switch to the OSRM backend. |
+| `RuntimeError: Kakao API key required (is_use_time=True mode)` | Generating with `is_use_time=True` but no `--kakao_api_key` provided | Provide a key, or use `is_use_time=false` (OSRM). |
+| `OSRM 경로 없음 (code=NoRoute)` | Coordinate not connected in the OSRM road graph (sea/island) | Exclude the coordinate. Equivalent to Kakao rc=102. |
 | `UnicodeEncodeError: cp949` | Windows console encoding | Set `PYTHONIOENCODING=utf-8` |
 | YAML key order crash | `sort_keys=True` in yaml.dump | Use `sort_keys=False` (already fixed) |
 | Simulation hangs | stdout pipe buffer full | Fixed via Popen + daemon thread |

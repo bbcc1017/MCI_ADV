@@ -266,3 +266,4 @@ scenarios/label_map.csv
 !scenarios/*.xlsx
 experiment_logs/
 results/
+reports/

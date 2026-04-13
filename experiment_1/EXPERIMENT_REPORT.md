@@ -41,7 +41,7 @@
 | UAV 속도 | 80 km/h | |
 | 구급차 인계시간 (`amb_handover_time`) | 10분 | |
 | UAV 인계시간 (`uav_handover_time`) | 15분 | |
-| API 경로 사용 (`is_use_time`) | True | Kakao Mobility API duration 기반 |
+| API 경로 사용 (`is_use_time`) | True | Kakao Mobility API duration 기반 (본 실험 당시. 이후 OSRM 백엔드도 추가되어 `is_use_time=false`로도 동일 파이프라인을 돌릴 수 있음) |
 | Duration 가중치 (`duration_coeff`) | 1.0 | |
 | 병원 전송계수 (`max_send_coeff`) | [1.0, 1.0] | |
 | 출발시각 (`departure_time`) | 202604071400 | 2026년 4월 7일(화) 14:00 |
@@ -347,6 +347,8 @@ python experiment_1/generate_coords.py --n 1000 --seed 0
 ```
 
 ### Step 2. 배치 실험 실행
+
+**(A) Kakao API 모드 (원본 실험과 동일, `is_use_time=true`)**
 ```bash
 python experiment_1/batch_runner.py \
     --kakao-api-key YOUR_KEY \
@@ -364,6 +366,26 @@ python experiment_1/batch_runner.py \
     --duration-coeff 1.0 \
     --departure-time 202604071400
 ```
+
+**(B) OSRM 모드 (오픈소스, 키 불필요, `is_use_time=false`)**
+```bash
+python experiment_1/batch_runner.py \
+    --experiment-id exp_korea_random_1000_osrm \
+    --incident-size 30 \
+    --amb-count 30 \
+    --uav-count 3 \
+    --amb-velocity 40 \
+    --uav-velocity 80 \
+    --total-samples 30 \
+    --random-seed 0 \
+    --amb-handover-time 10.0 \
+    --uav-handover-time 15.0 \
+    --is-use-time false \
+    --duration-coeff 1.0 \
+    --departure-time 202604071400 \
+    --osrm-url https://router.project-osrm.org   # 또는 자체 호스팅 URL
+```
+> 주: 본 보고서의 수치는 (A) Kakao 모드 결과이며, (B) OSRM 모드는 동일 파이프라인의 재현 가능성을 위한 대안이다. 도로 네트워크/속도 모델 차이로 절대 수치는 다를 수 있다.
 
 ### Step 3. 결과 시각화
 ```bash

@@ -62,13 +62,32 @@ python experiment_1/generate_coords.py --n 50 --seed 0
 
 **매일 동일한 명령**을 실행하면 `progress.json`을 보고 자동으로 이어서 처리합니다.
 
-### 기본 실행
+### 기본 실행 (Kakao 모드)
 
 ```bash
 python experiment_1/batch_runner.py \
     --kakao-api-key YOUR_KEY \
     --experiment-id exp_batch_research
 ```
+
+### OSRM 모드 (카카오 키 불필요, 오픈소스 백엔드)
+
+카카오 API 키가 없는 경우 `--is-use-time false`를 주면 [OSRM](https://project-osrm.org/docs/v5.24.0/api/#) HTTP API로 도로 거리/시간을 받아 카카오와 동일한 스키마로 저장된다. 시뮬레이터는 `distance/velocity`로 시간을 산출하며, 동일 시나리오 폴더로 시뮬을 재실행할 때 YAML의 `is_use_time`을 `True`로 바꾸면 OSRM duration 기반 시뮬도 가능하다.
+
+```bash
+# 데모 서버 사용 (소규모 테스트 한정)
+python experiment_1/batch_runner.py \
+    --is-use-time false \
+    --experiment-id exp_batch_osrm
+
+# 자체 호스팅 OSRM (운영 권장)
+python experiment_1/batch_runner.py \
+    --is-use-time false \
+    --osrm-url http://localhost:5000 \
+    --experiment-id exp_batch_osrm
+```
+
+자체 호스팅 도커 절차는 프로젝트 루트 `README.md`의 "OSRM 백엔드" 섹션 참고.
 
 ### 파라미터 전체 지정 예시
 
@@ -83,7 +102,7 @@ python experiment_1/batch_runner.py \
     --uav-count 3 \
     --amb-velocity 40 \
     --uav-velocity 80 \
-    --total-samples 10 \
+    --total-samples 30 \
     --random-seed 0 \
     --amb-handover-time 10.0 \
     --uav-handover-time 15.0 \
@@ -113,7 +132,7 @@ python experiment_1/batch_runner.py \
 | `--uav-count` | `3` | UAV 수 |
 | `--amb-velocity` | `40` | 구급차 속도 (km/h) |
 | `--uav-velocity` | `80` | UAV 속도 (km/h) |
-| `--total-samples` | `10` | 시뮬레이션 반복 횟수 |
+| `--total-samples` | `30` | 시뮬레이션 반복 횟수 |
 | `--random-seed` | `0` | 랜덤 시드 |
 
 **이송 / 시간 파라미터**
@@ -122,8 +141,9 @@ python experiment_1/batch_runner.py \
 |------|--------|------|
 | `--amb-handover-time` | `0.0` | 구급차 환자 인계시간 (분) |
 | `--uav-handover-time` | `0.0` | UAV 환자 인계시간 (분) |
-| `--is-use-time` | `true` | Kakao API duration 사용 여부 (`true`/`false`) |
+| `--is-use-time` | `true` | `true`: 카카오 API duration / `false`: OSRM 정적 거리(distance/velocity). `false` 모드에서도 OSRM duration이 CSV에 저장되어 추후 `is_use_time=true`로 재실행 시 활용 가능 |
 | `--duration-coeff` | `1.0` | API duration 시간 가중치 |
+| `--osrm-url` | env `MCI_OSRM_URL` 또는 `https://router.project-osrm.org` | OSRM HTTP API base URL (`is-use-time=false` 전용). 데모 서버는 fair-use 정책 있음 — 자체 호스팅 권장 |
 
 **병원 할당 파라미터**
 
@@ -137,7 +157,7 @@ python experiment_1/batch_runner.py \
 
 | 인수 | 기본값 | 설명 |
 |------|--------|------|
-| `--kakao-api-key` | — | **(필수)** Kakao REST API 키 |
+| `--kakao-api-key` | — | Kakao REST API 키 (`--is-use-time true` 모드에서만 필수, OSRM 모드에서는 불필요) |
 | `--departure-time` | 현재 시간 | Kakao 출발시간 `YYYYMMDDHHmm` 형식 (선택) |
 | `--daily-limit` | `5000` | 하루 최대 API 호출 수 (Kakao 일일 한도: 5000) |
 | `--calls-per-coord` | `40` | 좌표 1개당 예상 API 호출 수 |

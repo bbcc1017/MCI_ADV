@@ -45,10 +45,11 @@
 - **권장**: `len(df)` 사용으로 통일
 
 ### 2.4 [MAJOR] API 에러 핸들링 — 429(Rate Limit) 재시도 로직 부재
-- **파일**: `make_csv_yaml_dynamic.py:153+` `get_road_distance_kakao()`
+- **파일**: `make_csv_yaml_dynamic.py:153+` `get_road_distance_kakao()` / `get_road_distance_osrm()`
 - **현상**: Kakao API 429 응답 시 즉시 실패 처리. 재시도(retry with backoff) 로직 없음
 - **영향**: API 할당량 한도 근처에서 간헐적 실패
 - **권장**: `tenacity` 또는 수동 exponential backoff 추가
+- **업데이트(2026-04)**: OSRM 백엔드 추가에 따라 동일 시그니처의 `get_road_distance_osrm()`이 신설되고, 두 공급자를 `road_provider`(kakao/osrm)로 분기하는 `get_road_distance()` 디스패처가 도입됨. `is_use_time=True`이면 Kakao, `False`이면 OSRM이 자동 선택된다. 또한 기존에 키가 없을 때 silently haversine으로 빠지던 fallback(구 라인 165–169)은 제거되었고, Kakao 모드에서 키가 없으면 즉시 `RuntimeError`로 중단한다(silent degradation 방지).
 
 ### 2.5 [MINOR] 하드코딩된 매직 넘버
 - `buffer_ratio=1.5` (병원 검색 반경 배율)
@@ -135,6 +136,7 @@
 - **현상**: `st.caption(f"Debug: header = Authorization: KakaoAK {kakao_api_key[:4]}...{kakao_api_key[-4:]}")` — API 키의 앞 4자리와 뒤 4자리가 UI에 노출됨
 - **영향**: 보안 위험 (특히 Streamlit Cloud 배포 시)
 - **권장**: 디버그 출력 제거 또는 환경변수 플래그로 제어
+- **참고(2026-04)**: OSRM 백엔드가 추가되어 `is_use_time=False` 모드에서는 Kakao 키가 아예 필요 없게 되었다. 다만 본 디버그 출력은 Kakao 모드 분기에 그대로 남아 있으므로 별도 제거가 필요하다.
 
 ### 4.3 [MAJOR] Session State 초기화 — 페이지 간 충돌
 - **파일**: `Generate.py`, `MCI_Streamlit.py`

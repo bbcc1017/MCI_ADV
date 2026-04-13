@@ -60,7 +60,7 @@ MCI_ADV/
 │   ├── 엑셀 결합 데이터.xlsx               # 병원 마스터 데이터 (필수)
 │   ├── DISTANCE_MATRIX_FINAL.xlsx         # 사전 계산된 거리 행렬
 │   ├── label_map.csv                      # 실험 좌표 레이블
-│   └── exp_{YYYYMMDD_HHMMSS}_dep_{HHMM}/ # 생성된 시나리오
+│   └── exp_{base}_dep_{HHMM}/  또는  exp_{base}_osrm/   # 생성된 시나리오 (Kakao=_dep_, OSRM=_osrm)
 │       └── (lat,lon)/                     # 좌표별 폴더
 │           ├── config_(lat,lon).yaml      # 시뮬레이션 설정
 │           ├── patient_info.csv           # 환자 중증도 분포
@@ -76,7 +76,7 @@ MCI_ADV/
 │               └── hos2site/              # 사고지점 → 병원
 │
 ├── results/                               # 시뮬레이션 결과
-│   └── exp_{YYYYMMDD_HHMMSS}_dep_{HHMM}/
+│   └── exp_{base}_dep_{HHMM}/  또는  exp_{base}_osrm/
 │       └── (lat,lon)/
 │           ├── results_(lat,lon).txt      # RAW 결과 (전체 데이터)
 │           └── results_(lat,lon)_stat.txt # 통계 요약
@@ -124,7 +124,7 @@ MCI_ADV/
 │    ├─ routes/*.json 생성 (API 응답 저장)                                      │
 │    └─ config_{coord}.yaml 생성                                               │
 │                     ↓                                                        │
-│  scenarios/exp_{YYYYMMDD_HHMMSS}_dep_{HHMM}/(lat,lon)/                       │
+│  scenarios/exp_{base}_dep_{HHMM}/(lat,lon)/   또는   exp_{base}_osrm/...      │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 
@@ -404,8 +404,9 @@ entity_info:
     dispatch_distance_info: "./amb_info_road.csv"
     velocity: 40                   # km/h
     handover_time: 0               # 환자 인계 시간 (분)
-    is_use_time: True              # API duration 사용 여부
+    is_use_time: True              # True: 카카오 API duration / False: OSRM 정적거리(distance/velocity)
     duration_coeff: 1.0            # duration 가중치
+    road_provider: kakao           # 시나리오 생성 시 사용된 도로 데이터 공급자 (kakao | osrm)
 
   uav:
     load_data: True
@@ -423,7 +424,7 @@ rule_info:
   yellow_mode_rule: ["OnlyUAV", "Both_UAVFirst", "Both_AMBFirst", "OnlyAMB"]
 
 run_setting:
-  totalSamples: 10                 # 반복 횟수
+  totalSamples: 30                 # 반복 횟수
   random_seed: 0                   # 랜덤 시드 (null=미고정)
   rule_test: True
   eval_mode: True
@@ -551,6 +552,49 @@ export KAKAO_REST_API_KEY="your_api_key"
 # 3. Generate.py UI 직접 입력
 ```
 
+### OSRM 백엔드 (오픈소스, 카카오 키 불필요)
+
+카카오 모빌리티 API는 한국 한정 유료 서비스라 외부 사용자나 코드 리뷰어가 동일한 파이프라인을 그대로 돌리기 어렵다. 시나리오 최초 생성 시 `is_use_time=False`로 두면 카카오 대신 [OSRM](https://project-osrm.org/docs/v5.24.0/api/#) HTTP API로 도로 거리/시간을 받아 카카오와 **동일한 JSON·CSV·YAML 스키마**로 저장한다. 따라서 시뮬레이터/시각화 등 downstream은 그대로 동작한다.
+
+```bash
+# 카카오 키 없이 OSRM 데모 서버 사용 (소규모 테스트 한정)
+python src/sce_src/make_csv_yaml_dynamic.py \
+  --base_path . --latitude 37.5665 --longitude 126.9780 \
+  --incident_size 30 --amb_count 30 --uav_count 3 \
+  --is_use_time false --experiment_id osrm_demo
+```
+
+운영용으로는 자체 호스팅을 권장한다(데모 서버는 fair-use 정책이 있음):
+
+```bash
+# 한국 OSM 추출본 다운로드 후 1회 사전처리
+wget https://download.geofabrik.de/asia/south-korea-latest.osm.pbf
+docker run -t -v "$(pwd):/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/south-korea-latest.osm.pbf
+docker run -t -v "$(pwd):/data" osrm/osrm-backend osrm-partition  /data/south-korea-latest.osrm
+docker run -t -v "$(pwd):/data" osrm/osrm-backend osrm-customize  /data/south-korea-latest.osrm
+# 라우팅 서버 기동
+docker run -t -i -p 5000:5000 -v "$(pwd):/data" osrm/osrm-backend \
+  osrm-routed --algorithm mld /data/south-korea-latest.osrm
+
+# 시나리오 생성 시 자체 OSRM 인스턴스 지정
+export MCI_OSRM_URL=http://localhost:5000   # 또는 --osrm_url 인자
+python src/sce_src/make_csv_yaml_dynamic.py ... --is_use_time false --osrm_url http://localhost:5000
+```
+
+`is_use_time=False` 모드에서도 OSRM duration이 CSV의 `duration` 컬럼에 함께 저장되므로, **동일 시나리오 폴더로 시뮬을 재실행할 때 YAML의 `is_use_time`을 True로 바꾸면** OSRM duration 기반 시뮬이 가능하다(분기 로직: `src/sim_src/ScenarioManager.py:191-212`). 첫 시뮬은 `distance/velocity` 분기로 동작한다.
+
+#### OSRM 응답 매핑
+```
+GET {osrm_url}/route/v1/driving/{lon1},{lat1};{lon2},{lat2}
+    ?overview=full&geometries=geojson&steps=false&annotations=false
+
+routes[0].distance (m)         → distance_km = / 1000
+routes[0].duration (s)         → duration_min = / 60
+routes[0].geometry.coordinates → 지도 시각화용 폴리라인
+```
+
+저장되는 JSON은 카카오와 동일하게 `{meta, payload}` 구조이며, `meta.api_provider == "osrm"`, `payload.osrm_response`에 전체 응답이 들어간다. 대시보드 지도(`MCI_Streamlit.draw_route_from_json`)는 `api_provider`를 보고 카카오/OSRM 분기를 선택해 렌더링한다(OSRM은 혼잡도 데이터가 없으므로 단일 색 폴리라인).
+
 #### 오류 처리
 - **401 (Auth failure)**: API 키 확인 필요 → 중단
 - **429 (Rate limit)**: 2초 대기 후 재시도 (최대 3회)
@@ -619,7 +663,7 @@ streamlit run pages/Generate.py
 
 #### 1. Settings (사이드바)
 - **프로젝트 경로**: `C:\Users\User\MCI_ADV` 입력
-- **실험 ID 선택**: `exp_YYYYMMDD_HHMM_dep_HHMM` 드롭다운
+- **실험 ID 선택**: `exp_<base>_dep_<HHMM>` (Kakao 모드) 또는 `exp_<base>_osrm` (OSRM 모드) 드롭다운
 - **좌표 선택**: `(lat,lon)` 드롭다운
 - **미니맵**: 선택된 좌표 위치 표시
 

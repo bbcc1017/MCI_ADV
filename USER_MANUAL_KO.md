@@ -30,7 +30,9 @@
 MCI_ADV는 대량 재난 사고(Mass Casualty Incident) 발생 시 **환자 이송 최적화**를 위한 시뮬레이션 및 분석 플랫폼입니다. 구급차(AMB)와 드론(UAV)을 활용한 64가지 배차 정책 조합을 평가하여 주어진 사고 지점에서의 최적 전략을 도출합니다.
 
 ### 핵심 기능
-- **시나리오 생성**: 카카오 모빌리티 API 기반 실시간/미래시간 교통정보 반영
+- **시나리오 생성**: 두 가지 도로 데이터 백엔드 지원
+  - **카카오 모빌리티 API** (`is_use_time=True`) — 실시간/미래시간 교통정보 반영, 한국 한정 유료 키 필요
+  - **OSRM** (`is_use_time=False`) — 오픈소스 라우팅 엔진, 카카오 키 불필요. 정적 도로 그래프 기반(distance/velocity로 시간 산출). 외부 리뷰어/공개 사용자를 위한 대안.
 - **시뮬레이션 엔진**: 이산 사건 시뮬레이션(DES), 64개 규칙 조합 (완전요인설계)
 - **통계 분석**: ANOVA, Tukey HSD, Games-Howell 사후검정 자동 수행
 - **웹 대시보드**: Streamlit 기반 인터랙티브 UI (지도, 분석, 데이터 편집)
@@ -41,8 +43,8 @@ MCI_ADV는 대량 재난 사고(Mass Casualty Incident) 발생 시 **환자 이�
 ```
 좌표 입력 → 시나리오 생성 → 시뮬레이션 (64규칙 x N샘플) → 분석 및 시각화
     │              │                    │                        │
- (위도, 경도)   카카오 API 호출      이벤트 기반 시뮬        ANOVA, 순위
-               CSV/YAML 출력       results_*.txt          Folium 지도
+ (위도, 경도)   카카오 API 또는 OSRM     이벤트 기반 시뮬        ANOVA, 순위
+               CSV/YAML/JSON 출력      results_*.txt           Folium 지도
 ```
 
 ---
@@ -57,12 +59,20 @@ MCI_ADV는 대량 재난 사고(Mass Casualty Incident) 발생 시 **환자 이�
 ### 소프트웨어
 - Python 3.9 이상
 - Windows 10/11, macOS, 또는 Linux
-- 인터넷 연결 (카카오 API 호출용)
+- 인터넷 연결 (도로 데이터 API 호출용 — 카카오 또는 OSRM)
 
-### 필수 API 키
+### API 키 / 라우팅 백엔드 (택1)
+
+**옵션 A — 카카오 모빌리티 API 사용 (`is_use_time=True`)**
 - **카카오 REST API 키** (아래 서비스 활성화 필요):
-  - 카카오 모빌리티 (길찾기 API)
-  - 카카오 로컬 (키워드/주소 검색)
+  - 카카오 모빌리티 (길찾기 API) — 도로 거리 + 실시간/미래 duration
+  - 카카오 로컬 (키워드/주소 검색) — 좌표 검색 / 역지오코딩
+
+**옵션 B — OSRM 백엔드 사용 (`is_use_time=False`)**
+- 카카오 키 **불필요**. 외부 리뷰어/공개 사용자에게 권장.
+- [OSRM](https://project-osrm.org/) HTTP API로 도로 거리 + duration을 받는다.
+- 기본값은 공식 데모 서버(`https://router.project-osrm.org`)지만 fair-use 정책이 있으므로 운영용은 자체 호스팅(도커) 권장. 자세한 절차는 프로젝트 루트 `README.md` "OSRM 백엔드" 섹션 참고.
+- 이 모드에서는 좌표 검색/역지오코딩 UI가 동작하지 않을 수 있다(카카오 로컬 의존). CSV로 직접 좌표를 넣는 배치 모드는 정상 동작.
 
 ---
 
@@ -148,8 +158,8 @@ MCI_ADV/
 
 3. **설정 입력**:
    - 프로젝트 경로 (자동 감지)
-   - 카카오 REST API 키
-   - 출발 날짜/시간
+   - 카카오 REST API 키 (`is_use_time` 체크 시) **또는** OSRM URL (체크 해제 시)
+   - 출발 날짜/시간 (카카오 모드 전용)
    - 사고 좌표 (검색 또는 직접 입력)
 
 4. **파라미터 설정**:
@@ -170,11 +180,21 @@ MCI_ADV/
 ### 5.2 명령줄 인터페이스 (단일 좌표)
 
 ```bash
-# 1단계: 시나리오 생성
+# 1단계: 시나리오 생성 — Kakao 모드
 python src/sce_src/make_csv_yaml_dynamic.py \
-  --lat 37.5665 --lon 126.9780 \
+  --base_path . \
+  --latitude 37.5665 --longitude 126.9780 \
+  --is_use_time true \
   --kakao_api_key YOUR_API_KEY \
   --departure_time 202604031400 \
+  --incident_size 30 --amb_count 30 --uav_count 3
+
+# 1단계 (대안): 시나리오 생성 — OSRM 모드 (카카오 키 불필요)
+python src/sce_src/make_csv_yaml_dynamic.py \
+  --base_path . \
+  --latitude 37.5665 --longitude 126.9780 \
+  --is_use_time false \
+  --osrm_url http://localhost:5000 \
   --incident_size 30 --amb_count 30 --uav_count 3
 
 # 2단계: 시뮬레이션 실행
@@ -197,13 +217,13 @@ python src/sim_src/main.py --config_path scenarios/exp_.../config_(lat,lon).yaml
   ├── Tier 2 (종합병원):     종별코드 = 11
   └── Tier 1 (병원/요양병원): 종별코드 = 21, 28, 29, 31
         ↓
-카카오 모빌리티 API → 각 병원까지의 도로 거리 및 소요 시간
+카카오 모빌리티 API 또는 OSRM → 각 병원까지의 도로 거리 및 소요 시간
         ↓
 소방서 데이터 로드 (안전센터와 소방서.csv)
         ↓
 유클리드 거리 기준 최근접 30개 소방서 선택
         ↓
-카카오 모빌리티 API → 각 소방서까지의 도로 거리 및 소요 시간
+카카오 모빌리티 API 또는 OSRM → 각 소방서까지의 도로 거리 및 소요 시간
         ↓
 CSV 파일 생성:
   ├── patient_info.csv      (환자 중증도 분포: Green/Yellow/Red)
@@ -232,7 +252,8 @@ config_(lat,lon).yaml 생성
 | `amb_handover_time` | 10.0 | 구급차 환자 인계 시간 (분) |
 | `uav_handover_time` | 15.0 | UAV 환자 인계 시간 (분) |
 | `buffer_ratio` | 1.5 | 병원 검색 반경 배율 |
-| `is_use_time` | True | API 기반 이동 시간 사용 여부 (미사용 시 거리/속도 계산) |
+| `is_use_time` | True | True: 카카오 API duration 기반 / False: OSRM 정적 거리(distance/velocity) 기반. False 모드에서도 OSRM duration이 CSV에 함께 저장되므로, 동일 시나리오 폴더로 시뮬을 재실행할 때 YAML의 `is_use_time`을 True로 바꾸면 OSRM duration 기반 시뮬이 가능합니다. |
+| `osrm_url` | (env `MCI_OSRM_URL` 또는 `https://router.project-osrm.org`) | OSRM HTTP API base URL. `is_use_time=False`일 때만 사용. 데모 서버는 fair-use 정책이 있으므로 자체 호스팅(도커) 권장. |
 | `duration_coeff` | 1.0 | 소요 시간 가중치 계수 |
 | `total_samples` | 30 | 규칙당 시뮬레이션 반복 횟수 |
 | `random_seed` | 0 | 재현성을 위한 랜덤 시드 |
@@ -390,6 +411,8 @@ python experiment_1/generate_coords.py \
 - `coord_id, lat, lon` 형식 CSV 및 미리보기 HTML 지도 출력
 
 #### 2단계: 배치 처리 실행
+
+**Kakao 모드** (실시간 교통정보)
 ```bash
 python experiment_1/batch_runner.py \
   --coords experiment_1/coords_korea.csv \
@@ -397,6 +420,16 @@ python experiment_1/batch_runner.py \
   --experiment-id exp_korea_random_1000 \
   --departure-time 202603311400 \
   --daily-limit 4900 \
+  --total-samples 30
+```
+
+**OSRM 모드** (오픈소스, 카카오 키 불필요)
+```bash
+python experiment_1/batch_runner.py \
+  --coords experiment_1/coords_korea.csv \
+  --is-use-time false \
+  --osrm-url http://localhost:5000 \
+  --experiment-id exp_korea_random_1000_osrm \
   --total-samples 30
 ```
 
@@ -486,7 +519,7 @@ python experiment_1/visualize_coords.py \
 
 ## 12. API 설정
 
-### 12.1 카카오 REST API 키 발급
+### 12.1 카카오 REST API 키 발급 (`is_use_time=True` 모드)
 
 1. [카카오 개발자](https://developers.kakao.com/) 사이트 방문
 2. 애플리케이션 생성
@@ -495,7 +528,7 @@ python experiment_1/visualize_coords.py \
    - **카카오 로컬** (검색 API)
 4. **REST API 키** 복사
 
-### 12.2 사용되는 API 엔드포인트
+### 12.2 사용되는 API 엔드포인트 (Kakao 모드)
 
 | 엔드포인트 | 용도 | 좌표당 호출 수 |
 |------------|------|---------------|
@@ -504,11 +537,45 @@ python experiment_1/visualize_coords.py \
 | 로컬 키워드 검색 | 좌표 검색 (대시보드 전용) | 검색당 1회 |
 | 로컬 주소 검색 | 주소 조회 (대시보드 전용) | 검색당 1회 |
 
-### 12.3 API 할당량 관리
+### 12.3 카카오 API 할당량 관리
 - 카카오 무료 티어: **일 5,000회**
 - 좌표당 약 **50-80회** API 호출 필요
 - `batch_runner.py`가 `api_log`를 통해 일일 사용량 추적
 - `--daily-limit` 설정 (기본값: 4900)으로 안전 마진 확보
+
+### 12.4 OSRM 백엔드 (`is_use_time=False` 모드)
+
+카카오 키가 없거나 외부 공개 환경에서는 OSRM(오픈소스 라우팅 엔진)을 사용한다.
+
+**기본 동작**: 환경변수 `MCI_OSRM_URL`이 설정되어 있으면 그 값을, 아니면 공식 데모 서버 `https://router.project-osrm.org`를 사용한다. CLI/UI에서 `--osrm_url`로 명시 오버라이드 가능.
+
+**자체 호스팅 (운영 권장)**:
+```bash
+# 한국 OSM 추출본 다운로드 + 사전처리
+wget https://download.geofabrik.de/asia/south-korea-latest.osm.pbf
+docker run -t -v "$(pwd):/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/south-korea-latest.osm.pbf
+docker run -t -v "$(pwd):/data" osrm/osrm-backend osrm-partition  /data/south-korea-latest.osrm
+docker run -t -v "$(pwd):/data" osrm/osrm-backend osrm-customize  /data/south-korea-latest.osrm
+
+# 라우팅 서버 기동
+docker run -t -i -p 5000:5000 -v "$(pwd):/data" osrm/osrm-backend \
+  osrm-routed --algorithm mld /data/south-korea-latest.osrm
+
+# 사용
+export MCI_OSRM_URL=http://localhost:5000
+```
+
+**호출되는 OSRM 엔드포인트**:
+| 엔드포인트 | 용도 |
+|------------|------|
+| `/route/v1/driving/{lon1},{lat1};{lon2},{lat2}` | 병원/소방서까지의 도로 distance + duration + GeoJSON 폴리라인 |
+
+자체 호스팅 OSRM은 호출 한도가 없고(서버 자원 한계 내), `--daily-limit` 설정은 무의미하지만 호환을 위해 그대로 유지된다.
+
+**제한사항**:
+- 실시간 교통정보 없음 (정적 도로 그래프 기반)
+- 도로 혼잡도 데이터 없음 → 대시보드 지도는 단일 색 폴리라인
+- 좌표 검색/역지오코딩 UI는 카카오 로컬 의존이라 OSRM 모드에서 동작하지 않음. CSV 직접 입력 배치 모드 권장.
 
 ---
 
@@ -520,8 +587,10 @@ python experiment_1/visualize_coords.py \
 |------|------|----------|
 | 시나리오 생성 `RuntimeError` | 사고지점 자체에 도로 없음 (rc=102): 산, 바다, 무인도 | 버그가 아닌 정상 동작. 1000개 좌표 배치 실험 기준 223개가 이 유형. 소방서 경로 문제는 0건. |
 | `Exception: Impossible to divert` | 코드 로직 버그: UAV+Red 환자는 헬기장+Tier3 병원에만 이송 가능. 유일한 해당 병원(예: 원광대, 용량16)이 가득 차면 비헬기장 Tier3 병원(전북대, 용량19)에 빈자리가 있어도 전원 실패. | 알려진 엣지 케이스 (1000개 중 5개 영향). 병상 부족 아님 — 전체 Tier3 용량(35)이 환자 수(30)보다 충분. `diversion_rule()`에 fallback 로직 추가 필요. |
-| API 401 Unauthorized | 잘못된 API 키 | 카카오 개발자 콘솔에서 키 확인 |
-| API 429 Rate Limit | 일일 할당량 초과 | 24시간 대기 또는 할당량 증가 |
+| API 401 Unauthorized | 잘못된 카카오 API 키 | 카카오 개발자 콘솔에서 키 확인. 키가 없다면 `is_use_time=false`로 OSRM 백엔드 사용 |
+| API 429 Rate Limit | 카카오 일일 할당량 초과 | 24시간 대기, 할당량 증가, 또는 OSRM 백엔드로 전환 |
+| `RuntimeError: 카카오 API 키가 없습니다 (is_use_time=True 모드)` | `is_use_time=True`로 시나리오 생성하면서 `--kakao_api_key` 미지정 | 키 제공하거나 `is_use_time=false`로 OSRM 사용 |
+| `OSRM 경로 없음 (code=NoRoute)` | OSRM 그래프에 연결되지 않은 좌표 (해상/도서) | 해당 좌표 제외. 카카오 102와 동일한 의미. |
 | `UnicodeEncodeError: cp949` | Windows 콘솔 인코딩 | `PYTHONIOENCODING=utf-8` 환경변수 설정 |
 | YAML 키 순서 크래시 | yaml.dump의 sort_keys=True | sort_keys=False 사용 (수정 완료) |
 | 시뮬레이션 무한 대기 | stdout 파이프 버퍼 가득 참 | Popen + 데몬 스레드로 수정 완료 |
