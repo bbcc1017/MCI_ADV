@@ -417,21 +417,22 @@ def build_histograms(data: dict, out_path: Path, ranges: dict, clip_pct: float,
 # ---------------------------------------------------------------------------
 
 RULE_METRICS = [
-    ("reward", "The expected number of survivors", True),
-    ("time",   "The response completion time (min)", False),
+    ("reward", "The expected number\nof survivors", True),
+    ("time",   "The response completion\ntime (min)", False),
     ("pdr",    "PDR", False),
 ]
 
 FACTOR_NAMES = ["priority", "hos_select", "red_mode", "yellow_mode"]
 FACTOR_LABELS = {
-    "priority":    "Priority Rule",
+    "priority":    "Patient Prioritization",
     "hos_select":  "Hospital Selection",
-    "red_mode":    "Red Transport Mode",
-    "yellow_mode": "Yellow Transport Mode",
+    "red_mode":    "Transport Mode Selection (Red)",
+    "yellow_mode": "Transport Mode Selection (Yellow)",
 }
 PRIORITY_LEVELS   = ["START", "ReSTART"]
 HOS_SELECT_LEVELS = ["RedOnly", "YellowNearest"]
 MODE_LEVELS       = ["OnlyUAV", "Both_UAVFirst", "Both_AMBFirst", "OnlyAMB"]
+MODE_DISPLAY      = ["UAV-only", "UAV-first", "AMB-first", "AMB-only"]
 
 
 def _parse_rule_name(rule_str: str):
@@ -570,8 +571,8 @@ def build_rule_heatmaps(rule_data: dict, out_path: Path):
 
     fig = plt.figure(figsize=(22, 14))
     outer = gridspec.GridSpec(len(metrics), len(panel_combos),
-                              wspace=0.25, hspace=0.35,
-                              left=0.06, right=0.92, top=0.92, bottom=0.06)
+                              wspace=0.30, hspace=0.45,
+                              left=0.08, right=0.91, top=0.86, bottom=0.08)
 
     # Precompute global min/max per metric for consistent colorbar
     metric_ranges = {}
@@ -580,7 +581,7 @@ def build_rule_heatmaps(rule_data: dict, out_path: Path):
         metric_ranges[mk] = (min(vals), max(vals))
 
     for row, (mk, mlabel, high_is_good) in enumerate(metrics):
-        cmap_name = "RdYlGn" if high_is_good else "RdYlGn_r"
+        cmap_name = "GnBu" if high_is_good else "GnBu_r"
         vmin, vmax = metric_ranges[mk]
 
         for col, (pri, hos) in enumerate(panel_combos):
@@ -607,26 +608,27 @@ def build_rule_heatmaps(rule_data: dict, out_path: Path):
                         continue
                     # Text color: black on light cells, white on dark
                     norm_v = (v - vmin) / (vmax - vmin) if vmax > vmin else 0.5
-                    text_color = "white" if norm_v < 0.3 or norm_v > 0.7 else "black"
+                    if high_is_good:
+                        text_color = "white" if norm_v > 0.55 else "black"
+                    else:
+                        text_color = "white" if norm_v < 0.45 else "black"
                     fmt = f"{v:.1f}" if mk == "time" else f"{v:.2f}" if mk == "pdr" else f"{v:.2f}"
                     ax.text(y_i, r_i, fmt, ha="center", va="center",
-                            fontsize=8.5, fontweight="bold", color=text_color)
+                            fontsize=15, fontweight="bold", color=text_color)
 
             # Axis labels
             ax.set_xticks(range(4))
-            ax.set_xticklabels(["OnlyUAV", "Both\nUAVFirst", "Both\nAMBFirst", "OnlyAMB"],
-                               fontsize=7.5)
+            ax.set_xticklabels(MODE_DISPLAY, fontsize=14)
             ax.set_yticks(range(4))
-            ax.set_yticklabels(["OnlyUAV", "Both\nUAVFirst", "Both\nAMBFirst", "OnlyAMB"],
-                               fontsize=7.5)
+            ax.set_yticklabels(MODE_DISPLAY, fontsize=14)
 
             if row == len(metrics) - 1:
-                ax.set_xlabel("Yellow Transport Mode", fontsize=9, fontweight="bold")
+                ax.set_xlabel("Transport Mode Selection (Yellow)", fontsize=16, fontweight="bold")
             if col == 0:
-                ax.set_ylabel("Red Transport Mode", fontsize=9, fontweight="bold")
+                ax.set_ylabel("Transport Mode Selection (Red)", fontsize=16, fontweight="bold")
 
             # Panel title
-            ax.set_title(f"{pri} × {hos}", fontsize=10, fontweight="bold", pad=6)
+            ax.set_title(f"{pri} × {hos}", fontsize=16, fontweight="bold", pad=8)
 
         # Colorbar for this metric row
         cbar_ax = fig.add_axes([0.935, 0.06 + (len(metrics) - 1 - row) * 0.30,
@@ -635,12 +637,12 @@ def build_rule_heatmaps(rule_data: dict, out_path: Path):
                                     norm=plt.Normalize(vmin=vmin, vmax=vmax))
         sm.set_array([])
         cbar = fig.colorbar(sm, cax=cbar_ax)
-        cbar.ax.set_ylabel(mlabel, fontsize=9, fontweight="bold")
-        cbar.ax.tick_params(labelsize=8)
+        cbar.ax.set_ylabel(mlabel, fontsize=16, fontweight="bold")
+        cbar.ax.tick_params(labelsize=14)
 
-    fig.suptitle("Rule Performance Heatmap — Mean across 772 Scenarios\n"
-                 "(rows: Red Transport Mode, cols: Yellow Transport Mode)",
-                 fontsize=14, fontweight="bold", y=0.97)
+    fig.suptitle("Rule Performance Heatmap — Mean across Scenarios\n"
+                 "(rows: Transport Mode Selection for Red, cols: Transport Mode Selection for Yellow)",
+                 fontsize=20, fontweight="bold", y=0.97)
 
     for fmt, dpi in [("pdf", None), ("png", 300)]:
         p = out_path.with_name(out_path.stem + f"_rule_heatmap.{fmt}")
@@ -692,10 +694,10 @@ def build_main_effects(rule_data: dict, out_path: Path):
 
     metrics = RULE_METRICS
     factors_info = [
-        ("priority",    "Priority Rule",        PRIORITY_LEVELS),
-        ("hos_select",  "Hospital Selection",    HOS_SELECT_LEVELS),
-        ("red_mode",    "Red Transport Mode",    MODE_LEVELS),
-        ("yellow_mode", "Yellow Transport Mode", MODE_LEVELS),
+        ("priority",    "Patient Prioritization",           PRIORITY_LEVELS),
+        ("hos_select",  "Hospital Selection",               HOS_SELECT_LEVELS),
+        ("red_mode",    "Transport Mode Selection (Red)",    MODE_LEVELS),
+        ("yellow_mode", "Transport Mode Selection (Yellow)", MODE_LEVELS),
     ]
 
     # η² via ANOVA SS decomposition
@@ -735,12 +737,12 @@ def build_main_effects(rule_data: dict, out_path: Path):
     print(row_total)
 
     fig, axes = plt.subplots(len(metrics), len(factors_info),
-                              figsize=(20, 11), sharey="row")
+                              figsize=(22, 12), sharey="row")
 
-    colors = {"priority": ["#2196F3", "#FF9800"],
-              "hos_select": ["#4CAF50", "#E91E63"],
-              "red_mode": ["#9C27B0", "#3F51B5", "#009688", "#FF5722"],
-              "yellow_mode": ["#9C27B0", "#3F51B5", "#009688", "#FF5722"]}
+    colors = {"priority": ["#00695C", "#80CBC4"],
+              "hos_select": ["#00695C", "#80CBC4"],
+              "red_mode": ["#004D40", "#00695C", "#4DB6AC", "#B2DFDB"],
+              "yellow_mode": ["#004D40", "#00695C", "#4DB6AC", "#B2DFDB"]}
 
     for row, (mk, mlabel, high_is_good) in enumerate(metrics):
         for col, (fname, flabel, levels) in enumerate(factors_info):
@@ -756,7 +758,7 @@ def build_main_effects(rule_data: dict, out_path: Path):
             for i, (bar, m, s) in enumerate(zip(bars, means, stds)):
                 fmt = f"{m:.1f}" if mk == "time" else f"{m:.4f}" if mk == "pdr" else f"{m:.2f}"
                 ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                        fmt, ha="center", va="bottom", fontsize=8.5, fontweight="bold")
+                        fmt, ha="center", va="bottom", fontsize=15, fontweight="bold")
 
             # Highlight best level — bold red border + star marker
             if high_is_good:
@@ -768,29 +770,33 @@ def build_main_effects(rule_data: dict, out_path: Path):
             bars[best_idx].set_linestyle("solid")
             bx = bars[best_idx].get_x() + bars[best_idx].get_width() / 2
             by = bars[best_idx].get_height()
-            ax.annotate("★ Best", xy=(bx, by), fontsize=8, fontweight="bold",
+            ax.annotate("★ Best", xy=(bx, by), fontsize=15, fontweight="bold",
                         color="#D32F2F", ha="center", va="bottom",
-                        xytext=(0, 14), textcoords="offset points")
+                        xytext=(0, 16), textcoords="offset points")
 
             # η² annotation (ANOVA-based)
             eta = eta_sq[(fname, mk)]
             ax.text(0.98, 0.95,
                     f"η² = {eta:.4f}\n({eta*100:.1f}%)",
-                    transform=ax.transAxes, fontsize=9, fontweight="bold",
+                    transform=ax.transAxes, fontsize=15, fontweight="bold",
                     ha="right", va="top",
-                    bbox=dict(boxstyle="round,pad=0.4", facecolor="#FFEBEE",
-                              edgecolor="#D32F2F", linewidth=1.5, alpha=0.95))
+                    bbox=dict(boxstyle="round,pad=0.4", facecolor="#E0F2F1",
+                              edgecolor="#00695C", linewidth=1.5, alpha=0.95))
 
-            short_levels = [l.replace("Both_", "Both\n") for l in levels]
+            if levels is MODE_LEVELS:
+                display_levels = MODE_DISPLAY
+            else:
+                display_levels = levels
             ax.set_xticks(x)
-            ax.set_xticklabels(short_levels, fontsize=8.5, rotation=0)
+            ax.set_xticklabels(display_levels, fontsize=15, rotation=0)
             ax.grid(axis="y", linestyle="--", linewidth=0.4, alpha=0.5, zorder=0)
             ax.spines[["top", "right"]].set_visible(False)
 
+            ax.tick_params(axis="y", labelsize=14)
             if row == 0:
-                ax.set_title(flabel, fontsize=11, fontweight="bold", pad=8)
+                ax.set_title(flabel, fontsize=17, fontweight="bold", pad=10)
             if col == 0:
-                ax.set_ylabel(mlabel, fontsize=10, fontweight="bold")
+                ax.set_ylabel(mlabel, fontsize=16, fontweight="bold")
 
             # Tight y-axis range for readability
             val_range = max(means) - min(means)
@@ -799,8 +805,8 @@ def build_main_effects(rule_data: dict, out_path: Path):
 
     fig.suptitle("Factor Main Effects — Marginal Mean across Scenarios\n"
                  "(★ best level, η² = ANOVA eta-squared)",
-                 fontsize=14, fontweight="bold", y=0.98)
-    fig.tight_layout(rect=[0, 0, 1, 0.94])
+                 fontsize=20, fontweight="bold", y=0.98)
+    fig.tight_layout(rect=[0.04, 0, 1, 0.94])
 
     for fmt, dpi in [("pdf", None), ("png", 300)]:
         p = out_path.with_name(out_path.stem + f"_rule_effects.{fmt}")
