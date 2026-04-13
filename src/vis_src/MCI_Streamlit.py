@@ -1069,6 +1069,33 @@ def draw_route_from_json(m: folium.Map, route_obj: dict, highlight: bool=False):
                 tooltip=tooltip_text
             ).add_to(m)
 
+    elif api_provider == "osrm":
+        # OSRM: GeoJSON LineString geometry, no congestion info → 단일 색 폴리라인
+        payload = (route_obj.get("payload") or {}).get("osrm_response", {})
+        routes = payload.get("routes", [])
+        if not routes:
+            return
+        geom = routes[0].get("geometry", {}) or {}
+        coords = geom.get("coordinates", []) or []
+        # GeoJSON: [[lon, lat], ...] → folium용 [[lat, lon], ...]
+        latlngs = [[c[1], c[0]] for c in coords if isinstance(c, (list, tuple)) and len(c) >= 2]
+        if not latlngs:
+            return
+        meta_loc = route_obj.get("meta") or {}
+        dist_km = meta_loc.get("distance_km")
+        dur_min = meta_loc.get("duration_min")
+        try:
+            tooltip_text = f"OSRM · {float(dist_km):.2f}km · {float(dur_min):.1f}min"
+        except (TypeError, ValueError):
+            tooltip_text = "OSRM"
+        folium.PolyLine(
+            locations=latlngs,
+            color=CONG_COLORS.get(0, "#3388ff"),  # 정보없음 색상 (단일)
+            weight=8 if highlight else 5,
+            opacity=0.9 if highlight else 0.7,
+            tooltip=tooltip_text,
+        ).add_to(m)
+
     else:
         # Naver API: Original logic
         payload = (route_obj.get("payload") or {}).get("naver_response", {})
@@ -1600,7 +1627,7 @@ with tabs[1]:
                     cand_blocks = [b for b in rule_blocks if b.get("iter") == sel_iter]
                 else:
                     # Iter 라인이 없으면 기존 방식 유지(첫 블록)
-                    st.caption("Iter 라인이 없어 ‘단일 실행’으로 간주합니다.")
+                    st.caption("No 'Iter' lines found — treating this log as a single run.")
                     cand_blocks = rule_blocks
 
                 # 선택 블록 최종 결정(복수면 첫 블록)
@@ -3322,18 +3349,18 @@ with tabs[4]:
                     "Use API Duration",
                     value=amb_cfg_rerun.get('is_use_time', True),
                     key="rerun_is_use_time",
-                    help="True: API duration 사용, False: 거리/속도 계산"
+                    help="True: use API duration. False: compute time from distance / velocity."
                 )
                 amb_velocity_rerun = st.number_input(
                     "Ambulance Speed (km/h)",
-                    value=float(amb_cfg_rerun.get('velocity', 60)),
+                    value=float(amb_cfg_rerun.get('velocity', 40)),
                     min_value=1.0,
                     step=1.0,
                     key="rerun_amb_velocity"
                 )
                 amb_handover_rerun = st.number_input(
                     "Patient Handover Time (min)",
-                    value=float(amb_cfg_rerun.get('handover_time', 0)),
+                    value=float(amb_cfg_rerun.get('handover_time', 10.0)),
                     min_value=0.0,
                     step=0.5,
                     key="rerun_amb_handover"
@@ -3346,7 +3373,7 @@ with tabs[4]:
                     step=0.1,
                     format="%.1f",
                     key="rerun_duration_coeff",
-                    help="API duration에 곱해지는 계수 (기본값: 1.0)"
+                    help="Coefficient multiplied with the API duration (default: 1.0)."
                 )
 
             # UAV 파라미터
@@ -3362,7 +3389,7 @@ with tabs[4]:
                 )
                 uav_handover_rerun = st.number_input(
                     "Patient Handover Time (min)",
-                    value=float(uav_cfg_rerun.get('handover_time', 0)),
+                    value=float(uav_cfg_rerun.get('handover_time', 15.0)),
                     min_value=0.0,
                     step=0.5,
                     key="rerun_uav_handover"
@@ -3374,16 +3401,16 @@ with tabs[4]:
                 hosp_cfg_rerun = yaml_data_rerun.get('entity_info', {}).get('hospital', {})
                 max_send_coeff_rerun = st.text_input(
                     "hospital_max_send_coeff",
-                    value=str(hosp_cfg_rerun.get('max_send_coeff', [1.0, 1.0])).strip('[]'),
+                    value=str(hosp_cfg_rerun.get('max_send_coeff', [1, 1])).strip('[]'),
                     key="rerun_max_send_coeff",
-                    help="예: 1.1, 1.0"
+                    help="e.g. 1.1, 1.0"
                 )
 
             with col4:
                 run_cfg_rerun = yaml_data_rerun.get('run_setting', {})
                 total_samples_rerun = st.number_input(
                     "Simulation Iterations",
-                    value=int(run_cfg_rerun.get('totalSamples', 10)),
+                    value=int(run_cfg_rerun.get('totalSamples', 30)),
                     min_value=1,
                     step=1,
                     key="rerun_total_samples"

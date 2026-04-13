@@ -205,9 +205,9 @@ if "batch_presets" not in st.session_state:
         "uav_count": 3,
         "amb_velocity": 40,
         "uav_velocity": 80,
-        "amb_handover": 0.0,
-        "uav_handover": 0.0,
-        "total_samples": 10,
+        "amb_handover": 10.0,
+        "uav_handover": 15.0,
+        "total_samples": 30,
         "random_seed": 0,
         "buffer_ratio": 1.5,
         "max_send_coeff": "1,1",
@@ -234,9 +234,9 @@ def _append_coord_row(label: str, lat: float, lon: float, address: str = "", pre
         "uav_count": p.get("uav_count", 3),
         "amb_velocity": p.get("amb_velocity", 40),
         "uav_velocity": p.get("uav_velocity", 80),
-        "amb_handover": p.get("amb_handover", 0.0),
-        "uav_handover": p.get("uav_handover", 0.0),
-        "total_samples": p.get("total_samples", 10),
+        "amb_handover": p.get("amb_handover", 10.0),
+        "uav_handover": p.get("uav_handover", 15.0),
+        "total_samples": p.get("total_samples", 30),
         "random_seed": p.get("random_seed", 0),
         "buffer_ratio": p.get("buffer_ratio", 1.5),
         "max_send_coeff": p.get("max_send_coeff", "1,1"),
@@ -390,6 +390,31 @@ else:
 # 모든 용도에 동일한 키 사용
 kakao_api_key = st.session_state.kakao_api_key
 
+# ─────────────────────────────────────────────────────────────
+# Road data provider selection (Kakao API ↔ OSRM)
+# ─────────────────────────────────────────────────────────────
+st.markdown("#### 🛣️ Road Data Provider")
+is_use_time = st.checkbox(
+    "Use Kakao Mobility API duration (real-time traffic)",
+    value=True,
+    key="is_use_time_checkbox",
+    help=(
+        "✅ Checked → Calls the Kakao Mobility API. Real-time/predicted duration (minutes) "
+        "for the given departure time is saved to CSV and used by the simulator as "
+        "'duration × duration_coeff'. **Requires a Kakao REST API key.**\n\n"
+        "⬜ Unchecked → Calls the open-source OSRM service "
+        "(https://router.project-osrm.org). Both road distance (km) and duration (min) "
+        "are saved with the same schema, but the **first simulation runs in "
+        "distance/velocity mode** (ScenarioManager branch). No API key needed — "
+        "recommended for external reviewers and public code environments. "
+        "If you later re-run the same scenario folder with is_use_time=True, "
+        "the stored OSRM duration will be used."
+    ),
+)
+if not is_use_time:
+    st.caption("ℹ️ OSRM mode: no Kakao key required. The OSRM URL comes from the "
+               "`MCI_OSRM_URL` environment variable, or the default demo server.")
+
 # 운행시간 모드 선택
 st.markdown("#### 📍 Departure Time Setup")
 
@@ -425,24 +450,16 @@ if departure_time != st.session_state.departure_time_value:
 departure_time_str = f"{st.session_state.departure_date_value.strftime('%Y%m%d')}{st.session_state.departure_time_value.strftime('%H%M')}"
 st.caption(f"→ API param: `{departure_time_str}`")
 
-# is_use_time 플래그 및 duration_coeff
-col_time1, col_time2 = st.columns(2)
-with col_time1:
-    is_use_time = st.checkbox(
-        "✅ Use API-based transport time (recommended)",
-        value=True,
-        help="Checked: use API duration(min) | Unchecked: distance/speed calculation"
-    )
-with col_time2:
-    duration_coeff = st.number_input(
-        "API Duration Weight",
-        value=1.0,
-        min_value=0.1,
-        max_value=10.0,
-        step=0.1,
-        format="%.1f",
-        help="Coefficient multiplied to API duration (default: 1.0, adjust for weather/traffic)"
-    )
+# duration_coeff (is_use_time has moved to the 'Road Data Provider' section above)
+duration_coeff = st.number_input(
+    "API Duration Weight",
+    value=1.0,
+    min_value=0.1,
+    max_value=10.0,
+    step=0.1,
+    format="%.1f",
+    help="Coefficient multiplied with the API duration (default 1.0; adjust for weather/traffic). Only meaningful when is_use_time=True."
+)
 
 st.markdown("---")
 st.markdown("### 2️⃣ Coordinate Search")
@@ -711,24 +728,25 @@ with colA:
     latitude  = st.number_input("Latitude", value=st.session_state.selected_lat, format="%.6f")
     incident_size = st.number_input("Patient Count (incident_size)", value=30, min_value=1, step=1)
     amb_velocity  = st.number_input("Ambulance Speed (km/h)", value=40, min_value=1, step=1)
-    amb_handover_time = st.number_input("AMB Handover Time (min)", value=0.0, min_value=0.0, step=0.1, format="%.1f", help="Time to load/unload patients at scene or hospital")
-    total_samples = st.number_input("Simulation Iterations (totalSamples)", value=10, min_value=1, step=1)
+    amb_handover_time = st.number_input("AMB Handover Time (min)", value=10.0, min_value=0.0, step=0.1, format="%.1f", help="Time to load/unload patients at scene or hospital")
+    total_samples = st.number_input("Simulation Iterations (totalSamples)", value=30, min_value=1, step=1)
 with colB:
     longitude = st.number_input("Longitude", value=st.session_state.selected_lon, format="%.6f")
     amb_count  = st.number_input("Ambulance Count (amb_count)", value=30, min_value=1, step=1)
     uav_velocity = st.number_input("UAV Speed (km/h)", value=80, min_value=1, step=1)
-    uav_handover_time = st.number_input("UAV Handover Time (min)", value=0.0, min_value=0.0, step=0.1, format="%.1f", help="Time to load/unload patients at scene or hospital")
+    uav_handover_time = st.number_input("UAV Handover Time (min)", value=15.0, min_value=0.0, step=0.1, format="%.1f", help="Time to load/unload patients at scene or hospital")
     random_seed  = st.number_input("Random Seed", value=0, min_value=0, step=1)
 with colC:
     uav_count = st.number_input("UAV Count (uav_count)", value=3, min_value=0, step=1)
-    hospital_max_send_coeff = st.text_input("max_send_coeff (예: 1.05,1)", value="1,1")
+    hospital_max_send_coeff = st.text_input("max_send_coeff (e.g. 1.05,1)", value="1,1")
     buffer_ratio = st.number_input("buffer_ratio", value=1.5, min_value=1.0, step=0.1)
 
 
 if st.button("📦 Generate Scenario", key="btn_generate_scenario"):
-        # API 키 검증
-    if not kakao_api_key or not kakao_api_key.strip():
-        st.error("⚠️ Please enter the Kakao API key!")
+        # API 키 검증 (is_use_time=True 모드에서만 카카오 키 필수)
+    if is_use_time and (not kakao_api_key or not kakao_api_key.strip()):
+        st.error("⚠️ Kakao API key is required when 'Use Kakao API duration' is checked. "
+                 "Uncheck it to use the OSRM backend instead.")
         st.stop()
 
     try:
@@ -736,12 +754,12 @@ if st.button("📦 Generate Scenario", key="btn_generate_scenario"):
         extra_args = {
             "buffer_ratio": buffer_ratio,
             "hospital_max_send_coeff": hospital_max_send_coeff.strip(),
-            "kakao_api_key": kakao_api_key.strip(),
+            "kakao_api_key": kakao_api_key.strip() if kakao_api_key else "",
             "departure_time": departure_time_str,
             "is_use_time": str(is_use_time).lower(),  # "true" or "false"
             "amb_handover_time": float(amb_handover_time),
             "uav_handover_time": float(uav_handover_time),
-            "duration_coeff": float(duration_coeff)
+            "duration_coeff": float(duration_coeff),
         }
         orc = Orchestrator(base_path=bp)
         res = orc.generate_scenario(
@@ -835,9 +853,9 @@ default_preset = [{
     "uav_count": 3,
     "amb_velocity": 40,
     "uav_velocity": 80,
-    "amb_handover": 0.0,
-    "uav_handover": 0.0,
-    "total_samples": 10,
+    "amb_handover": 10.0,
+    "uav_handover": 15.0,
+    "total_samples": 30,
     "random_seed": 0,
     "buffer_ratio": 1.5,
     "max_send_coeff": "1,1",
@@ -958,7 +976,7 @@ if st.button("Batch Run", type="primary", key="btn_batch_run"):
         preset_lookup = {p.get("name"): p for p in st.session_state.batch_presets}
 
         for ridx, row in enumerate(rows, start=1):
-            preset_name = row.get("preset") or (preset_names[0] if preset_names else "기본")
+            preset_name = row.get("preset") or (preset_names[0] if preset_names else "default")
             preset = preset_lookup.get(preset_name) or _get_preset_by_name(preset_name)
 
             def pick(key, default):
@@ -975,8 +993,8 @@ if st.button("Batch Run", type="primary", key="btn_batch_run"):
                 "kakao_api_key": kakao_api_key.strip(),
                 "departure_time": departure_time_str,
                 "is_use_time": str(bool(pick("is_use_time", True))).lower(),
-                "amb_handover_time": float(pick("amb_handover", 0)),
-                "uav_handover_time": float(pick("uav_handover", 0)),
+                "amb_handover_time": float(pick("amb_handover", 10.0)),
+                "uav_handover_time": float(pick("uav_handover", 15.0)),
                 "duration_coeff": float(pick("duration_coeff", 1.0)),
             }
             rec = {
@@ -1000,7 +1018,7 @@ if st.button("Batch Run", type="primary", key="btn_batch_run"):
                     uav_count=int(pick("uav_count", 3)),
                     amb_velocity=int(pick("amb_velocity", 40)),
                     uav_velocity=int(pick("uav_velocity", 80)),
-                    total_samples=int(pick("total_samples", 10)),
+                    total_samples=int(pick("total_samples", 30)),
                     random_seed=int(pick("random_seed", 0)),
                     exp_id=exp_id,
                     extra_env=env,

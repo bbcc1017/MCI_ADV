@@ -114,9 +114,11 @@ def _now_kst_departure() -> str:
     return datetime.now(KST).strftime("%Y%m%d%H%M")
 
 
-def _build_full_exp_id(base_name: str, departure_time: str) -> str:
-    """Compute the full experiment folder name with dep suffix.
+def _build_full_exp_id(base_name: str, departure_time: str, is_use_time_kakao: bool = True) -> str:
+    """Compute the full experiment folder name with the appropriate suffix.
     Mirrors make_csv_yaml_dynamic.py logic so the folder name matches exactly.
+    Kakao mode (is_use_time_kakao=True) → exp_<base>_dep_<YYYYMMDDHHMM>
+    OSRM  mode (is_use_time_kakao=False) → exp_<base>_osrm
     """
     import re as _re
     base = base_name.strip()
@@ -125,6 +127,11 @@ def _build_full_exp_id(base_name: str, departure_time: str) -> str:
     base = _re.sub(r"\s+", "_", base).strip("_")
     if not base:
         base = datetime.now(KST).strftime("%Y%m%d%H%M")
+    # Strip any pre-existing _dep_ / _osrm suffix so we never double-append.
+    base = _re.sub(r"_dep_\d{12}$", "", base)
+    base = _re.sub(r"_osrm$", "", base)
+    if not is_use_time_kakao:
+        return f"exp_{base}_osrm"
     if departure_time and departure_time.strip():
         return f"exp_{base}_dep_{departure_time.strip()}"
     return f"exp_{base}"
@@ -207,11 +214,26 @@ with st.expander("Step 1: Generate Random Coordinates", expanded=False):
         s1_base_name = st.text_input("Experiment name", value="batch_research",
                                      key="s1_expid")
     with col3:
-        s1_dep_time = st.text_input("Departure time (YYYYMMDDHHmm)",
-                                    value=_now_kst_departure(), key="s1_dep",
-                                    help="Kakao API routing time. Included in folder name.")
+        s1_use_kakao = st.checkbox(
+            "Use Kakao Mobility API (is_use_time)",
+            value=True,
+            key="s1_use_kakao",
+            help=(
+                "✅ Checked → Kakao API mode. Folder name gets a `_dep_<YYYYMMDDHHMM>` suffix "
+                "from the departure time below.\n\n"
+                "⬜ Unchecked → OSRM (open-source) mode. Departure time is meaningless for OSRM, "
+                "so the folder gets an `_osrm` suffix instead."
+            ),
+        )
+        if s1_use_kakao:
+            s1_dep_time = st.text_input("Departure time (YYYYMMDDHHmm)",
+                                        value=_now_kst_departure(), key="s1_dep",
+                                        help="Kakao API routing time. Included in folder name.")
+        else:
+            s1_dep_time = ""
+            st.caption("Departure time disabled (OSRM mode).")
 
-    s1_exp_id = _build_full_exp_id(s1_base_name, s1_dep_time)
+    s1_exp_id = _build_full_exp_id(s1_base_name, s1_dep_time, is_use_time_kakao=s1_use_kakao)
 
     # CSV path is derived from full experiment_id: scenarios/<exp_id>/coords.csv
     csv_path = _scenario_dir(s1_exp_id) / "coords.csv"
@@ -279,16 +301,35 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
     with col_e3:
         max_retries = st.number_input("Max retries per coord", value=2, key="s3_retry")
 
-    # departure_time: 폴더명에서 자동 추출
+    # ── Road data provider auto-detected from folder suffix ────────
+    # `*_dep_<12digits>` → kakao mode, `*_osrm` → osrm mode.
     import re as _re
-    _dep_match = _re.search(r"_dep_(\d{12})", experiment_id or "")
-    departure_time = _dep_match.group(1) if _dep_match else ""
-    if departure_time:
-        st.caption(f"Departure time (from folder name): `{departure_time}`")
+    _dep_match = _re.search(r"_dep_(\d{12})$", experiment_id or "")
+    _is_osrm_folder = bool(_re.search(r"_osrm$", experiment_id or ""))
+
+    if _is_osrm_folder:
+        is_use_time_bool = False
+        departure_time = ""
+        st.info("🛣️ OSRM mode (folder ends with `_osrm`). Kakao API key not required. "
+                "First simulation runs in distance/velocity mode; the stored OSRM "
+                "duration becomes available if you later re-run with is_use_time=True.")
+    elif _dep_match:
+        is_use_time_bool = True
+        departure_time = _dep_match.group(1)
+        st.info(f"🗾 Kakao mode (folder has `_dep_` suffix). Departure time: `{departure_time}`. "
+                "Requires a Kakao REST API key below.")
     else:
+        # Legacy folder with no recognizable suffix — let the user pick.
+        is_use_time_bool = st.checkbox(
+            "Use Kakao Mobility API duration (real-time traffic)",
+            value=True,
+            key="s3_usetime_chk_legacy",
+            help="Folder has no `_dep_` or `_osrm` suffix; choose the mode manually.",
+        )
         departure_time = st.text_input("Departure time (YYYYMMDDHHmm)",
                                        value=_now_kst_departure(), key="s3_dep",
                                        help="Folder has no dep suffix. Enter manually.")
+    is_use_time = "true" if is_use_time_bool else "false"
 
     st.divider()
 
@@ -311,8 +352,10 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
     with st.expander("Advanced Transport Parameters", expanded=False):
         col_t1, col_t2 = st.columns(2)
         with col_t1:
-            duration_coeff = st.number_input("Duration coefficient", value=1.0, key="s3_dcoeff")
-            is_use_time = st.selectbox("Use API duration", ["true", "false"], key="s3_usetime")
+            duration_coeff = st.number_input(
+                "Duration coefficient", value=1.0, key="s3_dcoeff",
+                help="Coefficient multiplied with the API duration when is_use_time=True. Ignored in OSRM mode (is_use_time=False)."
+            )
         with col_t2:
             st.caption("Hospital allocation params (leave empty for defaults)")
             hospital_max_send = st.text_input("Hospital max send coeff (e.g. 1.1,1.0)",
@@ -365,8 +408,11 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
                 st.session_state.batch_stop_requested = True
 
         if start_btn:
-            if not kakao_key:
-                st.error("Kakao API Key is required.")
+            # is_use_time=false (OSRM 모드)에서는 카카오 키 불필요
+            requires_kakao = (str(is_use_time).lower() == "true")
+            if requires_kakao and not kakao_key:
+                st.error("Kakao API Key is required when is_use_time=true. "
+                         "If you don't have a key, uncheck the box above to use the OSRM backend instead.")
             else:
                 st.session_state.batch_running = True
                 st.session_state.batch_stop_requested = False
