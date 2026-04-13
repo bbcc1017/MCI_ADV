@@ -450,8 +450,8 @@ python experiment_1/visualize_coords.py \
 Outputs (saved in `scenarios/{experiment_id}/`):
 - `coords_map.html`: Interactive result map (Reward/Time/PDR toggle, OpenStreetMap/CartoDB tile switch)
 - `coords_map_hist.pdf/png`: Histogram distributions of key metrics
-- `coords_map_rule_heatmap.pdf/png`: 64-rule performance heatmap (3 metrics × 4 panels)
-- `coords_map_rule_effects.pdf/png`: Factor main effects chart (Best level marker, effect size box)
+- `coords_map_rule_heatmap.pdf/png`: 64-rule performance heatmap (3 metrics × 4 panels, GnBu monotone colormap, reversed for lower-is-better metrics)
+- `coords_map_rule_effects.pdf/png`: Factor main effects chart with ANOVA η² effect size (★ Best level marker, teal monotone bars)
 
 ### 9.3 Progress JSON Structure
 ```json
@@ -482,12 +482,12 @@ The simulation evaluates **64 rule combinations** using Full Factorial Design:
 
 ### Factors
 
-| Factor | Levels | Description |
-|--------|--------|-------------|
-| Priority (Phase) | 2 | `START` (initial dispatch), `ReSTART` (re-evaluation) |
-| Hospital Selection | 2 | `RedOnly` (Red patients first), `YellowNearest` (nearest available) |
-| Red Action | 4 | `OnlyUAV`, `Both_UAVFirst`, `Both_AMBFirst`, `OnlyAMB` |
-| Yellow Action | 4 | `OnlyUAV`, `Both_UAVFirst`, `Both_AMBFirst`, `OnlyAMB` |
+| Factor | Levels | Internal Values | Display Labels |
+|--------|--------|-----------------|----------------|
+| Patient Prioritization | 2 | `START`, `ReSTART` | START (initial dispatch), ReSTART (re-evaluation) |
+| Hospital Selection | 2 | `RedOnly`, `YellowNearest` | RedOnly (Red patients first), YellowNearest (nearest available) |
+| Transport Mode Selection (Red) | 4 | `OnlyUAV`, `Both_UAVFirst`, `Both_AMBFirst`, `OnlyAMB` | UAV-only, UAV-first, AMB-first, AMB-only |
+| Transport Mode Selection (Yellow) | 4 | `OnlyUAV`, `Both_UAVFirst`, `Both_AMBFirst`, `OnlyAMB` | UAV-only, UAV-first, AMB-first, AMB-only |
 
 **Total**: 2 x 2 x 4 x 4 = **64 combinations**
 

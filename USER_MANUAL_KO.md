@@ -450,8 +450,8 @@ python experiment_1/visualize_coords.py \
 출력물 (`scenarios/{experiment_id}/` 폴더에 저장):
 - `coords_map.html`: 인터랙티브 결과 지도 (Reward/Time/PDR 전환, OpenStreetMap/CartoDB 타일 전환)
 - `coords_map_hist.pdf/png`: 주요 지표 분포 히스토그램
-- `coords_map_rule_heatmap.pdf/png`: 64개 규칙 성능 히트맵 (3지표 × 4패널)
-- `coords_map_rule_effects.pdf/png`: 요인별 주효과 그래프 (Best level 표시, Effect size 박스)
+- `coords_map_rule_heatmap.pdf/png`: 64개 규칙 성능 히트맵 (3지표 × 4패널, GnBu 단조톤 컬러맵, 낮을수록 좋은 지표는 색상 반전)
+- `coords_map_rule_effects.pdf/png`: 요인별 주효과 그래프 (ANOVA η² effect size, ★ Best level 표시, teal 단조톤 바)
 
 ### 9.3 Progress JSON 구조
 ```json
@@ -482,12 +482,12 @@ python experiment_1/visualize_coords.py \
 
 ### 요인
 
-| 요인 | 수준 수 | 설명 |
-|------|---------|------|
-| 우선순위 (Phase) | 2 | `START` (초기 배차), `ReSTART` (재평가) |
-| 병원 선택 | 2 | `RedOnly` (Red 환자 우선), `YellowNearest` (최근접 가용) |
-| Red 행동 | 4 | `OnlyUAV`, `Both_UAVFirst`, `Both_AMBFirst`, `OnlyAMB` |
-| Yellow 행동 | 4 | `OnlyUAV`, `Both_UAVFirst`, `Both_AMBFirst`, `OnlyAMB` |
+| 요인 | 수준 수 | 내부 값 | 표시 이름 |
+|------|---------|---------|-----------|
+| Patient Prioritization (환자 우선순위) | 2 | `START`, `ReSTART` | START (초기 배차), ReSTART (재평가) |
+| Hospital Selection (병원 선택) | 2 | `RedOnly`, `YellowNearest` | RedOnly (Red 환자 우선), YellowNearest (최근접 가용) |
+| Transport Mode Selection — Red (이송 수단 선택 — Red) | 4 | `OnlyUAV`, `Both_UAVFirst`, `Both_AMBFirst`, `OnlyAMB` | UAV-only, UAV-first, AMB-first, AMB-only |
+| Transport Mode Selection — Yellow (이송 수단 선택 — Yellow) | 4 | `OnlyUAV`, `Both_UAVFirst`, `Both_AMBFirst`, `OnlyAMB` | UAV-only, UAV-first, AMB-first, AMB-only |
 
 **합계**: 2 x 2 x 4 x 4 = **64개 조합**
 
