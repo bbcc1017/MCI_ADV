@@ -261,7 +261,6 @@ $RECYCLE.BIN/
 
 
 scenarios/*
-scenarios/label_map.csv
 !scenarios/안전센터와 소방서.csv
 !scenarios/*.xlsx
 experiment_logs/

@@ -252,9 +252,16 @@ class ScenarioGenerator:
                     route = data["routes"][0]
                     result_code = route.get("result_code", 0)
                     if result_code != 0:
+                        _rc_msg = {
+                            101: "경유지 주변 도로 탐색 불가",
+                            102: "출발지 주변 도로 탐색 불가",
+                            103: "도착지 주변 도로 탐색 불가",
+                            104: "출발지와 도착지가 5m 이내",
+                            105: "출발지 주변 도로에 교통 장애(유고 정보) 존재",
+                        }.get(result_code, "알 수 없는 오류")
                         raise RuntimeError(
                             f"카카오 API 경로 없음 (result_code={result_code}, {start} → {end}): "
-                            f"페리 없이 도달할 수 없는 구간입니다."
+                            f"{_rc_msg}"
                         )
                     summary = route.get("summary", {})
 
