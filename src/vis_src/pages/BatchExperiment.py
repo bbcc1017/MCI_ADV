@@ -149,6 +149,7 @@ def _make_args(**kwargs) -> SimpleNamespace:
         amb_handover_time=10.0, uav_handover_time=15.0,
         is_use_time="true", duration_coeff=1.0,
         hospital_max_send_coeff=None, buffer_ratio=None, util_by_tier=None,
+        osrm_url=None,
     )
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
@@ -287,19 +288,11 @@ with st.expander("Step 2: View Coordinates", expanded=False):
 # ===========================================================================
 
 with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False):
-    st.markdown("Runs scenario generation (Kakao API) + simulation per coordinate.")
+    st.markdown("Runs scenario generation + simulation per coordinate.")
 
-    # --- Experiment & API settings ---
+    # --- Experiment folder selection ---
     st.subheader("Experiment & API Settings")
-    col_e1, col_e2, col_e3 = st.columns(3)
-    with col_e1:
-        experiment_id = _experiment_selectbox("Experiment Folder", key="s3_expid")
-        kakao_key = st.text_input("Kakao API Key", type="password", key="s3_kakao")
-    with col_e2:
-        daily_limit = st.number_input("Daily API limit", value=5000, key="s3_dlimit")
-        calls_per_coord = st.number_input("Est. API calls per coord", value=40, key="s3_cpc")
-    with col_e3:
-        max_retries = st.number_input("Max retries per coord", value=2, key="s3_retry")
+    experiment_id = _experiment_selectbox("Experiment Folder", key="s3_expid")
 
     # ── Road data provider auto-detected from folder suffix ────────
     # `*_dep_<12digits>` → kakao mode, `*_osrm` → osrm mode.
@@ -310,14 +303,11 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
     if _is_osrm_folder:
         is_use_time_bool = False
         departure_time = ""
-        st.info("🛣️ OSRM mode (folder ends with `_osrm`). Kakao API key not required. "
-                "First simulation runs in distance/velocity mode; the stored OSRM "
-                "duration becomes available if you later re-run with is_use_time=True.")
+        st.info("🛣️ OSRM mode (folder ends with `_osrm`). Kakao API key not required.")
     elif _dep_match:
         is_use_time_bool = True
         departure_time = _dep_match.group(1)
-        st.info(f"🗾 Kakao mode (folder has `_dep_` suffix). Departure time: `{departure_time}`. "
-                "Requires a Kakao REST API key below.")
+        st.info(f"🗾 Kakao mode (folder has `_dep_` suffix). Departure time: `{departure_time}`.")
     else:
         # Legacy folder with no recognizable suffix — let the user pick.
         is_use_time_bool = st.checkbox(
@@ -330,6 +320,23 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
                                        value=_now_kst_departure(), key="s3_dep",
                                        help="Folder has no dep suffix. Enter manually.")
     is_use_time = "true" if is_use_time_bool else "false"
+
+    # --- API settings (only shown when Kakao mode is active) ---
+    _requires_kakao = is_use_time_bool
+    if _requires_kakao:
+        col_e1, col_e2, col_e3 = st.columns(3)
+        with col_e1:
+            kakao_key = st.text_input("Kakao API Key", type="password", key="s3_kakao")
+        with col_e2:
+            daily_limit = st.number_input("Daily API limit", value=5000, key="s3_dlimit")
+            calls_per_coord = st.number_input("Est. API calls per coord", value=40, key="s3_cpc")
+        with col_e3:
+            max_retries = st.number_input("Max retries per coord", value=2, key="s3_retry")
+    else:
+        kakao_key = ""
+        daily_limit = 999999
+        calls_per_coord = 0
+        max_retries = st.number_input("Max retries per coord", value=2, key="s3_retry")
 
     st.divider()
 
@@ -358,7 +365,7 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
             )
         with col_t2:
             st.caption("Hospital allocation params (leave empty for defaults)")
-            hospital_max_send = st.text_input("Hospital max send coeff (e.g. 1.1,1.0)",
+            hospital_max_send = st.text_input("Hospital max send coeff (default: 1,1)",
                                               value="", key="s3_hcoeff")
             buffer_ratio_str = st.text_input("Buffer ratio", value="", key="s3_buffer")
             util_by_tier_str = st.text_input("Util by tier (e.g. 1:0.90,11:0.75)",
@@ -439,16 +446,22 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
                 pending = select_pending(progress_data, max_retries)
 
                 stats = calc_stats(progress_data)
-                remaining_budget = daily_limit - stats["today_calls"]
-                can_process = max(0, remaining_budget // calls_per_coord)
-                targets = pending[:can_process] if can_process > 0 else []
+                if calls_per_coord > 0:
+                    remaining_budget = daily_limit - stats["today_calls"]
+                    can_process = max(0, remaining_budget // calls_per_coord)
+                    targets = pending[:can_process] if can_process > 0 else []
+                else:
+                    # OSRM mode: no API calls, process all pending
+                    remaining_budget = 0
+                    can_process = len(pending)
+                    targets = pending
 
                 if not targets:
                     st.warning("No coordinates to process (all done, or daily API limit reached).")
                     st.session_state.batch_running = False
                 else:
                     st.info(f"Processing **{len(targets)}** coordinates "
-                            f"(budget allows ~{can_process} today, {len(pending)} pending)")
+                            f"({len(pending)} pending)")
 
                     progress_bar = st.progress(0)
                     status_text = st.empty()
@@ -492,7 +505,7 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
                             "api_calls": api_used,
                         })
 
-                        if session_calls >= remaining_budget:
+                        if calls_per_coord > 0 and session_calls >= remaining_budget:
                             status_text.warning("Daily API budget exhausted.")
                             break
 

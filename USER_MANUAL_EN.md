@@ -388,6 +388,7 @@ The dashboard opens at `http://localhost:8501`.
 - 5-step workflow: Generate Coords -> View -> Run -> Progress -> Visualize
 - Import functions from experiment_1 scripts
 - Progress tracking with stop/resume capability
+- **OSRM mode auto-detection**: When the folder name ends with `_osrm`, the Kakao API key field, daily limit, and calls-per-coord controls are hidden automatically, and all pending coordinates are processed without API budget limits. Kakao-related settings are only shown for `_dep_` suffix folders.
 
 ---
 

@@ -388,6 +388,7 @@ streamlit run src/vis_src/MCI_Streamlit.py
 - 5단계 워크플로우: 좌표 생성 → 확인 → 실행 → 진행 현황 → 시각화
 - experiment_1 스크립트 함수 직접 import 재사용
 - 중지/재개 기능이 있는 진행 추적
+- **OSRM 모드 자동 감지**: 폴더명이 `_osrm`으로 끝나면 Kakao API 키 입력란·일일 한도·호출 추정치 UI를 자동으로 숨기고, API 예산 제한 없이 전체 좌표를 처리한다. Kakao 관련 설정은 `_dep_` 접미사 폴더에서만 표시된다.
 
 ---
 
