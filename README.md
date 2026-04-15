@@ -800,25 +800,17 @@ python experiment_1/visualize_coords.py [옵션]
 ## 설치 및 실행
 
 ### 환경 요구사항
-- Python 3.9 이상
+- Python 3.12 이상
 - Windows / Linux / macOS
 
 ### 설치
 ```bash
 # 1. Conda 환경 생성 (권장)
-conda create -n MCI python=3.9
+conda create -n MCI python=3.12
 conda activate MCI
 
 # 2. 패키지 설치
 pip install -r requirements.txt
-
-# 또는 개별 설치
-pip install streamlit==1.50.0 pandas==2.2.2 numpy==1.26.4 \
-    folium==0.20.0 streamlit-folium==0.25.1 altair==5.5.0 \
-    plotly==6.5.1 openpyxl==3.1.2 PyYAML==6.0.2 \
-    requests==2.32.4 haversine==2.9.0 scipy==1.13.1 \
-    statsmodels==0.14.5 scikit-posthocs==0.11.4 pingouin==0.5.5 \
-    gymnasium==1.0.0
 ```
 
 ### 필수 파일 확인
