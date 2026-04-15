@@ -7,7 +7,7 @@
 ### 핵심 기능
 - **시나리오 생성**: 카카오 모빌리티 API 기반 실시간/미래시간 교통정보 반영
 - **시뮬레이션 엔진**: 구급차(AMB)와 드론(UAV)을 활용한 64개 정책 조합 평가
-- **통계 분석**: Full Factorial ANOVA, 사후검정 자동 수행
+- **통계 분석**: Full Factorial ANOVA, EMM 기반 사후검정, CLD(Piepho 2004) 자동 수행
 - **시각화 대시보드**: Streamlit 기반 웹 인터페이스
 
 ---
@@ -185,7 +185,7 @@ MCI_ADV/
 │    ├─ Analytics 탭                                                           │
 │    │     ├─ results_.txt 파싱                                                │
 │    │     ├─ ANOVA 분석 (Full Factorial, One-way, RCBD)                       │
-│    │     ├─ 사후검정 (Tukey HSD, Games-Howell)                               │
+│    │     ├─ 사후검정 (EMM t-test/Holm for RCBD, Games-Howell for One-way)     │
 │    │     ├─ 잔차 진단 (Shapiro-Wilk, QQ plot)                                │
 │    │     └─ A그룹 교집합 추천                                                 │
 │    │                                                                         │
@@ -685,16 +685,25 @@ streamlit run pages/Generate.py
 - **팝업**: 클릭 시 거리(km), 시간(min) 표시
 
 #### 4. Analytics 탭
+- **서브탭 구조**: RAW Data | STAT Summary | ANOVA Suite
 - **지표 선택**: Reward, Time, PDR, Reward w.o.G, PDR w.o.G
 - **정렬 기준**: Reward↓, PDR↑, Time↑
 - **ANOVA 설계**:
-  - Full Factorial: Phase × RedPolicy × RedAction × YellowAction
-  - One-way: 단일 요인
-  - RCBD: Randomized Complete Block Design
-- **유의수준**: α = 0.001 ~ 0.1
-- **사후검정**: Tukey HSD (등분산), Games-Howell (이분산)
-- **잔차 진단**: Shapiro-Wilk 검정, QQ plot, 히스토그램
-- **A그룹 교집합**: 모든 지표에서 상위 그룹인 시나리오 추천
+  - One-way: `value ~ C(rule)` — 단일 요인
+  - RCBD: `value ~ C(rule) + C(run)` — run을 블록으로 취급 (CRN 전제)
+  - Reduced Factorial: `value ~ C(run) + 4 main effects + 6 two-way interactions` — 블록 포함
+- **유의수준**: α = 0.001 ~ 0.1 (슬라이더)
+- **사후검정**:
+  - RCBD/Factorial: **EMM(Estimated Marginal Means)** 기반 pairwise t-test + Holm 보정 (모형 MS_residual 사용)
+  - One-way: Games-Howell (이분산 로버스트)
+  - Fallback: Pairwise Welch t-test + Holm 보정 (pingouin 미설치 시)
+- **CLD(Compact Letter Display)**: Piepho(2004) absorption 알고리즘 — 다중 문자 부여 가능 (예: "ab")
+- **효과크기**: η² (eta-squared), ω² (omega-squared, 편향보정)
+- **잔차 진단**: Shapiro-Wilk + Anderson-Darling 정규성, QQ plot, 히스토그램, Residuals vs Fitted
+- **등분산 검정**: Levene (Brown-Forsythe variant, center=median)
+- **RCBD 가법성**: Tukey 1-df non-additivity test
+- **A그룹 교집합**: Reward↑ ∩ Time↓ ∩ PDR↓ 에서 letter 'a' 포함 시나리오 추천
+- **CRN 전제**: RCBD/Factorial 모드는 각 run 내 64개 rule이 동일 랜덤 시드를 공유한다고 가정
 
 #### 5. Data Tables 탭
 - CSV 파일 선택 (파일명만 표시, 경로 숨김)

@@ -34,7 +34,7 @@ MCI_ADV는 대량 재난 사고(Mass Casualty Incident) 발생 시 **환자 이�
   - **카카오 모빌리티 API** (`is_use_time=True`) — 실시간/미래시간 교통정보 반영, 한국 한정 유료 키 필요
   - **OSRM** (`is_use_time=False`) — 오픈소스 라우팅 엔진, 카카오 키 불필요. 정적 도로 그래프 기반(distance/velocity로 시간 산출). 외부 리뷰어/공개 사용자를 위한 대안.
 - **시뮬레이션 엔진**: 이산 사건 시뮬레이션(DES), 64개 규칙 조합 (완전요인설계)
-- **통계 분석**: ANOVA, Tukey HSD, Games-Howell 사후검정 자동 수행
+- **통계 분석**: ANOVA (One-way / RCBD / Reduced Factorial), EMM 기반 사후검정, CLD (Piepho 2004)
 - **웹 대시보드**: Streamlit 기반 인터랙티브 UI (지도, 분석, 데이터 편집)
 - **배치 처리**: 수백~수천 개 좌표 대규모 실험
 
@@ -355,12 +355,24 @@ streamlit run src/vis_src/MCI_Streamlit.py
 - 표시 경로 멀티셀렉트 (렌더링 성능을 위한 제한 가능)
 
 #### Analytics 탭
-- **RAW 결과 테이블**: 각 메트릭의 반복별 값
-- **STAT 요약**: 64개 시나리오의 평균, 표준편차, 95% 신뢰구간
-- **시나리오 순위**: Reward(내림차순), PDR(오름차순), Time(오름차순) 정렬
-- **ANOVA 스위트**: 완전요인, 일원배치, RCBD 분석
-- **사후검정**: Tukey HSD, Games-Howell
-- **잔차 진단**: Shapiro-Wilk 정규성 검정, QQ plot, 히스토그램
+
+3개 서브탭으로 구성: **RAW Data** | **STAT Summary** | **ANOVA Suite**
+
+- **RAW Data**: 각 메트릭의 반복별 원시값 (Reward, Time, PDR, Reward w.o.G, PDR w.o.G)
+- **STAT Summary**: 시나리오별 평균, 표준편차, 95% CI + 시나리오 순위 (Reward↓, PDR↑, Time↑ 정렬)
+- **ANOVA Suite**:
+  - **모형**: One-way (`value ~ C(rule)`), RCBD (`value ~ C(rule) + C(run)`), Reduced Factorial (주효과 + 2원 교호작용 + 블록)
+  - **CRN 가정**: RCBD 및 Factorial 모드는 Common Random Numbers(공통 난수) 전제 — 각 run 내 64개 rule이 동일 랜덤 시드를 공유하므로 `run`이 유효한 블록 변수
+  - **사후검정**:
+    - RCBD/Factorial: **EMM(추정 주변 평균)** 기반 pairwise t-test, 모형의 MS_residual을 풀링 오차로 사용, Holm 보정
+    - One-way: Games-Howell (이분산 로버스트)
+    - Fallback: Pairwise Welch t-test + Holm 보정 (pingouin 미설치 시)
+  - **CLD(Compact Letter Display)**: Piepho(2004) absorption 알고리즘 — 그룹에 다중 문자 부여 가능 (예: "ab"); 공유 문자가 있으면 유의차 없음
+  - **효과크기**: η² (에타제곱) 및 ω² (오메가제곱, 편향 보정)
+  - **잔차 진단**: Shapiro-Wilk + Anderson-Darling 정규성, QQ plot, 히스토그램, Residuals vs Fitted
+  - **등분산 검정**: Levene (Brown-Forsythe variant, center=median)
+  - **RCBD 가법성**: Tukey 1-df 비가법성 검정
+  - **A그룹 교집합**: Reward↑ ∩ Time↓ ∩ PDR↓ 세 지표 모두에서 최상위 CLD 그룹(문자 'a' 포함) 시나리오 추천
 
 #### Data Tables 탭
 - 시나리오 CSV 파일 직접 편집

@@ -1220,7 +1220,7 @@ st.set_page_config(page_title="MCI Streamlit", page_icon="📊", layout="wide")
 
 
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.header("Settings")
 
     base_input = st.text_input(
         "base_path",
@@ -1239,10 +1239,10 @@ with st.sidebar:
             st.success("✅ base_path set! Select a scenario or create a new one in the Generate tab.")
     if st.session_state.base_path and not base_ok(st.session_state.base_path):
         st.warning("Invalid base_path. (scenarios folder required)")
-    st.text("※ Click the button above to start")
+    # (removed guidance text for cleaner UI)
     if base_ok(st.session_state.base_path):
         exps = list_experiments_any(st.session_state.base_path)
-        st.caption("📂 Select existing scenario (optional)")
+        st.caption("Select existing scenario (optional)")
 
         # Ensure stored value is still valid; reset if not
         if st.session_state.selected_exp not in exps:
@@ -1271,38 +1271,12 @@ with st.sidebar:
             lat, lon = coord_center(st.session_state.selected_coord)
             st.caption("Current Coordinate")
 
-            # ── 베이스맵 선택(라이트 전용) + 테마 토글 ─────────────────
-            col_m1, col_m2 = st.columns(2)
-            with col_m1:
-                basemap_choice_ui = st.selectbox(
-                    "Light Tile",
-                    ["OpenStreetMap","CartoDB Positron"],
-                    index=0,
-                    key="mini_basemap_light",
-                )
-            with col_m2:
-                theme_choice = st.radio(
-                    "Theme",
-                    ["Light", "Dark"],
-                    index=0,
-                    horizontal=True,
-                    key="mini_theme",
-                )
-
             # ── folium 기반 렌더(표출 로직 동일: 한 점만) ────────────────
             try:
                 import folium
                 from streamlit_folium import st_folium
 
-                # UI 라벨 → folium 타일 이름 매핑
-                tile_map_light = {
-                    "CartoDB Positron": "CartoDB positron",
-                    "OpenStreetMap": "OpenStreetMap",
-                }
-                # Dark는 고정
-                tile_dark = "CartoDB dark_matter"
-
-                chosen_tile = tile_dark if theme_choice == "Dark" else tile_map_light[basemap_choice_ui]
+                chosen_tile = "CartoDB positron"
 
                 m = folium.Map(location=(lat, lon), zoom_start=12, control_scale=True, tiles=chosen_tile)
                 folium.CircleMarker(
@@ -1342,30 +1316,31 @@ st.markdown("""
 .stMultiSelect [data-baseweb="select"]{max-width:100%!important}
 
 /* ── 폰트 ── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
 html, body, .stApp, [data-testid="stAppViewContainer"] {
-    font-family: 'Inter', 'Pretendard', -apple-system, sans-serif !important;
+    font-family: 'DM Sans', -apple-system, sans-serif !important;
+}
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', 'DM Sans', -apple-system, sans-serif !important;
 }
 
-/* ── 배경 그라데이션 ── */
+/* ── 배경 ── */
 .stApp {
-    background: linear-gradient(160deg, #0a0f1e 0%, #111827 40%, #0f172a 100%);
+    background: #141417;
 }
 
 /* ── 사이드바 ── */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0d1526 0%, #111d35 100%) !important;
-    border-right: 1px solid rgba(56, 189, 248, 0.08) !important;
+    background: #1c1c21 !important;
+    border-right: 1px solid rgba(226, 160, 74, 0.1) !important;
 }
 [data-testid="stSidebar"] .stMarkdown h1,
 [data-testid="stSidebar"] .stMarkdown h2,
 [data-testid="stSidebar"] .stMarkdown h3 {
-    background: linear-gradient(90deg, #38bdf8, #818cf8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #e2a04a !important;
 }
 [data-testid="stSidebar"] label {
-    color: #cbd5e1 !important;
+    color: #a1a1aa !important;
     font-weight: 500;
     font-size: 0.85rem;
 }
@@ -1375,65 +1350,64 @@ h1 {
     font-weight: 700 !important;
     letter-spacing: -0.5px;
     padding-bottom: 4px;
-    color: #e2e8f0 !important;
+    color: #e4e4e7 !important;
 }
 .gradient-text {
-    background: linear-gradient(90deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+    background: linear-gradient(90deg, #e2a04a 0%, #2dd4bf 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
 /* ── 서브헤더 ── */
 h2, h3 {
-    color: #e2e8f0 !important;
+    color: #e4e4e7 !important;
     font-weight: 600 !important;
-    border-bottom: 2px solid rgba(56, 189, 248, 0.15);
+    border-bottom: 2px solid rgba(226, 160, 74, 0.18);
     padding-bottom: 8px;
     margin-bottom: 16px !important;
 }
 
 /* ── 탭 바 ── */
 .stTabs [data-baseweb="tab-list"] {
-    background: rgba(15, 23, 42, 0.6);
-    border-radius: 14px;
-    padding: 5px;
+    background: #1c1c21;
+    border-radius: 10px;
+    padding: 4px;
     gap: 4px;
-    border: 1px solid rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.06);
 }
 .stTabs [data-baseweb="tab"] {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 10px 22px;
     font-weight: 500;
-    color: #94a3b8 !important;
-    transition: all 0.25s ease;
+    color: #71717a !important;
+    transition: all 0.2s ease;
 }
 .stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg, #1e3a5f, #1e40af) !important;
-    color: #e0f2fe !important;
-    box-shadow: 0 2px 12px rgba(59, 130, 246, 0.25);
+    background: rgba(226, 160, 74, 0.15) !important;
+    color: #e2a04a !important;
+    box-shadow: none;
+    border-bottom: 2px solid #e2a04a;
 }
 .stTabs [data-baseweb="tab"]:hover {
-    color: #e2e8f0 !important;
-    background: rgba(30, 58, 95, 0.4);
+    color: #d4d4d8 !important;
+    background: rgba(255, 255, 255, 0.04);
 }
 .stTabs [data-baseweb="tab-highlight"] { display: none; }
 .stTabs [data-baseweb="tab-border"] { display: none; }
 
-/* ── 버튼 ── */
+/* ── 버튼 (primary: amber) ── */
 .stButton > button {
-    border-radius: 10px !important;
-    border: 1px solid rgba(59, 130, 246, 0.3) !important;
-    background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%) !important;
-    color: #e0f2fe !important;
-    font-weight: 500 !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(226, 160, 74, 0.4) !important;
+    background: rgba(226, 160, 74, 0.12) !important;
+    color: #e2a04a !important;
+    font-weight: 600 !important;
     padding: 8px 20px !important;
-    transition: all 0.25s ease !important;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: all 0.2s ease !important;
 }
 .stButton > button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
-    border-color: rgba(56, 189, 248, 0.5) !important;
+    background: rgba(226, 160, 74, 0.22) !important;
+    border-color: #e2a04a !important;
 }
 .stButton > button:active { transform: translateY(0); }
 
@@ -1442,87 +1416,87 @@ h2, h3 {
 [data-baseweb="select"] > div,
 .stTextInput > div > div,
 .stNumberInput > div > div > div {
-    background: rgba(15, 23, 42, 0.6) !important;
-    border: 1px solid rgba(56, 189, 248, 0.12) !important;
-    border-radius: 10px !important;
+    background: #1c1c21 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 8px !important;
     transition: border-color 0.2s ease;
 }
 [data-baseweb="input"]:focus-within,
 [data-baseweb="select"] > div:focus-within {
-    border-color: rgba(59, 130, 246, 0.5) !important;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+    border-color: rgba(226, 160, 74, 0.5) !important;
+    box-shadow: 0 0 0 2px rgba(226, 160, 74, 0.08) !important;
 }
 
 /* ── 드롭다운 메뉴 ── */
 [data-baseweb="popover"] {
-    border-radius: 12px !important;
-    border: 1px solid rgba(56, 189, 248, 0.12) !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
     overflow: hidden;
 }
-[data-baseweb="menu"] { background: #111827 !important; }
+[data-baseweb="menu"] { background: #1c1c21 !important; }
 
 /* ── Expander ── */
 [data-testid="stExpander"] {
-    background: rgba(15, 23, 42, 0.4) !important;
-    border: 1px solid rgba(56, 189, 248, 0.08) !important;
-    border-radius: 14px !important;
+    background: #1c1c21 !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-radius: 10px !important;
     overflow: hidden;
-    transition: border-color 0.2s ease;
 }
 [data-testid="stExpander"]:hover {
-    border-color: rgba(56, 189, 248, 0.18) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 /* ── 메트릭 카드 ── */
 [data-testid="stMetric"] {
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(56, 189, 248, 0.08);
-    border-radius: 14px;
+    background: #1c1c21;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 3px solid #e2a04a;
+    border-radius: 10px;
     padding: 18px 20px;
     transition: all 0.2s ease;
 }
 [data-testid="stMetric"]:hover {
-    border-color: rgba(56, 189, 248, 0.2);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border-color: rgba(255, 255, 255, 0.1);
+    border-left-color: #e2a04a;
 }
 [data-testid="stMetricLabel"] {
-    color: #94a3b8 !important;
+    color: #71717a !important;
     font-size: 0.82rem !important;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 [data-testid="stMetricValue"] {
-    color: #e0f2fe !important;
+    color: #e4e4e7 !important;
     font-weight: 700 !important;
 }
 
 /* ── 데이터프레임 ── */
 [data-testid="stDataFrame"], .stDataFrame {
-    border-radius: 12px !important;
+    border-radius: 8px !important;
     overflow: hidden;
-    border: 1px solid rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* ── 구분선 ── */
 hr {
-    border-color: rgba(56, 189, 248, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
     margin: 24px 0 !important;
 }
 
 /* ── 알림 메시지 ── */
-.stAlert, [data-testid="stAlert"] { border-radius: 10px !important; }
+.stAlert, [data-testid="stAlert"] { border-radius: 8px !important; }
 
 /* ── 체크박스/라디오 호버 ── */
-.stCheckbox label:hover, .stRadio label:hover { color: #38bdf8 !important; }
+.stCheckbox label:hover, .stRadio label:hover { color: #e2a04a !important; }
 
 /* ── 스크롤바 ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.3); }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #141417; }
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #1e40af, #38bdf8);
+    background: #3f3f46;
     border-radius: 4px;
 }
-::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1534,7 +1508,7 @@ tabs = st.tabs(["Maps", "Scenarios", "Analytics", "Data Tables", "Rerun"])
 # Scenarios 탭
 # ------------------------------
 with tabs[1]:
-    st.subheader("📁 Selected Scenario")
+    st.subheader("Selected Scenario")
     bp = st.session_state.base_path; exp = st.session_state.selected_exp; coord = st.session_state.selected_coord
 
     # 시나리오 변경 시 로그 로드 상태 리셋
@@ -1554,7 +1528,7 @@ with tabs[1]:
         site_info, sim_info = summarize_experiment_extended(smdf)
         site_info["Coordinate"] = f"{lat:.6f}, {lon:.6f}"
 
-        with st.expander("📝 View Experiment Summary", expanded=True):
+        with st.expander("View Experiment Summary", expanded=True):
             left, right = st.columns([0.42, 0.58])
             with left:
                 st.markdown("**Incident Site**")
@@ -1578,7 +1552,7 @@ with tabs[1]:
                 if pd.notna(total_samples_val):
                     total_samples = int(total_samples_val)
 
-        st.markdown("### 🧾 Execution Log")
+        st.markdown("### Execution Log")
 
         # 디버깅: total_samples 값 확인
         if total_samples > 0:
@@ -1591,11 +1565,11 @@ with tabs[1]:
             st.caption(f"💡 For performance, logs with 101+ iterations should be checked in the source folder.")
 
             # 버튼 비활성화 상태로 표시
-            st.button("📂 Load Log Files", key="load_logs_btn_disabled", disabled=True, help="Log viewer is disabled for 101+ iterations")
+            st.button("Load Log Files", key="load_logs_btn_disabled", disabled=True, help="Log viewer is disabled for 101+ iterations")
             logs = None
         else:
             # 성능 최적화: 버튼 클릭 시에만 로그 로드 (다른 탭 로딩 속도 개선)
-            if st.button("📂 Load Log Files", key="load_logs_btn", help="Click to load logs"):
+            if st.button("Load Log Files", key="load_logs_btn", help="Click to load logs"):
                 st.session_state.logs_loaded = True
 
             if st.session_state.get("logs_loaded", False):
@@ -1637,7 +1611,7 @@ with tabs[1]:
                 st.caption(f"Selected: Rule={sel_rule} / Iter={sel_iter if sel_iter is not None else 'N/A'}")
 
 
-                st.markdown("#### 👤 Patient Story (Summary)")
+                st.markdown("#### Patient Story (Summary)")
                 psum = build_patient_summary(blk["events"]) if blk else pd.DataFrame()
                 if psum.empty:
                     st.caption("No patient events found.")
@@ -1651,19 +1625,19 @@ with tabs[1]:
                     )
 
 
-                st.markdown("#### 🧰 Full Event Table")
+                st.markdown("#### Full Event Table")
                 ev_df = pd.DataFrame(blk["events"]).rename(columns={"t":"Time","eid":"EventID","ev":"Event","p":"Patient","a":"Ambulance","u":"UAV","h":"Hospital"}) if blk else pd.DataFrame()
                 st.dataframe(ev_df, width='stretch', height=320)
                 _suffix = f"_iter{sel_iter}" if sel_iter is not None else ""
                 st.download_button("⬇️ Full Events (csv)", ev_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"events_all{_suffix}.csv")
 
-            st.markdown("#### 🗂 View Raw Log")
+            st.markdown("#### View Raw Log")
             with st.expander("Expand Raw Text", expanded=False):
                 st.code(log_text[:30000] + ("\n... (생략)" if len(log_text) > 30000 else ""))
                 st.download_button("Download Raw Log", log_text, file_name=os.path.basename(log_sel))
 
             st.markdown("---")
-            st.markdown("### 🛈 Action/Rule Reference")
+            st.markdown("### Action/Rule Reference")
             st.markdown(ACTION_TOOLTIP_MD)
         else:
             st.info("No log files found for this combination.")
@@ -1673,7 +1647,7 @@ with tabs[1]:
 # Maps 탭 (복수선택 + UAV 출동/이송 토글 + 범례 강화)
 # ------------------------------
 with tabs[0]:
-    st.subheader("🗺️ Map Visualization")
+    st.subheader("Map Visualization")
     bp   = st.session_state.base_path
     exp  = st.session_state.selected_exp
     coord= st.session_state.selected_coord
@@ -1739,8 +1713,10 @@ with tabs[0]:
     # ─────────────────────────────────────────────────────────────────────
     # ① AMB 경로 (C→S 표 / S→H 표)
     # ─────────────────────────────────────────────────────────────────────
-    st.markdown("### AMB Routes")
-    col_amb_c2s, col_amb_s2h = st.columns(2)
+    _route_exp = st.expander("Route Details & Selection", expanded=False)
+    with _route_exp:
+        st.markdown("### AMB Routes")
+        col_amb_c2s, col_amb_s2h = st.columns(2)
 
     # --- AMB: C→S(출동) 표 (표시, 인덱스, 안전센터/소방서, 거리) ---
     with col_amb_c2s:
@@ -1879,8 +1855,9 @@ with tabs[0]:
     # ─────────────────────────────────────────────────────────────────────
     # ② UAV 경로 (출동/이송 — 직선거리 표출)
     # ─────────────────────────────────────────────────────────────────────
-    st.markdown("### UAV Routes")
-    col_uav_out, col_uav_back = st.columns(2)
+    with _route_exp:
+        st.markdown("### UAV Routes")
+        col_uav_out, col_uav_back = st.columns(2)
 
     # 출동(병원→사고): 헬기장 병원 (uav_info.csv에서 읽기)
     with col_uav_out:
@@ -2468,7 +2445,7 @@ RAW_RE = re.compile(r'^(START|ReSTART),\s*(RedOnly|YellowNearest),\s*Red\s+([A-Z
 
 # ===== Analysis 탭 =====
 with tabs[2]:
-    st.subheader("📊 RAW Result Analysis (results_{coord}.txt)")
+    st.subheader("RAW Result Analysis (results_{coord}.txt)")
 
     bp   = st.session_state.base_path
     exp  = st.session_state.selected_exp
@@ -2489,42 +2466,44 @@ with tabs[2]:
         # 성능 최적화: 버튼 클릭 시에만 Analytics 데이터 로드
         st.info("💡 Large simulation results may take time to load. Click the button below to start analysis.")
 
-        if st.button("📊 Load Analysis Data", key="load_analytics_btn", help="Parse and analyze RAW results"):
+        if st.button("Load Analysis Data", key="load_analytics_btn", help="Parse and analyze RAW results"):
             st.session_state.analytics_loaded = True
 
         if not st.session_state.get("analytics_loaded", False):
             st.caption("💡 Click 'Load Analysis Data' above to view analysis. (Disabled by default for faster tab loading)")
         else:
-            # ── RAW: 선택한 지표만 토글 표출
-            raw_tables = {}
-            if rpath and os.path.exists(rpath):
-                with st.spinner("Parsing RAW results... (large files may take a moment)"):
-                    raw_tables = parse_raw_all_metrics(rpath)  # {metric: df}
+            analytics_tabs = st.tabs(["RAW Data", "STAT Summary", "ANOVA Suite"])
 
-                if raw_tables:
-                    # 파일에 실제 들어있는 지표만 옵션으로 노출
-                    metric_options = [m for m in RAW_METRIC_NAMES if m in raw_tables.keys()]
-                    picked = st.multiselect(
-                        "Select metrics to display",
-                        options=metric_options,
-                        default=[metric_options[0]] if metric_options else [],
-                        help="Only selected metrics will be shown below."
-                    )
-                    for m in picked:
-                        st.markdown(f"#### ▶ RAW Table — **{m}** (per run)")
-                        st.dataframe(raw_tables[m], width='stretch')
+            # ── RAW Data sub-tab ──
+            with analytics_tabs[0]:
+                raw_tables = {}
+                if rpath and os.path.exists(rpath):
+                    with st.spinner("Parsing RAW results... (large files may take a moment)"):
+                        raw_tables = parse_raw_all_metrics(rpath)  # {metric: df}
+
+                    if raw_tables:
+                        # 파일에 실제 들어있는 지표만 옵션으로 노출
+                        metric_options = [m for m in RAW_METRIC_NAMES if m in raw_tables.keys()]
+                        picked = st.multiselect(
+                            "Select metrics to display",
+                            options=metric_options,
+                            default=[metric_options[0]] if metric_options else [],
+                            help="Only selected metrics will be shown below."
+                        )
+                        for m in picked:
+                            st.markdown(f"#### RAW Table -- **{m}** (per run)")
+                            st.dataframe(raw_tables[m], width='stretch')
+                    else:
+                        st.warning("No readable blocks found in RAW (results_*.txt).")
                 else:
-                    st.warning("No readable blocks found in RAW (results_*.txt).")
-            else:
-                st.warning("RAW (results_*.txt) file not found.")
+                    st.warning("RAW (results_*.txt) file not found.")
 
-            st.divider()
-
-            # ===== (기존) stat 요약 분석 섹션 =====
-            st.subheader("📈 STAT Summary Analysis (_stat.txt)")
-            st.info(
-                "📂 results/exp_YYYYMMDD_HHMMSS/(lat,lon)/results_{coord}.txt (Raw), results_{coord}_stat.txt (통계)\n\n"
-                "- **Reward**: 생존확률 합\n- **Time**: 소요시간\n- **PDR**\n- **w.o.G**: Green 제외 지표"
+            # ── STAT Summary sub-tab ──
+            with analytics_tabs[1]:
+                st.subheader("STAT Summary Analysis (_stat.txt)")
+                st.info(
+                "results/exp_YYYYMMDD_HHMMSS/(lat,lon)/results_{coord}.txt (Raw), results_{coord}_stat.txt (Stat)\n\n"
+                "- **Reward**: Survival probability sum\n- **Time**: Elapsed time\n- **PDR**\n- **w.o.G**: Excluding Green"
             )
 
             wide, long_df = (pd.DataFrame(), pd.DataFrame())
@@ -2536,12 +2515,12 @@ with tabs[2]:
                     "M1_mean":"Reward Mean","M1_std":"Reward Std","M1_ci":"Reward 95%CI",
                     "M2_mean":"Time Mean","M2_std":"Time Std","M2_ci":"Time 95%CI",
                     "M3_mean":"PDR Mean","M3_std":"PDR Std","M3_ci":"PDR 95%CI",
-                    "M4_mean":"Reward w.o.G 평균","M4_std":"Reward w.o.G 표준편차","M4_ci":"Reward w.o.G 95%CI",
-                    "M5_mean":"PDR w.o.G 평균","M5_std":"PDR w.o.G 표준편차","M5_ci":"PDR w.o.G 95%CI",
+                    "M4_mean":"Reward w.o.G Mean","M4_std":"Reward w.o.G Std","M4_ci":"Reward w.o.G 95%CI",
+                    "M5_mean":"PDR w.o.G Mean","M5_std":"PDR w.o.G Std","M5_ci":"PDR w.o.G 95%CI",
                 })
                 st.dataframe(display, width='stretch')
 
-                st.markdown("#### 🏆 Scenario Ranking (Sort by)")
+                st.markdown("#### Scenario Ranking (Sort by)")
                 crit = st.selectbox("Sort by", ["Reward (desc)","PDR (asc)","Time (asc)"], index=0)
                 if crit == "Reward (desc)":
                     df_sorted = wide.sort_values("M1_mean", ascending=False)
@@ -2556,9 +2535,7 @@ with tabs[2]:
             else:
                 st.info("STAT summary file not found or empty.")
 
-
-            # ── ANOVA Suite (when raw file exists)
-            st.markdown("#### 🧪 ANOVA (One-way / RCBD / Reduced Factorial)")
+            # ── ANOVA Suite sub-tab ── (opened below after helper definitions)
 
             import itertools
 
@@ -2616,8 +2593,8 @@ with tabs[2]:
                     return float(default)
 
 
-            def games_howell_fallback(df, grp, yvar, alpha=0.05):
-                """pingouin이 없을 때 Welch t + Holm으로 근사."""
+            def welch_holm_posthoc(df, grp, yvar, alpha=0.05):
+                """Pairwise Welch t-tests with Holm correction (used when pingouin is unavailable)."""
                 from scipy import stats as sps
                 pairs, pvals = [], []
                 for g1, g2 in itertools.combinations(sorted(df[grp].unique()), 2):
@@ -2682,54 +2659,133 @@ with tabs[2]:
 
             def cld_from_pairs(means: pd.Series, pair_tbl: pd.DataFrame, alpha=0.05):
                 """
-                단조(monotone) CLD: 정렬된 means 순서에서 위→아래로 내려오며
-                현재 그룹의 모든 멤버와 '비유의'일 때만 같은 레터를 부여.
-                하나라도 '유의'면 다음 레터로 넘어감.
-                - means: index=그룹명(룰), values=사후검정과 같은 스케일에서의 평균
-                        (RCBD면 y_adj 평균으로 정렬 권장; 아래 적용부 참조)
-                - pair_tbl: columns 중 ['group1','group2']와 ['reject'] 또는 ['p-adj'] 포함
-                결과: 각 그룹당 단일 레터(A,B,C,...) — 지그재그 방지, 구간형 묶음 보장.
+                Compact Letter Display based on the absorption algorithm
+                (Piepho 2004, "An algorithm for a letter-based representation
+                of all pairwise comparisons").
+
+                Each group may receive multiple letters (e.g. "ab"). Two groups
+                sharing at least one letter are NOT significantly different.
+                Groups sharing NO letters ARE significantly different.
+
+                - means: index=group name, values=mean (pre-sorted by caller)
+                - pair_tbl: must contain ['group1','group2'] and ['reject'] or ['p-adj']
+                Returns DataFrame with columns [rule, mean, CLD].
                 """
                 # 빈 테이블이면 전부 A
                 if pair_tbl is None or pair_tbl.empty or len(means) <= 1:
-                    return pd.DataFrame({"rule": means.index, "mean": means.values, "CLD": ["A"]*len(means)})
+                    return pd.DataFrame({"rule": means.index, "mean": means.values, "CLD": ["a"]*len(means)})
 
                 ph = pair_tbl.copy()
-                # 비유의 여부 계산
                 if "reject" in ph.columns:
-                    ph["ns"] = ~ph["reject"].astype(bool)
+                    ph["sig"] = ph["reject"].astype(bool)
                 else:
-                    ph["ns"] = ph["p-adj"] >= alpha
+                    ph["sig"] = ph["p-adj"] < alpha
 
-                # 빠른 조회용 dict: (a,b)->비유의(True/False), 무정보는 보수적으로 '유의' 취급
-                key = lambda a,b: tuple(sorted((a,b)))
-                ns_map = { key(r["group1"], r["group2"]): bool(r["ns"]) for _, r in ph.iterrows() }
+                # 유의 쌍 집합 (정렬된 튜플)
+                _key = lambda a, b: tuple(sorted((a, b)))
+                sig_pairs = set()
+                for _, r in ph.iterrows():
+                    if bool(r["sig"]):
+                        sig_pairs.add(_key(r["group1"], r["group2"]))
 
-                ordered = list(means.index)  # 이미 바깥에서 정렬되어 들어오는 것을 전제
-                def is_ns(a, b):
-                    return ns_map.get(key(a,b), False)  # 무정보는 False(=유의)로 처리해 과도한 병합 방지
+                ordered = list(means.index)
+                n = len(ordered)
 
-                letters = {}
-                current_letter = "A"
-                current_members = [ordered[0]]
-                letters[ordered[0]] = current_letter
+                # --- Absorption algorithm ---
+                # Start: single letter 'a' assigned to all groups
+                # Each letter defines a "family" of groups that are mutually non-significant.
+                # If a family contains a significant pair, split it by removing one member
+                # and assigning a new letter.
 
-                for g in ordered[1:]:
-                    # 현재 그룹의 모든 멤버와 비유의이면 같은 레터 유지
-                    if all(is_ns(g, m) for m in current_members):
-                        letters[g] = current_letter
-                        current_members.append(g)
-                    else:
-                        # 다음 레터로 진행(단조 증가)
-                        nxt = ord(current_letter) + 1
-                        current_letter = chr(nxt) if nxt <= ord('Z') else current_letter  # Z 초과면 Z 유지
-                        letters[g] = current_letter
-                        current_members = [g]
+                # Initial: one family containing all groups
+                families = [set(ordered)]  # list of sets
+
+                changed = True
+                max_iter = n * 26  # safety limit
+                iteration = 0
+                while changed and iteration < max_iter:
+                    changed = False
+                    iteration += 1
+                    new_families = []
+                    for fam in families:
+                        # Check if this family contains any significant pair
+                        has_sig = False
+                        for a_grp in fam:
+                            for b_grp in fam:
+                                if a_grp < b_grp and _key(a_grp, b_grp) in sig_pairs:
+                                    has_sig = True
+                                    break
+                            if has_sig:
+                                break
+
+                        if not has_sig:
+                            new_families.append(fam)
+                        else:
+                            # Split: find the member whose removal resolves the most conflicts
+                            best_remove = None
+                            best_conflicts = -1
+                            for candidate in fam:
+                                conflicts = sum(
+                                    1 for other in fam
+                                    if other != candidate and _key(candidate, other) in sig_pairs
+                                )
+                                if conflicts > best_conflicts:
+                                    best_conflicts = conflicts
+                                    best_remove = candidate
+
+                            # Keep family without the removed member
+                            remaining = fam - {best_remove}
+                            if remaining:
+                                new_families.append(remaining)
+                            # New family: the removed member + all non-significant partners from original
+                            new_fam = {best_remove}
+                            for other in fam:
+                                if other != best_remove and _key(best_remove, other) not in sig_pairs:
+                                    new_fam.add(other)
+                            new_families.append(new_fam)
+                            changed = True
+
+                    # Deduplicate families (same set of members)
+                    unique = []
+                    seen = set()
+                    for fam in new_families:
+                        key_frozen = frozenset(fam)
+                        if key_frozen not in seen:
+                            seen.add(key_frozen)
+                            unique.append(fam)
+                    families = unique
+
+                # Absorb: remove families that are subsets of other families
+                families.sort(key=len, reverse=True)
+                absorbed = []
+                for i, fam in enumerate(families):
+                    is_subset = False
+                    for j, other in enumerate(absorbed):
+                        if fam.issubset(other):
+                            is_subset = True
+                            break
+                    if not is_subset:
+                        absorbed.append(fam)
+                families = absorbed
+
+                # Assign letters (a, b, c, ...) to families, sorted by best mean
+                def family_rank(fam):
+                    # rank by the best (first in ordered list) member
+                    return min(ordered.index(g) for g in fam)
+                families.sort(key=family_rank)
+
+                letters_list = [chr(ord('a') + i) if i < 26 else chr(ord('a') + i - 26).upper()
+                                for i in range(len(families))]
+
+                group_letters = {g: [] for g in ordered}
+                for letter, fam in zip(letters_list, families):
+                    for g in fam:
+                        group_letters[g].append(letter)
 
                 return pd.DataFrame({
                     "rule": ordered,
                     "mean": [means[g] for g in ordered],
-                    "CLD":  [letters[g] for g in ordered],
+                    "CLD":  ["".join(group_letters[g]) for g in ordered],
                 })
             def _series_1d(obj) -> pd.Series:
                 """DataFrame/Series/ndarray/리스트 등 무엇이 와도 1D Series(float)로 강제."""
@@ -2751,9 +2807,11 @@ with tabs[2]:
                 return pd.DataFrame({"rule": df["rule"].values, "__y__": y_s.values})
 
 
-            if not rpath:
+            with analytics_tabs[2]:
+              st.markdown("#### ANOVA (One-way / RCBD / Reduced Factorial)")
+              if not rpath:
                 st.caption(f"Raw file (results_{coord}.txt) not found; skipping ANOVA.")
-            else:
+              else:
                 dfraw = parse_raw_results(rpath)  # 반드시 long 형식
                 if dfraw.empty:
                     st.caption("RAW parsing result is empty. Check file format.")
@@ -2784,6 +2842,8 @@ with tabs[2]:
 
                         mode = st.radio("Analysis Type", ["One-way (rule only)","One-way + Block(run) (RCBD recommended)","Reduced Factorial (main + 2-way)"],
                                         index=1, horizontal=True)
+                        if "Block" in mode or "Factorial" in mode:
+                            st.caption("RCBD assumes Common Random Numbers (CRN): all 64 rules within each run share the same random seed, so `run` is a valid block variable.")
 
                         if not HAS_SM:
                             st.warning("statsmodels not installed. Cannot run ANOVA. `pip install statsmodels` and retry.")
@@ -2800,12 +2860,12 @@ with tabs[2]:
                                 formula = f"{yvar} ~ C(rule) + C(run)"
                                 st.caption("Model: value ~ C(rule) + C(run)  (run=block)")
                             else:
-                                # Reduced factorial: main effects + 2-way interactions only (no 3/4-way)
-                                formula = (f"{yvar} ~ C(Phase) + C(RedPolicy) + C(RedAction) + C(YellowAction)"
+                                # Reduced factorial: main effects + 2-way interactions + block(run)
+                                formula = (f"{yvar} ~ C(run) + C(Phase) + C(RedPolicy) + C(RedAction) + C(YellowAction)"
                                            " + C(Phase):C(RedPolicy) + C(Phase):C(RedAction) + C(Phase):C(YellowAction)"
                                            " + C(RedPolicy):C(RedAction) + C(RedPolicy):C(YellowAction)"
                                            " + C(RedAction):C(YellowAction)")
-                                st.caption("Model: main effects + all 2-way interactions (3/4-way excluded for power)")
+                                st.caption("Model: C(run) + main effects + all 2-way interactions (3/4-way excluded for power)")
 
                             model = smf.ols(formula, data=d).fit()
                             anova_tbl = sm.stats.anova_lm(model, typ=2)
@@ -2818,7 +2878,7 @@ with tabs[2]:
                             alpha = st.slider("Significance Level (alpha)", 0.001, 0.1, 0.05, 0.001)
                             sig = out[(out.index!="Total") & (out["PR(>F)"] < alpha)].sort_values("PR(>F)")
                             if not sig.empty:
-                                st.markdown("##### 📌 Interpretation Summary")
+                                st.markdown("##### Interpretation Summary")
                                 lines = []
                                 for idx, r in sig.iterrows():
                                     omega = f", ω²={r['omega_sq']:.3f}" if pd.notna(r.get('omega_sq')) else ""
@@ -2889,21 +2949,9 @@ with tabs[2]:
                             st.altair_chart(rvf_chart + zero_line, width='stretch')
                         
 
-                            # 등분산(룰 기준). RCBD면 블록-잔차화 값으로 검사
-                            try:
-                                if mode.startswith("One-way"):
-                                    df_lev = d
-                                else:
-                                    df_lev = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
-                                groups = [g[yvar].values for _, g in df_lev.groupby("rule")]
-                                p_lev = sps.levene(*groups, center="median").pvalue
-                                st.write(f"Levene(Brown–Forsythe): p={p_lev:.3g}")
-                            except Exception:
-                                p_lev = np.nan
-
-                            # p_shap, p_lev 계산부 바로 다음에 추가
-                            p_shap = _scalar(p_shap, default=1.0)  # 실패 시 '정규성 통과' 쪽으로
-                            p_lev  = _scalar(p_lev,  default=np.nan)
+                            # p_shap 스칼라 보정 (Levene는 사후검정 섹션에서 1회만 수행)
+                            p_shap = _scalar(p_shap, default=1.0)
+                            p_lev  = np.nan  # 아래 사후검정 섹션에서 계산
                             alpha  = _scalar(alpha,  default=0.05)
 
                             # ===== 사후검정 & CLD =====
@@ -2914,49 +2962,99 @@ with tabs[2]:
                                 # Time, PDR(woG 포함)=작을수록 좋음 / Reward류=클수록 좋음
                                 return (m == "Time") or m.startswith("PDR")
 
-                            # --- 사후검정 입력과 CLD용 평균(Series) 확정 ---
+                            # --- EMM-based post-hoc for RCBD; Games-Howell for One-way ---
+                            def _emm_pairwise(model_obj, data, rule_col, block_col, yvar, alpha_val):
+                                """
+                                Estimated Marginal Means (EMM) pairwise comparison.
+                                Uses RCBD model's MS_residual as the pooled error term.
+                                Pairwise differences tested with t-distribution, Holm-corrected.
+                                """
+                                ms_res = model_obj.mse_resid
+                                df_res = model_obj.df_resid
+                                rules = sorted(data[rule_col].unique())
+                                n_per_cell = data.groupby(rule_col).size()
+
+                                # EMM = marginal mean of each rule (averaged over blocks)
+                                emm = data.groupby(rule_col)[yvar].mean()
+
+                                pairs, pvals, diffs = [], [], []
+                                for g1, g2 in itertools.combinations(rules, 2):
+                                    diff = emm[g1] - emm[g2]
+                                    n1, n2 = n_per_cell[g1], n_per_cell[g2]
+                                    se = np.sqrt(ms_res * (1.0/n1 + 1.0/n2))
+                                    t_stat = diff / se if se > 0 else 0
+                                    p_val = 2.0 * (1.0 - sps.t.cdf(abs(t_stat), df_res))
+                                    pairs.append((g1, g2))
+                                    pvals.append(p_val)
+                                    diffs.append(diff)
+
+                                from statsmodels.stats.multitest import multipletests
+                                reject, p_adj, _, _ = multipletests(pvals, method="holm", alpha=alpha_val)
+                                ph = pd.DataFrame({
+                                    "group1": [p[0] for p in pairs],
+                                    "group2": [p[1] for p in pairs],
+                                    "diff": diffs,
+                                    "p-adj": p_adj,
+                                    "reject": reject,
+                                })
+                                return ph, emm
+
                             if mode == "One-way + Block(run) (RCBD recommended)":
-                                dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
-                                dd_work = _make_dd_work(dd, yvar)               # ▶ 분석 컬럼을 '__y__'로 1D 보장
-                                y_post  = dd_work["__y__"]
-                                grp_post= dd_work["rule"]
-                                means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
-                                    ascending=_small_is_better(metric)
-                                )
-                                # Levene도 dd_work 기반으로 (더 안전)
-                                lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
+                                # EMM-based pairwise comparison using RCBD model error
+                                try:
+                                    posthoc, emm_means = _emm_pairwise(model, d, "rule", "run", yvar, alpha)
+                                    means_for_cld = emm_means.sort_values(ascending=_small_is_better(metric))
+                                    explain = "EMM pairwise t-tests (RCBD MS_residual) + Holm correction"
+                                except Exception as e_emm:
+                                    # Fallback to block-adjusted Games-Howell
+                                    dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
+                                    dd_work = _make_dd_work(dd, yvar)
+                                    means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
+                                        ascending=_small_is_better(metric))
+                                    try:
+                                        import pingouin as pg
+                                        gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
+                                        posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
+                                        posthoc["reject"] = posthoc["p-adj"] < alpha
+                                        explain = f"Games-Howell on block-adjusted y* (EMM failed: {e_emm})"
+                                    except Exception:
+                                        y_post = dd_work["__y__"]; grp_post = dd_work["rule"]
+                                        posthoc = welch_holm_posthoc(
+                                            pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
+                                            "rule", "y", alpha=alpha)
+                                        explain = f"Welch t + Holm on block-adjusted y* (EMM failed: {e_emm})"
+                                # Levene on block-adjusted residuals
+                                dd_lev = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
+                                dd_lev_work = _make_dd_work(dd_lev, yvar)
+                                lev_groups = [g["__y__"].values for _, g in dd_lev_work.groupby("rule")]
                             else:
-                                dd_work = _make_dd_work(d, yvar)                # ▶ One-way도 동일하게 1D 보장
+                                # One-way: Games-Howell (robust to unequal variance)
+                                dd_work = _make_dd_work(d, yvar)
                                 y_post  = dd_work["__y__"]
                                 grp_post= dd_work["rule"]
                                 means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
-                                    ascending=_small_is_better(metric)
-                                )
+                                    ascending=_small_is_better(metric))
                                 lev_groups = [g["__y__"].values for _, g in dd_work.groupby("rule")]
+                                try:
+                                    import pingouin as pg
+                                    gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
+                                    posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
+                                    posthoc["reject"] = posthoc["p-adj"] < alpha
+                                    explain = "Games-Howell"
+                                except Exception:
+                                    posthoc = welch_holm_posthoc(
+                                        pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
+                                        "rule", "y", alpha=alpha)
+                                    explain = "Pairwise Welch t-tests + Holm correction (pingouin unavailable)"
 
                             try:
                                 if len(lev_groups) >= 2 and all(len(x) > 1 for x in lev_groups):
                                     p_lev = sps.levene(*lev_groups, center="median").pvalue
                                 else:
                                     p_lev = np.nan
-                                st.write(f"Levene(Brown–Forsythe): p={_scalar(p_lev):.3g}")
+                                st.write(f"Levene(Brown-Forsythe): p={_scalar(p_lev):.3g}")
                             except Exception:
                                 p_lev = np.nan
-
-
-                            # --- Post-hoc: Games-Howell (robust to non-normality & heteroscedasticity) ---
-                            try:
-                                import pingouin as pg
-                                gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
-                                posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
-                                posthoc["reject"] = posthoc["p-adj"] < alpha
-                                explain = "Games–Howell"
-                            except Exception:
-                                posthoc = games_howell_fallback(
-                                    pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
-                                    "rule", "y", alpha=alpha
-                                )
-                                explain = "Welch t-tests + Holm correction (Games–Howell fallback)"
 
                             # --- 결과 출력 & CLD ---
                             if not posthoc.empty:
@@ -2968,18 +3066,18 @@ with tabs[2]:
                                     st.info("No p-value information available for CLD.")
                                 else:
                                     cld = cld_from_pairs(means_for_cld, ph, alpha=alpha)
-                                    st.markdown("##### CLD (same letter = no significant difference, A = best)")
-                                    st.caption("⚠️ CLD uses a greedy monotone algorithm; letter assignments may vary with group ordering. "
-                                               "Interpret letters as approximate groupings — always check pairwise p-values for precise conclusions.")
+                                    st.markdown("##### CLD (shared letter = no significant difference, 'a' = best)")
+                                    st.caption("CLD uses the absorption algorithm (Piepho 2004). Groups may have multiple letters (e.g. 'ab'). "
+                                               "Two groups sharing at least one letter are not significantly different.")
                                     st.dataframe(cld, width='stretch')
 
                                     # 최종 후보(‘A’ 그룹) — 지표 방향에 맞춰 정렬
-                                    st.markdown(f"#### ✅ Top Candidates (**{metric}, A=Best**)")
-                                    top = cld[cld["CLD"]=="A"].sort_values("mean", ascending=_small_is_better(metric))
+                                    st.markdown(f"#### Top Candidates (**{metric}**, groups containing letter 'a')")
+                                    top = cld[cld["CLD"].str.contains("a", na=False)].sort_values("mean", ascending=_small_is_better(metric))
                                     st.dataframe(top, width='stretch')
 
                                     # ================== A그룹 교집합 (Reward ∩ Time ∩ PDR, RCBD 기준) ==================구해도 좋습니다.")
-                                    st.markdown("### 🔗 A-Group Intersection (Reward ∩ Time(asc) ∩ PDR(asc), RCBD)")
+                                    st.markdown("### A-Group Intersection (Reward ∩ Time(asc) ∩ PDR(asc), RCBD)")
 
                                     def _prep_metric(dfraw_all: pd.DataFrame, metric_name: str):
                                         """raw(long)에서 metric 행 추출 + rule 컬럼 보정."""
@@ -3006,37 +3104,42 @@ with tabs[2]:
 
                                     def _rcbd_posthoc_cld(d: pd.DataFrame, yvar: str, alpha: float = 0.05, prefer_small_is_A: bool = False):
                                         """
-                                        RCBD: y ~ C(rule) + C(run), then Games-Howell on block-adjusted y*.
-                                        CLD via cld_from_pairs (monotone letter algorithm).
-                                        prefer_small_is_A=True  → ascending sort (A = smallest = Best)
-                                        prefer_small_is_A=False → descending sort (A = largest = Best)
+                                        RCBD: y ~ C(rule) + C(run), EMM-based pairwise t-tests using
+                                        the model's MS_residual as pooled error, Holm-corrected.
+                                        CLD via absorption algorithm (Piepho 2004).
+                                        prefer_small_is_A=True  → ascending sort (a = smallest = Best)
+                                        prefer_small_is_A=False → descending sort (a = largest = Best)
                                         """
                                         from scipy import stats as sps
 
                                         posthoc = pd.DataFrame()
                                         explain = ""
 
-                                        # --- Block-adjust y* for post-hoc input (1D guaranteed)
-                                        dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
-                                        dd_work = _make_dd_work(dd, yvar)
-                                        y_post, grp_post = dd_work["__y__"], dd_work["rule"]
-                                        means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
-                                            ascending=prefer_small_is_A
-                                        )
-
-                                        # --- Post-hoc: Games-Howell (robust to non-normality & heteroscedasticity)
+                                        # Fit RCBD model for this metric
                                         try:
-                                            import pingouin as pg
-                                            gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
-                                            posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
-                                            posthoc["reject"] = posthoc["p-adj"] < alpha
-                                            explain = "Games–Howell (RCBD, y*)"
-                                        except Exception:
-                                            posthoc = games_howell_fallback(
-                                                pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
-                                                "rule", "y", alpha=alpha
-                                            )
-                                            explain = "Welch t-tests + Holm correction (RCBD, y*)"
+                                            rcbd_model = smf.ols(f"{yvar} ~ C(rule) + C(run)", data=d).fit()
+                                            posthoc_emm, emm_means = _emm_pairwise(rcbd_model, d, "rule", "run", yvar, alpha)
+                                            posthoc = posthoc_emm
+                                            means_for_cld = emm_means.sort_values(ascending=prefer_small_is_A)
+                                            explain = "EMM pairwise t-tests (RCBD MS_residual) + Holm"
+                                        except Exception as e_emm:
+                                            # Fallback: block-adjusted Games-Howell
+                                            dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
+                                            dd_work = _make_dd_work(dd, yvar)
+                                            means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
+                                                ascending=prefer_small_is_A)
+                                            try:
+                                                import pingouin as pg
+                                                gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
+                                                posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
+                                                posthoc["reject"] = posthoc["p-adj"] < alpha
+                                                explain = f"Games-Howell block-adjusted (EMM failed: {e_emm})"
+                                            except Exception:
+                                                y_post = dd_work["__y__"]; grp_post = dd_work["rule"]
+                                                posthoc = welch_holm_posthoc(
+                                                    pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
+                                                    "rule", "y", alpha=alpha)
+                                                explain = f"Welch t + Holm block-adjusted (EMM failed: {e_emm})"
 
                                         # --- CLD 산출
                                         if posthoc.empty or (("p-adj" not in posthoc.columns) and ("reject" not in posthoc.columns)):
@@ -3045,7 +3148,7 @@ with tabs[2]:
                                         cld = cld_from_pairs(means_for_cld, posthoc, alpha=alpha)
                                         return means_for_cld, cld, explain
 
-                                    with st.expander("🔍 A-Group Intersection (Reward↑, Time↓, PDR↓)", expanded=True):
+                                    with st.expander("A-Group Intersection (Reward up, Time down, PDR down)", expanded=True):
                                         alpha_int = st.slider("Alpha for intersection", 0.001, 0.1, 0.05, 0.001, key="alpha_intersect_all")
                                         alpha_int = float(alpha_int)   # 슬라이더 값 스칼라화
                                         # --- Reward (클수록 A) ---
@@ -3056,7 +3159,7 @@ with tabs[2]:
                                         else:
                                             d_rew_tr, y_rew, _ = _transform_for_metric(d_rew, "Reward")
                                             means_rew, cld_rew, _ = _rcbd_posthoc_cld(d_rew_tr, y_rew, alpha=alpha_int, prefer_small_is_A=False)
-                                            A_rew = set(cld_rew.loc[cld_rew["CLD"]=="A","rule"]) if not cld_rew.empty else set()
+                                            A_rew = set(cld_rew.loc[cld_rew["CLD"].str.contains("a", na=False),"rule"]) if not cld_rew.empty else set()
                                             disp_rew = d_rew.groupby("rule")["value"].mean().rename("Reward_mean(orig)")
 
                                         # --- Time (작을수록 A) ---
@@ -3067,7 +3170,7 @@ with tabs[2]:
                                         else:
                                             d_time_tr, y_time, _ = _transform_for_metric(d_time, "Time")
                                             means_time, cld_time, _ = _rcbd_posthoc_cld(d_time_tr, y_time, alpha=alpha_int, prefer_small_is_A=True)
-                                            A_time = set(cld_time.loc[cld_time["CLD"]=="A","rule"]) if not cld_time.empty else set()
+                                            A_time = set(cld_time.loc[cld_time["CLD"].str.contains("a", na=False),"rule"]) if not cld_time.empty else set()
                                             disp_time = d_time.groupby("rule")["value"].mean().rename("Time_mean(orig)")
 
                                         # --- PDR (작을수록 A; logit 분석, 표시는 원척도 평균) ---
@@ -3078,7 +3181,7 @@ with tabs[2]:
                                         else:
                                             d_pdr_tr, y_pdr, _ = _transform_for_metric(d_pdr, "PDR")
                                             means_pdr, cld_pdr, _ = _rcbd_posthoc_cld(d_pdr_tr, y_pdr, alpha=alpha_int, prefer_small_is_A=True)
-                                            A_pdr = set(cld_pdr.loc[cld_pdr["CLD"]=="A","rule"]) if not cld_pdr.empty else set()
+                                            A_pdr = set(cld_pdr.loc[cld_pdr["CLD"].str.contains("a", na=False),"rule"]) if not cld_pdr.empty else set()
                                             disp_pdr = d_pdr.groupby("rule")["value"].mean().rename("PDR_mean(orig)")
 
                                         # --- 집합 & 교집합 결과 표시 ---
@@ -3126,7 +3229,7 @@ with tabs[2]:
 # Data Tables 탭 (편집/읽기 분리 + 파일명 라벨)
 # ------------------------------
 with tabs[3]:
-    st.subheader("🧾 CSV Tables (Edit/Save)")
+    st.subheader("CSV Tables (Edit/Save)")
     bp = st.session_state.base_path
     exp = st.session_state.selected_exp
     coord = st.session_state.selected_coord
@@ -3152,7 +3255,7 @@ with tabs[3]:
                     st.success("Save complete")
             with c2:
                 if st.button("🔄 Refresh"):
-                    st.experimental_rerun()
+                    st.rerun()
             with c3:
                 yaml_path = find_yaml_in_coord(bp, exp, coord)
                 if yaml_path and st.button("▶️ Re-run with Modified Values"):
@@ -3230,7 +3333,7 @@ with tabs[4]:
 
 
     st.markdown("---")
-    st.markdown("### 📁 Project Path Setup")
+    st.markdown("### Project Path Setup")
 
     col_path, col_btn = st.columns([4, 1])
     with col_path:
@@ -3280,7 +3383,7 @@ with tabs[4]:
     # 실험 폴더 및 좌표 폴더 선택
     # ─────────────────────────────────────────────────────────────────
     st.markdown("---")
-    st.markdown("### 🗂️ Select Scenario")
+    st.markdown("### Select Scenario")
 
     # 실험/좌표 목록 만들기
     exps_rerun = list_experiments_any(bp_rerun)
@@ -3327,7 +3430,7 @@ with tabs[4]:
             # 현재 설정 표시
             # ─────────────────────────────────────────────────────────────────
             st.markdown("---")
-            st.markdown("### ⚙️ Current Config")
+            st.markdown("### Current Config")
 
             with st.expander("📋 View Current Scenario Config", expanded=False):
                 st.json(yaml_data_rerun)
@@ -3343,7 +3446,7 @@ with tabs[4]:
 
             # Ambulance 파라미터
             with col1:
-                st.markdown("**🚑 Ambulance**")
+                st.markdown("**Ambulance**")
                 amb_cfg_rerun = yaml_data_rerun.get('entity_info', {}).get('ambulance', {})
                 is_use_time_amb_rerun = st.checkbox(
                     "Use API Duration",
@@ -3378,7 +3481,7 @@ with tabs[4]:
 
             # UAV 파라미터
             with col2:
-                st.markdown("**🛩️ UAV**")
+                st.markdown("**UAV**")
                 uav_cfg_rerun = yaml_data_rerun.get('entity_info', {}).get('uav', {})
                 uav_velocity_rerun = st.number_input(
                     "UAV Speed (km/h)",
