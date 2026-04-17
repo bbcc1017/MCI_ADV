@@ -82,7 +82,7 @@ MCI_ADV/
 │           └── results_(lat,lon)_stat.txt # 통계 요약
 │
 ├── experiment_logs/                       # 실행 로그
-│   └── (lat,lon)_YYYYMMDD_HHMMSS.txt
+│   └── (lat,lon)_YYYYMMDD_HHMMSS.txt     # 시나리오 생성(SCENARIO_GEN_START) 또는 시뮬레이션(SIM_START) 로그
 │
 ├── experiment_1/                          # 논문 배치 실험 파이프라인
 │   ├── generate_coords.py                # 한국 육지 좌표 1000개 생성
@@ -134,7 +134,7 @@ MCI_ADV/
 │                                                                              │
 │  Orchestrator.run_simulation(config_path)                                    │
 │                     ↓                                                        │
-│  main.py --config_path config.yaml                                           │
+│  main.py --config_path config.yaml [--trace]                                 │
 │                     ↓                                                        │
 │  RunManager 초기화                                                            │
 │    ├─ ScenarioManager: 개체 설정 로드 (환자, 병원, 구급차, UAV)                │
@@ -153,7 +153,8 @@ MCI_ADV/
 │                     ↓                                                        │
 │  results/exp_{...}/(lat,lon)/                                                │
 │    ├─ results_(lat,lon).txt       (RAW 데이터)                               │
-│    └─ results_(lat,lon)_stat.txt  (통계: 평균, 표준편차, 95% CI)              │
+│    ├─ results_(lat,lon)_stat.txt  (통계: 평균, 표준편차, 95% CI)              │
+│    └─ trace_(lat,lon).json        (환자별 트레이스, --trace 옵션 시)           │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 
@@ -196,6 +197,15 @@ MCI_ADV/
 │    │                                                                         │
 │    ├─ Rerun 탭                                                               │
 │    │     └─ 기존 YAML 기반 시뮬레이션 재실행                                  │
+│    │                                                                         │
+│    ├─ ResultsCompare 페이지 (pages/ResultsCompare.py)                        │
+│    │     ├─ 다수 좌표 간 결과 비교                                           │
+│    │     ├─ Composite Score 및 Tier 분류                                     │
+│    │     └─ Cross-Scenario Meta-Analysis                                     │
+│    │           ├─ Kendall's W (순위 일치도)                                   │
+│    │           ├─ Forest Plot (rule별 평균 ± CI across locations)             │
+│    │           ├─ Stability Index (rule의 상위 유지율)                        │
+│    │           └─ Rule × Location 교호작용 검정                               │
 │    │                                                                         │
 │    └─ Generate 페이지 (pages/Generate.py)                                    │
 │          ├─ 카카오 API 키 입력                                                │
@@ -278,7 +288,10 @@ RunManager (main.py)
 │   └── EventManager
 │       ├── event_queue: heapq  ← 우선순위 큐 (시간순)
 │       ├── events: onset, p_rescue, amb_arrival_site, ...
-│       └── time: 시뮬레이션 시계
+│       ├── time: 시뮬레이션 시계
+│       ├── enable_trace: bool  ← --trace 플래그 시 활성화
+│       ├── trace_log: list     ← 환자별 이벤트 기록
+│       └── get_trace(): dict   ← 트레이스 데이터 반환
 │
 ├── RuleManager
 │   └── rules: List[Universal_Rule]  ← 64개 정책 조합
@@ -471,11 +484,11 @@ Index,init_distance,hospital_name
 ...
 ```
 
-#### routes/*.json (카카오 API 응답)
+#### routes/*.json (경로 데이터 — Kakao 또는 OSRM)
 ```json
 {
   "meta": {
-    "api_provider": "kakao",
+    "api_provider": "kakao",   // "kakao" 또는 "osrm"
     "route_type": "center2site",
     "source_index": 0,
     "name": "영등포소방서",
@@ -673,19 +686,36 @@ streamlit run pages/Generate.py
 - **Iteration 선택**: 반복 횟수 중 선택
 - **환자 요약표**: 구조시각 → 이송수단 → 병원 → 도착시각 → 치료완료
 - **이벤트 테이블**: 전체 시뮬레이션 이벤트 타임라인
+- **Patient Story Animation**: 환자별 상태 변화를 시간축 위에 색상 바로 시각화 (Waiting → Rescued → Transport → Hospital → Completed)
+- **Simulation Trace Replay**: `--trace` 플래그로 실행한 시뮬레이션의 per-patient Gantt chart (trace_*.json 필요)
+  - 환자별 구조 → 이송 → 병원 도착 → 치료 시작 → 완료까지 타임라인
+  - 중증도별 색상 구분 (Red/Yellow/Green/Black)
+  - 이벤트 요약 통계 (Rescues, Transports, Arrivals, Diversions, Completed)
 
 #### 3. Maps 탭
-- **테마**: Light / Dark
-- **경로 표시**:
-  - AMB C→S (안전센터 → 사고지점): 실선, 혼잡도 색상
-  - AMB S→H (사고지점 → 병원): 실선
-  - UAV 출동: 점선 (상급종합병원 → 사고지점)
-  - UAV 이송: 점선 (사고지점 → 병원)
-- **범례**: 혼잡도 색상 + AMB/UAV 속도 표시
-- **팝업**: 클릭 시 거리(km), 시간(min) 표시
+- **모드 전환**: Static Map / Animation 라디오 버튼
+- **Static Map 모드**:
+  - **테마**: Light / Dark
+  - **경로 표시**:
+    - AMB C→S (안전센터 → 사고지점): 실선, 혼잡도 색상
+    - AMB S→H (사고지점 → 병원): 실선
+    - UAV 출동: 점선 (상급종합병원 → 사고지점)
+    - UAV 이송: 점선 (사고지점 → 병원)
+  - **범례**: 혼잡도 색상 + AMB/UAV 속도 표시
+  - **팝업**: 클릭 시 거리(km), 시간(min) 표시
+- **Animation 모드** (시뮬레이션 로그 기반):
+  - 시뮬레이션 로그 파일 선택 (시나리오 생성 로그는 자동 제외)
+  - Rule/Iteration 선택
+  - **이모지 마커**: 🚑 AMB, 🚁 UAV, 🛑 대기 환자, 🏥 치료 중, ✅ 치료 완료
+  - **실제 도로 경로**: route JSON 폴리라인을 따라 차량 이동
+  - **환자 탑승 표시**: 환자 이송 중 빨간 글로우 + 🧑‍⚕️ 오버레이
+  - **이동 방향 반영**: 경도 변화에 따라 이모지 좌우 반전
+  - **환자 클릭 팝업**: 환자 마커 클릭 시 이송 수단, 병원명, ER 대기 시간, 치료 시간, 총 체류 시간 팝업 표시
+  - **컨트롤 바** (지도 하단 외부): Play/Pause 버튼, Replay 버튼, 시간 슬라이더, 시간 표시
+  - 확대/축소/팬 지원 (재생 중에도 가능)
 
 #### 4. Analytics 탭
-- **서브탭 구조**: RAW Data | STAT Summary | ANOVA Suite
+- **서브탭 구조**: RAW Data | STAT Summary | ANOVA Suite | Pareto Dominance | Bootstrap / Non-Parametric | Power Analysis | Export
 - **지표 선택**: Reward, Time, PDR, Reward w.o.G, PDR w.o.G
 - **정렬 기준**: Reward↓, PDR↑, Time↑
 - **ANOVA 설계**:
@@ -704,6 +734,23 @@ streamlit run pages/Generate.py
 - **RCBD 가법성**: Tukey 1-df non-additivity test
 - **A그룹 교집합**: Reward↑ ∩ Time↓ ∩ PDR↓ 에서 letter 'a' 포함 시나리오 추천
 - **CRN 전제**: RCBD/Factorial 모드는 각 run 내 64개 rule이 동일 랜덤 시드를 공유한다고 가정
+- **Pareto Dominance** (Multi-Objective Analysis):
+  - 통계적 Pareto 효율성 분석: CLD 결과 기반 rule 간 지배 관계 판별
+  - 비지배 정렬 (Pareto Layer): Layer 0 = 최적 프론트
+  - 3D 산점도 (Reward × Time × PDR), Layer별 색상 구분
+  - Dominance 카운트 테이블 (각 rule이 지배/피지배하는 rule 수)
+- **Bootstrap / Non-Parametric** (정규성 위반 시 대안):
+  - BCa Bootstrap CI (scipy.stats.bootstrap): 편향 보정 가속 신뢰구간
+  - Friedman Test: RCBD 비모수 대안 + Conover 사후검정
+  - Kruskal-Wallis: One-way 비모수 대안 + Dunn 사후검정
+- **Power Analysis** (검정력 분석):
+  - 사후 검정력: 관측된 효과크기(η²)와 MSE 기반
+  - 사전 표본 크기 권장: 목표 검정력(0.8)에 필요한 n 계산
+  - 검정력 곡선 그래프 (n vs power)
+- **Export** (출판용 내보내기):
+  - ANOVA 테이블 LaTeX 형식 (APA 스타일)
+  - CLD 결과 LaTeX 테이블
+  - 전체 분석 번들 다운로드 (.txt)
 
 #### 5. Data Tables 탭
 - CSV 파일 선택 (파일명만 표시, 경로 숨김)
@@ -841,6 +888,11 @@ streamlit run pages/Generate.py
 # 3. 시뮬레이션 직접 실행 (CLI)
 cd src/sim_src
 python main.py --config_path /path/to/config.yaml
+
+# 4. 시뮬레이션 + 환자별 트레이스 로깅
+cd src/sim_src
+python main.py --config_path /path/to/config.yaml --trace
+# → results/ 폴더에 trace_*.json 생성 (Scenarios 탭 Trace Replay에서 시각화)
 ```
 
 ### Streamlit Cloud 배포

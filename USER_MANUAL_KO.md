@@ -130,7 +130,7 @@ MCI_ADV/
 │   │   └── MCIEnvironment_gymnasium.py  # Gymnasium 환경 래퍼
 │   │
 │   └── vis_src/                    # 대시보드 및 시각화
-│       ├── MCI_Streamlit.py        # 메인 대시보드 (3500+ 라인)
+│       ├── MCI_Streamlit.py        # 메인 대시보드 (~5000 라인)
 │       └── pages/
 │           ├── Generate.py         # 시나리오 생성 UI
 │           ├── ResultsCompare.py   # 다좌표 결과 비교
@@ -199,6 +199,10 @@ python src/sce_src/make_csv_yaml_dynamic.py \
 
 # 2단계: 시뮬레이션 실행
 python src/sim_src/main.py --config_path scenarios/exp_.../config_(lat,lon).yaml
+
+# 2b단계 (선택): 환자별 트레이스 로깅과 함께 실행
+python src/sim_src/main.py --config_path scenarios/exp_.../config_(lat,lon).yaml --trace
+# → results/ 폴더에 trace_*.json 생성 (Scenarios 탭 Trace Replay에서 시각화)
 ```
 
 ---
@@ -315,7 +319,14 @@ RunManager (main.py)
 4. 경과 시간 기반 생존확률 계산
 5. 지표 기록: Reward, Time, PDR, Reward_woG, PDR_woG
 
-### 7.4 전원(Diversion) 규칙
+### 7.4 트레이스 로깅 (`--trace`)
+
+`python main.py --config_path <config.yaml> --trace`로 실행하면 환자별 이벤트 트레이스를 기록합니다:
+- 기록 이벤트: onset, rescue, transport_start, hospital_arrival, diversion, care_start, care_complete
+- 출력: results 디렉토리에 `trace_*.json` 생성
+- 시각화: Scenarios 탭 → Simulation Trace Replay (Gantt chart)
+
+### 7.5 전원(Diversion) 규칙
 
 병원 용량 초과 시 환자를 다른 병원으로 전원합니다:
 - 구급차 환자: 환자 중증도에 맞는 가장 가까운 가용 병원으로 이송
@@ -345,8 +356,16 @@ streamlit run src/vis_src/MCI_Streamlit.py
 - **실험 로그 뷰어**: 좌표별 로그 필터링
 - **환자 타임라인**: 구조시각, 이송수단, 병원, 도착시각, 치료완료 시각
 - **이벤트 테이블**: 전체 이벤트 로그 (Rule/Iteration 필터 가능)
+- **Patient Story Animation**: 환자별 상태 변화를 시간축 위에 색상 바로 시각화 (Waiting → Rescued → Transport → Hospital → Completed)
+- **Simulation Trace Replay**: `--trace` 플래그로 실행한 시뮬레이션의 환자별 Gantt chart (trace_*.json 필요)
+  - 환자별 구조 → 이송 → 병원 도착 → 치료 시작 → 완료까지 타임라인
+  - 중증도별 색상 구분 (Red/Yellow/Green/Black)
+  - 이벤트 요약 통계 (Rescues, Transports, Arrivals, Diversions, Completed)
 
 #### Maps 탭
+상단 라디오 버튼으로 두 가지 모드 전환:
+
+**Static Map 모드:**
 - **인터랙티브 Folium 지도**: 경로 시각화
 - **구급차 경로**: 소방서→사고지점 (보라색), 사고지점→병원 (청록색)
 - **UAV 경로**: 헬기장 병원→사고지점 (출동), 사고지점→병원 (이송)
@@ -354,9 +373,21 @@ streamlit run src/vis_src/MCI_Streamlit.py
 - **경로 정보 팝업**: 거리(km), 소요시간(분)
 - 표시 경로 멀티셀렉트 (렌더링 성능을 위한 제한 가능)
 
+**Animation 모드** (시뮬레이션 로그 기반):
+- 시뮬레이션 로그 파일 선택 (시나리오 생성 로그는 자동 제외)
+- Rule/Iteration 선택
+- **이모지 마커**: 🚑 AMB, 🚁 UAV, 🛑 대기 환자, 🏥 치료 중, ✅ 치료 완료
+- **실제 도로 경로**: route JSON 폴리라인(Kakao/OSRM)을 따라 차량 이동
+- **환자 탑승 표시**: 환자 이송 중 빨간 글로우 + 🧑‍⚕️ 오버레이
+- **이동 방향 반영**: 경도 변화에 따라 이모지 좌우 반전
+- **환자 클릭 팝업**: 환자 마커 클릭 시 이송 수단, 병원명, ER 대기(핸드오버) 시간, 치료 시간, 총 체류 시간 팝업 표시
+- **컨트롤 바** (지도 하단 외부): Play/Pause 버튼, Replay 버튼, 시간 슬라이더, 시간 표시
+- 확대/축소/팬 지원 (재생 중에도 가능)
+- 프레임 수 슬라이더 조절 (30~300 프레임)
+
 #### Analytics 탭
 
-3개 서브탭으로 구성: **RAW Data** | **STAT Summary** | **ANOVA Suite**
+7개 서브탭으로 구성: **RAW Data** | **STAT Summary** | **ANOVA Suite** | **Pareto Dominance** | **Bootstrap / Non-Parametric** | **Power Analysis** | **Export**
 
 - **RAW Data**: 각 메트릭의 반복별 원시값 (Reward, Time, PDR, Reward w.o.G, PDR w.o.G)
 - **STAT Summary**: 시나리오별 평균, 표준편차, 95% CI + 시나리오 순위 (Reward↓, PDR↑, Time↑ 정렬)
@@ -373,6 +404,23 @@ streamlit run src/vis_src/MCI_Streamlit.py
   - **등분산 검정**: Levene (Brown-Forsythe variant, center=median)
   - **RCBD 가법성**: Tukey 1-df 비가법성 검정
   - **A그룹 교집합**: Reward↑ ∩ Time↓ ∩ PDR↓ 세 지표 모두에서 최상위 CLD 그룹(문자 'a' 포함) 시나리오 추천
+- **Pareto Dominance** (다목적 최적화 분석):
+  - 통계적 Pareto 효율성: CLD 결과 기반 rule 간 지배 관계 판별
+  - 비지배 정렬 (Pareto Layer): Layer 0 = 최적 프론트
+  - 3D 산점도 (Reward × Time × PDR), Layer별 색상 구분
+  - Dominance 카운트 테이블 (각 rule이 지배/피지배하는 rule 수)
+- **Bootstrap / Non-Parametric** (정규성 위반 시 대안):
+  - BCa Bootstrap CI (`scipy.stats.bootstrap`): 편향 보정 가속 신뢰구간
+  - Friedman Test: RCBD 비모수 대안 + Conover 사후검정
+  - Kruskal-Wallis: One-way 비모수 대안 + Dunn 사후검정
+- **Power Analysis** (검정력 분석):
+  - 사후 검정력: 관측된 효과크기(η²)와 MSE 기반
+  - 사전 표본 크기 권장: 목표 검정력(0.8)에 필요한 n 계산
+  - 검정력 곡선 그래프 (n vs power)
+- **Export** (출판용 내보내기):
+  - ANOVA 테이블 LaTeX 형식 (APA 스타일)
+  - CLD 결과 LaTeX 테이블
+  - 전체 분석 번들 다운로드 (.txt)
 
 #### Data Tables 탭
 - 시나리오 CSV 파일 직접 편집
@@ -395,6 +443,12 @@ streamlit run src/vis_src/MCI_Streamlit.py
 #### Results Compare (`pages/ResultsCompare.py`)
 - 다수 좌표 간 결과 비교
 - 메트릭 나란히 비교
+- Composite Score 및 Tier 분류 (A/B/C)
+- **Cross-Scenario Meta-Analysis**:
+  - Kendall's W 일치도 계수 (위치 간 순위 일치도)
+  - Forest Plot (rule별 평균 ± CI across locations)
+  - Stability Index (rule이 상위 유지되는 비율)
+  - Rule × Location 교호작용 검정 (이원 ANOVA)
 
 #### Batch Experiment (`pages/BatchExperiment.py`)
 - 5단계 워크플로우: 좌표 생성 → 확인 → 실행 → 진행 현황 → 시각화

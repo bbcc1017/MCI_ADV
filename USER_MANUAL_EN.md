@@ -130,7 +130,7 @@ MCI_ADV/
 │   │   └── MCIEnvironment_gymnasium.py  # Gymnasium environment wrapper
 │   │
 │   └── vis_src/                    # Dashboard & Visualization
-│       ├── MCI_Streamlit.py        # Main dashboard (3500+ lines)
+│       ├── MCI_Streamlit.py        # Main dashboard (~5000 lines)
 │       └── pages/
 │           ├── Generate.py         # Scenario generation UI
 │           ├── ResultsCompare.py   # Multi-coordinate result comparison
@@ -199,6 +199,10 @@ python src/sce_src/make_csv_yaml_dynamic.py \
 
 # Step 2: Run simulation
 python src/sim_src/main.py --config_path scenarios/exp_.../config_(lat,lon).yaml
+
+# Step 2b (optional): Run with per-patient trace logging
+python src/sim_src/main.py --config_path scenarios/exp_.../config_(lat,lon).yaml --trace
+# → Generates trace_*.json in results/ for Trace Replay visualization
 ```
 
 ---
@@ -315,7 +319,14 @@ For each rule (64 total) x each sample (N repetitions):
 4. Calculate survival probability based on elapsed time
 5. Record metrics: Reward, Time, PDR, Reward_woG, PDR_woG
 
-### 7.4 Diversion Rule
+### 7.4 Trace Logging (`--trace`)
+
+When run with `python main.py --config_path <config.yaml> --trace`, the simulation records per-patient event traces:
+- Events captured: onset, rescue, transport_start, hospital_arrival, diversion, care_start, care_complete
+- Output: `trace_*.json` in the results directory
+- Visualization: Scenarios tab → Simulation Trace Replay (Gantt chart)
+
+### 7.5 Diversion Rule
 
 When a hospital reaches capacity, patients are diverted:
 - AMB patients: transferred to nearest available hospital (any tier matching patient severity)
@@ -345,8 +356,16 @@ The dashboard opens at `http://localhost:8501`.
 - **Experiment logs viewer**: Filter by coordinate
 - **Patient timeline**: Rescue time, transport vehicle, hospital, arrival, treatment completion
 - **Event table**: Full event log with Rule/Iteration filter
+- **Patient Story Animation**: Visual timeline of each patient's state progression (Waiting → Rescued → Transport → Hospital → Completed) using color-coded bars
+- **Simulation Trace Replay**: Per-patient Gantt chart from `--trace` data (requires running simulation with `--trace` flag)
+  - Gantt bars for each patient: rescue → transport → hospital arrival → treatment start → completion
+  - Color-coded by severity (Red/Yellow/Green/Black)
+  - Summary statistics (Rescues, Transports, Arrivals, Diversions, Completed)
 
 #### Maps Tab
+Two modes available via radio toggle at top:
+
+**Static Map Mode:**
 - **Interactive Folium map** with route visualization
 - **Ambulance routes**: Fire station -> Incident site (purple), Incident site -> Hospital (teal)
 - **UAV routes**: Helipad hospital -> Incident site (dispatch), Incident site -> Hospital (transport)
@@ -354,9 +373,21 @@ The dashboard opens at `http://localhost:8501`.
 - **Route info popups**: Distance (km), duration (min)
 - Multi-select for displayed routes (limit to prevent rendering slowdown)
 
+**Animation Mode** (simulation log-based):
+- Select simulation log file (scenario generation logs are automatically filtered out)
+- Choose Rule and Iteration to replay
+- **Emoji markers on map**: 🚑 AMB, 🚁 UAV, 🛑 Waiting patient, 🏥 In treatment, ✅ Completed
+- **Road-following movement**: Vehicles move along actual route JSON polylines (Kakao/OSRM)
+- **Patient carrying indicator**: Red glow effect + 🧑‍⚕️ overlay when transporting a patient
+- **Directional emoji**: Emoji flips horizontally based on movement direction (west = flip)
+- **Patient click popup**: Click any patient marker to view transport vehicle, hospital name, ER wait (handover) time, treatment time, and total hospital stay
+- **Control bar** (below map, outside legend area): Play/Pause, Replay, time slider, time display
+- Full zoom/pan support during playback
+- Frame count adjustable via slider (30-300 frames)
+
 #### Analytics Tab
 
-Organized into three sub-tabs: **RAW Data**, **STAT Summary**, and **ANOVA Suite**.
+Organized into seven sub-tabs: **RAW Data**, **STAT Summary**, **ANOVA Suite**, **Pareto Dominance**, **Bootstrap / Non-Parametric**, **Power Analysis**, and **Export**.
 
 - **RAW Data**: Per-run values for each metric (Reward, Time, PDR, Reward w.o.G, PDR w.o.G)
 - **STAT Summary**: Mean, StdDev, 95% CI for all scenarios + Scenario Ranking (sort by Reward↓, PDR↑, Time↑)
@@ -373,6 +404,23 @@ Organized into three sub-tabs: **RAW Data**, **STAT Summary**, and **ANOVA Suite
   - **Homoscedasticity**: Levene test (Brown-Forsythe variant, center=median)
   - **RCBD additivity**: Tukey 1-df non-additivity test
   - **A-Group Intersection**: Identifies scenarios in the best CLD group (letter 'a') across Reward↑, Time↓, and PDR↓ simultaneously
+- **Pareto Dominance** (Multi-Objective Analysis):
+  - Statistical Pareto efficiency: rule A dominates B iff A is significantly better on ≥1 metric AND not significantly worse on any
+  - Non-dominated sorting into Pareto layers (Layer 0 = optimal front)
+  - 3D scatter plot (Reward × Time × PDR) with layer coloring
+  - Dominance count table (how many rules each rule dominates/is dominated by)
+- **Bootstrap / Non-Parametric** (robust alternatives when normality is violated):
+  - BCa Bootstrap CI (`scipy.stats.bootstrap`): bias-corrected accelerated confidence intervals
+  - Friedman Test: non-parametric RCBD alternative + Conover post-hoc
+  - Kruskal-Wallis: non-parametric one-way alternative + Dunn post-hoc
+- **Power Analysis**:
+  - Post-hoc power from observed η² and MSE
+  - Prospective sample size recommendation for target power (0.8)
+  - Power curve plot (n vs. power)
+- **Export** (publication-quality output):
+  - ANOVA tables in LaTeX (APA format)
+  - CLD tables in LaTeX
+  - Full analysis bundle download (.txt)
 
 #### Data Tables Tab
 - View and edit scenario CSV files directly
@@ -395,6 +443,12 @@ Organized into three sub-tabs: **RAW Data**, **STAT Summary**, and **ANOVA Suite
 #### Results Compare (`pages/ResultsCompare.py`)
 - Compare results across multiple coordinates
 - Side-by-side metric comparison
+- Composite score and tier classification (A/B/C)
+- **Cross-Scenario Meta-Analysis**:
+  - Kendall's W concordance coefficient (ranking agreement across locations)
+  - Forest plot (per-rule mean ± CI across locations)
+  - Stability index (fraction of locations where a rule stays in top tier)
+  - Rule × Location interaction test (two-way ANOVA)
 
 #### Batch Experiment (`pages/BatchExperiment.py`)
 - 5-step workflow: Generate Coords -> View -> Run -> Progress -> Visualize

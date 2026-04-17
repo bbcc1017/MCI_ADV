@@ -1,6 +1,7 @@
 import argparse
 import yaml
 import os
+import json
 import random
 import numpy as np
 import time
@@ -13,6 +14,8 @@ from MCIEnvironment_gymnasium import MCIEnvironment_gym
 # parser 객체 생성 및 등록
 parser = argparse.ArgumentParser(description='Run MCI_simulation')
 parser.add_argument('--config_path', default="./config.yaml", help='configuration file(.yaml) 경로')
+parser.add_argument('--trace', action='store_true', default=False,
+                    help='Enable per-patient trace logging (saves trace JSON)')
 args = parser.parse_args()
 
 
@@ -46,7 +49,12 @@ class RunManager():
         # 1. 데이터 읽어서 시나리오 생성
         self.s_manager = ScenarioManager(configs, rng=rng)
         scenario = self.s_manager.scenario
-        
+
+        # Enable trace logging if requested
+        self.enable_trace = getattr(args, 'trace', False)
+        if self.enable_trace:
+            scenario['EventManager'].enable_trace = True
+
         # 2. Rule 생성
         # configs: rule_name
         self.r_manager = RuleManager(configs['rule_info'], scenario=scenario, rng=rng) # Rule 객체 모음 return?
@@ -62,6 +70,13 @@ class RunManager():
         output, output_stat = self.run(self.env, self.rules, totalSamples)
         np.savetxt(os.path.join(output_path, "results_{0}.txt".format(exp_indicator)), output, fmt='%s', delimiter="  ")
         np.savetxt(os.path.join(output_path, "results_{0}_stat.txt".format(exp_indicator)), output_stat, fmt='%s', delimiter="  ")
+
+        # Save trace data if enabled
+        if self.enable_trace and hasattr(self, '_all_traces') and self._all_traces:
+            trace_path = os.path.join(output_path, "trace_{0}.json".format(exp_indicator))
+            with open(trace_path, 'w', encoding='utf-8') as f:
+                json.dump(self._all_traces, f, indent=2, default=str)
+            print(f"Trace saved to {trace_path}")
 
     def set_random_seed(self, seed):
         seed += self.init_random_seed
@@ -90,6 +105,7 @@ class RunManager():
         rule_names = np.array([rule.rule_name for rule in rules])
 
         action_logs = []
+        self._all_traces = {}
         for iter in range(1, totalSamples + 1):
             print("Iter :", iter)
             action_log = {'red_uav': 0, 'red_amb': 0, 'yellow_uav': 0, 'yellow_amb': 0, 'green': 0}
@@ -133,8 +149,10 @@ class RunManager():
                     # print(obs['num_amb'],obs['num_uav'])
                     # print("이번 의사결정시점 생존율 합: ", reward, "현재 시각", info['time'])
                 action_logs.append(action_log)
-                # print("전체 생존율 합: ", cumul_reward, "MCI 종료 시각", info['time'])
-                # print("{}-{}번째 시뮬레이션 끝".format(iter,r_idx))
+                # Collect trace if enabled
+                if self.enable_trace:
+                    trace_key = f"{rules[r_idx].rule_name}__iter{iter}"
+                    self._all_traces[trace_key] = env.ev_manager.get_trace()
                 results_rew[r_idx, iter - 1] = cumul_reward
                 results_time[r_idx, iter - 1] = info['time']
                 results_pdr[r_idx, iter - 1] = safe_pdr(cumul_reward, env.preventable)
