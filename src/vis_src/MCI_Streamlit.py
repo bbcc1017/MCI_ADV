@@ -377,11 +377,17 @@ def list_experiments_any(base_path: str) -> List[str]:
 # --- NEW: 특정 실험의 좌표 목록 (scenarios 기준) ---
 @st.cache_data(ttl=60)
 def list_coords_from_scenarios(base_path: str, exp_id: str) -> List[str]:
-    root = Path(base_path) / "scenarios" / exp_id
-    if not root.is_dir():
+    scn_root = Path(base_path) / "scenarios" / exp_id
+    res_root = Path(base_path) / "results" / exp_id
+    if not scn_root.is_dir():
         return []
-    items = [p.name for p in root.iterdir() if p.is_dir() and re.match(r"^\(.*\)$", p.name)]
-    items.sort()
+    scn_coords = {p.name for p in scn_root.iterdir() if p.is_dir() and re.match(r"^\(.*\)$", p.name)}
+    # results 폴더가 있으면 성공한 좌표만 필터링
+    if res_root.is_dir():
+        res_coords = {p.name for p in res_root.iterdir() if p.is_dir() and re.match(r"^\(.*\)$", p.name)}
+        items = sorted(scn_coords & res_coords)
+    else:
+        items = sorted(scn_coords)
     return items
 
 
@@ -2282,9 +2288,11 @@ with tabs[0]:
                 "Duration(min)": round(duration_min, 1)
             })
         uav_out_df = pd.DataFrame(uav_out_rows)
+        if uav_out_df.empty:
+            uav_out_df = pd.DataFrame(columns=["Index","Hospital","Grade Code","Hospital Grade","Distance(km)","Duration(min)"])
 
         if "uav_c2s_sel_idx" not in st.session_state:
-            st.session_state.uav_c2s_sel_idx = set(uav_out_df["Index"].tolist())
+            st.session_state.uav_c2s_sel_idx = set(uav_out_df["Index"].tolist()) if not uav_out_df.empty else set()
 
         f1, f2 = st.columns(2)
         if f1.button("UAV Dispatch Select All"):
