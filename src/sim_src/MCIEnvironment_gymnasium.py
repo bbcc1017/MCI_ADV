@@ -1,6 +1,8 @@
 import gymnasium as gym
 import numpy as np
 import math
+import io
+import contextlib
 
 # from gym import spaces
 # import pandas as pd
@@ -18,7 +20,10 @@ class MCIEnvironment_gym(gym.Env):
         self.rule_test = rule_test
         self.eval_mode = eval_mode
         self.pen_size = 1.0  # Default: 1.0
-        self.reset()
+        # 초기화용 throw-away reset: 본 루프(main.py)에서 어차피 다시 reset() 호출하므로
+        # 여기서 발생하는 EventManager 디버그 출력을 stdout에 남기지 않음.
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.reset()
 
     def set_seed(self, rng):
         self.rng = rng

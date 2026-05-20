@@ -722,6 +722,7 @@ def parse_log_blocks(log_text: str) -> List[Dict]:
     blocks = []
     cur_iter = None                         # ← [추가] 현재 Iter 저장
     cur = {"rule": "(Unlabeled)", "iter": cur_iter, "events": [], "actions": []}  # ← [변경]
+    seen_first_iter = False  # 첫 "Iter : N" 만나기 전 라인(env __init__ 시 throw-away reset 출력) 무시
 
     for raw in log_text.splitlines():
         s = raw.strip()
@@ -732,9 +733,14 @@ def parse_log_blocks(log_text: str) -> List[Dict]:
         miter = ITER_RE.match(s)
         if miter:
             cur_iter = int(miter.group(1))
+            seen_first_iter = True
             # 진행 중 블록에도 iter 주입(없으면/None이면 갱신)
             if "iter" not in cur or cur.get("iter") is None:
                 cur["iter"] = cur_iter
+            continue
+
+        # 첫 Iter 만나기 전의 라인들은 본 시뮬레이션 결과가 아니므로 폐기
+        if not seen_first_iter:
             continue
 
         mhead = RULE_HEADER_RE.match(s)
