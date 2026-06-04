@@ -1872,9 +1872,23 @@ with tabs[1]:
                                 # per-selection key would force a fresh remount on
                                 # every switch and reintroduce the blank-on-mount.
                                 st.plotly_chart(fig_anim, width='stretch', key="patient_anim_chart")
-                                if not st.session_state.get("_anim_first_render_done"):
-                                    st.session_state["_anim_first_render_done"] = True
-                                    st.rerun()
+                                # Mobile-safe redraw nudge (replaces a full st.rerun()).
+                                # Animated Plotly charts drop their first draw on the
+                                # initial mount (frames not yet laid out), leaving the
+                                # chart blank. A full st.rerun() fixes that on desktop but
+                                # re-renders the Rule/Iter selectboxes mid-mount, which
+                                # races react-select on mobile and triggers React #185
+                                # ("Maximum update depth exceeded"). Instead, fire a
+                                # one-shot window 'resize' after mount: Plotly listens for
+                                # it and redraws the already-populated base figure — no
+                                # Streamlit rerun, so the select widgets are never touched.
+                                import streamlit.components.v1 as _stc
+                                _stc.html(
+                                    "<script>setTimeout(function(){"
+                                    "window.parent.dispatchEvent(new Event('resize'));"
+                                    "},150);</script>",
+                                    height=0,
+                                )
 
                                 # Legend
                                 _legend_md = " | ".join(

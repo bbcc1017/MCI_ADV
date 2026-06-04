@@ -1020,7 +1020,14 @@ coord_edited = st.data_editor(
         "lat": st.column_config.NumberColumn("Latitude", format="%.6f"),
         "lon": st.column_config.NumberColumn("Longitude", format="%.6f"),
         "address": st.column_config.TextColumn("Address", required=False),
-        "preset": st.column_config.SelectboxColumn("Preset", options=preset_names or ["Default"]),
+        # NOTE: SelectboxColumn renders a react-select inside the grid, which
+        # crashes on mobile (React #185, "Maximum update depth"). Use a plain
+        # TextColumn instead — type a preset name from the table above.
+        "preset": st.column_config.TextColumn(
+            "Preset",
+            help="Type a preset name from the Preset table above"
+            + (f" (e.g. {preset_names[0]})" if preset_names else ""),
+        ),
         "incident_size": st.column_config.NumberColumn("incident_size", step=1, format="%d"),
         "amb_count": st.column_config.NumberColumn("amb_count", step=1, format="%d"),
         "uav_count": st.column_config.NumberColumn("uav_count", step=1, format="%d"),
