@@ -3,7 +3,7 @@
 # -------------------------------------------------------------------------------------------------
 import os, re, yaml, shutil
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, time as dt_time
 from pathlib import Path
 import streamlit as st
 import pandas as pd
@@ -522,7 +522,7 @@ if "departure_date_value" not in st.session_state:
 if "departure_time_value" not in st.session_state:
     st.session_state.departure_time_value = datetime.now(KST).time()
 
-col_date, col_time = st.columns(2)
+col_date, col_h, col_m = st.columns([2, 1, 1])
 with col_date:
     departure_date = st.date_input(
         "Departure Date",
@@ -530,13 +530,22 @@ with col_date:
         help="Expected incident date",
         key="departure_date_input"
     )
-with col_time:
-    departure_time = st.time_input(
-        "Departure Time",
-        value=st.session_state.departure_time_value,
-        help="Expected incident time",
-        key="departure_time_input"
+# NOTE: st.time_input renders a react-select dropdown that crashes on mobile
+# (React #185, "Maximum update depth"). Use two number_inputs (hour/minute)
+# instead — no react-select, mobile-safe.
+with col_h:
+    _dep_hh = st.number_input(
+        "Hour", min_value=0, max_value=23, step=1,
+        value=int(st.session_state.departure_time_value.hour),
+        key="departure_hour_input", help="Expected incident time (0–23)"
     )
+with col_m:
+    _dep_mm = st.number_input(
+        "Minute", min_value=0, max_value=59, step=1,
+        value=int(st.session_state.departure_time_value.minute),
+        key="departure_minute_input"
+    )
+departure_time = dt_time(int(_dep_hh), int(_dep_mm))
 
 # 값이 변경되면 즉시 session_state에 저장 (한 번 클릭으로 업데이트)
 if departure_date != st.session_state.departure_date_value:
