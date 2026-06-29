@@ -1,8 +1,13 @@
 [theme]
+# base = "dark" makes Streamlit compute ALL derived colors (captions,
+# secondary/widget text, disabled text, borders) for a dark background.
+# Without it (default "light") those texts stay dark/faded and vanish
+# on the dark custom background.
+base = "dark"
 primaryColor = "#e2a04a"
 backgroundColor = "#141417"
 secondaryBackgroundColor = "#1c1c21"
-textColor = "#d4d4d8"
+textColor = "#e2e8f0"
 font = "sans serif"
 
 [server]

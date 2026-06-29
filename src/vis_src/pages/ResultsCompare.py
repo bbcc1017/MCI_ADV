@@ -308,6 +308,13 @@ hr { border-color: rgba(226, 160, 74, 0.08) !important; }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(226, 160, 74, 0.25); border-radius: 4px; }
+
+/* ── Captions / helper text: clearly visible on the dark bg (no faded/transparent look) ── */
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p,
+[data-testid="stCaptionContainer"] small {
+    color: #b6bcc8 !important;
+}
 </style>""", unsafe_allow_html=True)
 
 st.title("Simulation Results Comparison")

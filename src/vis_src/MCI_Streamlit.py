@@ -1561,6 +1561,13 @@ hr {
     border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+/* ── 캡션/도움말 텍스트: 어두운 배경에서 또렷하게 (흐릿/투명 방지) ── */
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p,
+[data-testid="stCaptionContainer"] small {
+    color: #b6bcc8 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 

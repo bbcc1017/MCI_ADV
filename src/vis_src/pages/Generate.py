@@ -58,9 +58,9 @@ h1, h2, h3, h4, h5, h6,
 [data-testid="stMarkdownContainer"] h2,
 [data-testid="stMarkdownContainer"] h3 {
     font-family: 'Outfit', sans-serif;
-    background: linear-gradient(135deg, #e2a04a 0%, #2dd4bf 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #e2e8f0;
+    -webkit-text-fill-color: #e2e8f0;
+    font-weight: 600;
 }
 .stApp, [data-testid="stAppViewContainer"],
 [data-testid="stHeader"] {
@@ -140,6 +140,13 @@ input:focus, textarea:focus,
 ::-webkit-scrollbar-track { background: #141417; }
 ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a40; }
+
+/* ── Captions / helper text: clearly visible on the dark bg (no faded/transparent look) ── */
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p,
+[data-testid="stCaptionContainer"] small {
+    color: #b6bcc8 !important;
+}
 </style>""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────
