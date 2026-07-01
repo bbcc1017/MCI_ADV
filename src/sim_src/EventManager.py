@@ -95,6 +95,14 @@ class EventManager():
                 print("NO AMB")
                 return False, False
 
+            # 0b. UAV는 헬기장 보유 병원에만 이송 가능 (도메인 기본 제약).
+            # mask 우회/제거 알고리즘이 non-helipad 행동을 선택해도 여기서 차단한다.
+            if mode == 1:
+                helipad_idx = self.properties['hospital'].get('hos_helipad_idx', np.array([]))
+                if (destination - 1) not in helipad_idx:
+                    print("NO HELIPAD")
+                    return False, False
+
             # 1. 현장 환자 수 변경
             try:
                 p_idx = self.status['patient']['p_wait'][p_class][0].pop()
@@ -483,7 +491,9 @@ class EventManager():
 
         transportation_t = self.sample_transportation_time(mode=0, origination=h_idx + 1, destination=destination)
         if destination == 0:
-            self.status['ambulance']['amb_states'][a_idx] = (destination, transportation_t, 0)
+            # 복귀 leg: 병원 handover(인계) 후 현장 복귀 → 상태 time 도 handover 포함해야
+            # amb_arrival_site 이벤트(transportation_t+handover_time)와 일치(obs 충실도).
+            self.status['ambulance']['amb_states'][a_idx] = (destination, transportation_t + handover_time, 0)
             self.add_event(transportation_t + handover_time, 'amb_arrival_site', (a_idx,))
         else:
             self.status['ambulance']['amb_states'][a_idx] = (destination, transportation_t, p_class + 1)
@@ -536,7 +546,8 @@ class EventManager():
 
         transportation_t = self.sample_transportation_time(mode=1, origination=h_idx + 1, destination=destination)
         if destination == 0:
-            self.status['uav']['uav_states'][u_idx] = (destination, transportation_t, 0)
+            # 복귀 leg: handover 후 현장 복귀 → 상태 time 도 handover 포함(obs 충실도, amb 와 동일).
+            self.status['uav']['uav_states'][u_idx] = (destination, transportation_t + handover_time, 0)
             self.add_event(transportation_t + handover_time, 'uav_arrival_site', (u_idx,))
         else:
             self.status['uav']['uav_states'][u_idx] = (destination, transportation_t, p_class + 1)
@@ -554,6 +565,7 @@ class EventManager():
         # 처치 완료 환자 상태 변경
         self.status['patient']['p_states'][p_idx, -1] = 1
         self._record_trace("care_complete", patient_id=int(p_idx), hospital_id=int(h_idx))
+        self.status['hospital']['h_states'][h_idx, -1] -= 1  # n_occupied -= 1 (퇴원 → 입원 정원 반환)
 
         n_idle, n_queue = self.status['hospital']['h_states'][h_idx][0:2]
         # 새로운 처치 시작

@@ -582,11 +582,14 @@ def results_raw_path(base_path: str, exp_id: str, coord: str) -> Optional[str]:
 @st.cache_data(ttl=300)
 def get_patient_count(base_path: str, exp_id: str, coord: str) -> Optional[int]:
     folder = Path(base_path) / "scenarios" / exp_id / coord
-    for cand in ["amb_info.csv", "amb_info_road.csv", "patient_info.csv"]:
+    for cand in ["amb_info.csv", "amb_info_road.csv", "amb_station_info.csv", "patient_info.csv"]:
         fp = folder / cand
         if fp.is_file():
             try:
                 df = read_csv_smart(str(fp))
+                # 신포맷 amb_station_info: 센터당 1행이므로 보유대수 합 = 구급차 총수(구 amb_info_road 행수와 동일)
+                if cand == "amb_station_info.csv" and "보유대수" in df.columns:
+                    return int(pd.to_numeric(df["보유대수"], errors="coerce").fillna(0).sum())
                 return len(df.index)
             except Exception:
                 pass
@@ -595,17 +598,64 @@ def get_patient_count(base_path: str, exp_id: str, coord: str) -> Optional[int]:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def _load_scenario_csvs(bp: str, exp: str, coord: str):
-    """Load & rename scenario CSVs (cached at top level)."""
+    """Load & rename scenario CSVs (cached at top level).
+
+    신포맷(통합 hospital_info.csv + amb_station_info.csv)과 구포맷(분리 파일) 모두 인식.
+    어느 포맷이든 동일한 6-튜플 (h, c, a, dr, he, de) 을 '구포맷 스키마'로 반환하므로
+    아래 소비 코드는 수정 불필요. 신포맷은 통합 파일에서 구포맷 데이터프레임을 복원한다."""
     base = Path(bp) / "scenarios" / exp / coord
     _KR_HOSP = {"종별코드":"Grade Code","요양기관명":"Hospital Name","수술실수":"ORs","병상수":"Beds","헬기장 여부":"Helipad"}
     _KR_AMB  = {"안전센터/소방서이름":"Fire Station","보유대수":"Fleet Size"}
+    _HCOLS   = ["Index","ORs","Beds","Grade Code","Hospital Name","Helipad"]
 
     def _read(p, enc=None):
         if not p.is_file(): return pd.DataFrame()
         return pd.read_csv(p, encoding=enc) if enc else pd.read_csv(p)
 
-    h = _read(base / "hospital_info_road.csv").rename(columns=_KR_HOSP)
     c = _read(Path(bp) / "scenarios" / "안전센터와 소방서.csv", "cp949")
+
+    integrated = base / "hospital_info.csv"
+    station = base / "amb_station_info.csv"
+    if integrated.is_file():
+        # ── 신포맷: 통합 파일에서 구포맷 스키마 복원 (모두 road 소요시간 정렬순, Index=병원 인덱스) ──
+        hi = _read(integrated)  # Index,수술실수,병상수,종별코드,요양기관명,헬기장 여부,euc_dist,road_dist,road_duration
+        hr = hi.rename(columns=_KR_HOSP)
+        h  = hr[[col for col in _HCOLS if col in hr.columns]].copy()
+        he = (hi.sort_values("euc_dist").reset_index(drop=True).rename(columns=_KR_HOSP)[
+                  [col for col in _HCOLS if col in hr.columns]].copy()
+              if "euc_dist" in hi.columns else h.copy())
+        dr = (pd.DataFrame({"Index": hi["Index"], "distance": hi["road_dist"], "duration": hi["road_duration"]})
+              if {"Index","road_dist","road_duration"}.issubset(hi.columns) else pd.DataFrame())
+        de = (pd.DataFrame({"Index": hi["Index"], "distance": hi["euc_dist"]})
+              if {"Index","euc_dist"}.issubset(hi.columns) else pd.DataFrame())
+
+        # amb_station_info(센터당 1행, 보유대수=count) → 구 amb_info_road(개별 구급차) 복원:
+        # 보유대수만큼 전개 후 YAML amb_num 만큼 슬라이스(없으면 전체). Index 는 0..N-1 재부여.
+        st_df = _read(station)
+        if not st_df.empty and "보유대수" in st_df.columns:
+            st_df = st_df.copy()
+            st_df["보유대수"] = pd.to_numeric(st_df["보유대수"], errors="coerce").fillna(1).astype(int).clip(lower=1)
+            amb_num = None
+            cfg_path = base / f"config_{coord}.yaml"
+            if cfg_path.is_file():
+                try:
+                    _cfg = yaml.safe_load(open(cfg_path, encoding="utf-8"))
+                    amb_num = (_cfg.get("entity_info", {}) or {}).get("ambulance", {}).get("amb_num")
+                except Exception:
+                    amb_num = None
+            a_exp = st_df.loc[st_df.index.repeat(st_df["보유대수"].values)].reset_index(drop=True)
+            if amb_num is not None:
+                a_exp = a_exp.head(int(amb_num)).reset_index(drop=True)
+            if "Index" in a_exp.columns:
+                a_exp = a_exp.drop(columns=["Index"])
+            a_exp.insert(0, "Index", range(len(a_exp)))
+            a = a_exp.rename(columns=_KR_AMB)
+        else:
+            a = st_df.rename(columns=_KR_AMB)
+        return h, c, a, dr, he, de
+
+    # ── 구포맷 (기존) ──
+    h = _read(base / "hospital_info_road.csv").rename(columns=_KR_HOSP)
     a = _read(base / "amb_info_road.csv").rename(columns=_KR_AMB)
     dr = _read(base / "distance_Hos2Site_road.csv")
     he = _read(base / "hospital_info_euc.csv").rename(columns=_KR_HOSP)
@@ -2982,7 +3032,11 @@ with tabs[0]:
                                     _pat_info[f"P{_pid}"] = _info
 
                                 # Serialize animation data
-                                _anim_payload = json.dumps({"ts": _time_steps, "v": _veh_data, "p": _pat_data, "pi": _pat_info}, ensure_ascii=False)
+                                # ensure_ascii=True: 이모지/한글을 \uXXXX 로 escape.
+                                # False로 두면 raw astral 이모지(🛑=D83D DED1 등)가 srcdoc 인코딩 중
+                                # 청크 경계에서 서로게이트쌍이 깨져 떠돌이 서로게이트가 주입됨 →
+                                # 큰 payload(최장 시뮬 룰)에서 JS SyntaxError → 애니메이션 공백.
+                                _anim_payload = json.dumps({"ts": _time_steps, "v": _veh_data, "p": _pat_data, "pi": _pat_info}, ensure_ascii=True)
                                 _map_var = m.get_name()
 
                                 # Inject Leaflet JS animation into the Folium map HTML
