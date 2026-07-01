@@ -120,11 +120,10 @@ class Universal_Rule(Rule):
 
             num_D = max(self.expected_Y - yellow_move,0) # yellow 환자 발생 예상 환자 수, yellow_count = yellow 환자 이송 수
             num_I = max(self.expected_R - red_move,0)
-            # self.tau = 71 - (0.5 * num_D * (self.theta_amb/self.K_amb + self.theta_uav/self.K_uav))
-            if self.K_uav > 0:
-                self.tau = 71 - (0.5 * num_D * (self.theta_amb/self.K_amb + self.theta_uav/self.K_uav))
-            else:
-                self.tau = 71 - (0.5 * num_D * (self.theta_amb/self.K_amb))
+            # K_amb=0(UAV-only) 또는 K_uav=0 어느 쪽이든 ZeroDivisionError 방지
+            amb_term = (self.theta_amb / self.K_amb) if self.K_amb > 0 else 0.0
+            uav_term = (self.theta_uav / self.K_uav) if self.K_uav > 0 else 0.0
+            self.tau = 71 - (0.5 * num_D * (amb_term + uav_term))
             
 
         red_exist = self.obs['p_wait'][0][0]
@@ -204,12 +203,8 @@ class Universal_Rule(Rule):
                     action[0] = 1
                 elif red_exist:  # Red 환자 있는 경우
                     action[0] = 0  # Red
-            # elif self.tau >= num_I * (self.theta_amb / self.K_amb + self.theta_uav / self.K_uav):  # 모든 red 보내고 yellow
-            # 수정: UAV=0 대응
-            elif (self.K_uav > 0 and 
-                  self.tau >= num_I * (self.theta_amb/self.K_amb + self.theta_uav/self.K_uav)) or \
-                 (self.K_uav == 0 and 
-                  self.tau >= num_I * (self.theta_amb/self.K_amb)):
+            # K_amb=0(UAV-only) 또는 K_uav=0 어느 쪽이든 안전하게 처리
+            elif self.tau >= num_I * (amb_term + uav_term):
                 if red_exist:  # Red 환자 있는 경우
                     action[0] = 0  # Red
                 elif yellow_exist:  # Yellow 환자 있는 경우
