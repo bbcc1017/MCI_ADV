@@ -249,8 +249,7 @@ class MCIEnvironment_gym(gym.Env):
         if any_amb or any_uav:
             # occ(통신)=입원 census+이송중 in-flight(도착 예상) / psent(단절)=누적 발송
             if _cap_gate_is_occ():
-                cap_used_arr = (full['h_states'][:, -1]
-                                + self.en_manager.in_flight_by_hospital(full, H))
+                cap_used_arr = full['h_states'][:, -1] + self._in_flight_vec(full, H)  # [고속화 S2-7]
             else:
                 cap_used_arr = full['p_sent']
             for h in range(H):
@@ -274,6 +273,17 @@ class MCIEnvironment_gym(gym.Env):
 
         return np.concatenate([m_class, m_dest, m_mode])
 
+    def _in_flight_vec(self, full, H):
+        """[고속화 S2-7] 이송중 대수 — EventManager 증분 카운터가 있으면 그걸 쓴다.
+
+        카운터는 `EventManager.start()` 이후에만 존재하므로(그 전 호출·구 시나리오 객체)
+        없으면 원본과 같은 전수 계산으로 되돌아간다. 값은 어느 쪽이든 동일하다.
+        """
+        cnt = getattr(self.ev_manager, "_in_flight_cnt", None)
+        if cnt is not None and len(cnt) == H:
+            return cnt
+        return self.en_manager.in_flight_by_hospital(full, H)
+
     def action_masks_joint(self):
         """
         Discrete(2*(H+1)*2) 형식의 결합 mask. env_wrapper.SB3DiscreteWrapper 가 사용.
@@ -291,26 +301,33 @@ class MCIEnvironment_gym(gym.Env):
         # in-flight(도착 예상, 수술완료 시 census 감소=완료 확인) | psent(통신 단절)=
         # 현장이 보낸 누적 발송. _cap_gate_is_occ/RuleManager:253 과 동일 정의(쌍비교 불변식).
         if _cap_gate_is_occ():
-            cap_used = (full['h_states'][:, -1]
-                        + self.en_manager.in_flight_by_hospital(full, H))
+            cap_used = full['h_states'][:, -1] + self._in_flight_vec(full, H)
         else:
             cap_used = full['p_sent']
 
         # UAV → helipad 보유 병원만. helipad_idx 가 비어있으면 UAV는 어떤 병원도 못 감.
+        # [고속화 S2-8] 병원 축을 벡터화. 원본은 2×(H+1)×2 파이썬 3중 루프였다.
+        #   허용 조건은 원본과 글자 그대로 같다:
+        #     AMB : cap_used[h] < max_send[h]
+        #     UAV : cap_used[h] < max_send[h] AND h 가 헬기장 보유
+        #   범위를 벗어난 helipad 인덱스는 원본에서도 `h in range(H)` 와 안 만나 무시된다.
         helipad_idx = np.asarray(hos_props.get('hos_helipad_idx', np.array([]))).reshape(-1)
-        helipad_set = {int(i) for i in helipad_idx.tolist()}
+        helipad_ok = np.zeros(H, dtype=bool)
+        if helipad_idx.size:
+            hp = helipad_idx.astype(np.intp)
+            hp = hp[(hp >= 0) & (hp < H)]
+            helipad_ok[hp] = True
+
+        cap_ok = np.asarray(cap_used)[:H] < np.asarray(max_send)[:H]
+        allow = (cap_ok, cap_ok & helipad_ok)          # (AMB, UAV)
+        mode_avail = (any_amb, any_uav)
 
         mask = np.zeros((2, H + 1, 2), dtype=bool)
+        mask[:, 0, :] = True                            # stay 는 항상 허용
         for c in range(2):
-            class_avail = len(full['p_wait'][c][0]) > 0
-            for m, mode_avail in enumerate([any_amb, any_uav]):
-                # stay 는 항상 허용
-                mask[c, 0, m] = True
-                if class_avail and mode_avail:
-                    for h in range(H):
-                        if cap_used[h] >= max_send[h]:
-                            continue
-                        if m == 1 and h not in helipad_set:
-                            continue  # UAV: 헬기장 없는 병원 금지
-                        mask[c, h + 1, m] = True
+            if len(full['p_wait'][c][0]) == 0:
+                continue
+            for m in range(2):
+                if mode_avail[m]:
+                    mask[c, 1:, m] = allow[m]
         return mask.reshape(-1)

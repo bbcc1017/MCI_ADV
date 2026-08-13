@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from EntityManager import EntityManager
+from .EntityManager import EntityManager
 
 
 def _cap_gate_is_occ():
@@ -61,6 +61,9 @@ class Rule:
         self.name = "Undefined Rule"
     def init_with_scenario(self, scenario):
         en_properties = scenario['EntityManager'].en_properties
+        # [고속화 S2-7] EntityManager 를 들고 있으면 EventManager 가 유지하는 이송중
+        # 증분 카운터를 재사용할 수 있다(값 동일). 없으면 원본대로 전수 계산한다.
+        self._en_manager = scenario['EntityManager']
 
         
     #     # 가까운 세 개 병원 왕복이동시간 평균으로 theta 값 계산
@@ -119,6 +122,18 @@ class Rule:
 
     def set_seed(self, rng):
         self.rng = rng
+
+    def in_flight(self, obs):
+        """[고속화 S2-7] 병원별 이송중 대수. EventManager 증분 카운터가 있으면 재사용.
+
+        카운터는 `EventManager.start()` 에서 만들어져 EntityManager 에 게시된다.
+        없으면(구 시나리오·미시작 상태) 원본과 같은 전수 계산으로 되돌아간다 — 값은 동일.
+        """
+        em = getattr(self, "_en_manager", None)
+        cnt = getattr(em, "_in_flight_cnt", None) if em is not None else None
+        if cnt is not None and len(cnt) == self.hos_num:
+            return cnt
+        return EntityManager.in_flight_by_hospital(obs, self.hos_num)
 
     def select(self, obs):
         """
@@ -285,8 +300,7 @@ class Universal_Rule(Rule):
             #                    + in_flight(그 병원으로 이송중=도착 예상 정보)
             #   psent(통신 단절) = p_sent(현장이 보낸 누적) — 현장 지득 정보만
             if _cap_gate_is_occ():
-                cap_used = (self.obs['h_states'][:, -1]
-                            + EntityManager.in_flight_by_hospital(self.obs, self.hos_num))
+                cap_used = self.obs['h_states'][:, -1] + self.in_flight(self.obs)  # [고속화 S2-7]
             else:
                 cap_used = self.obs['p_sent']
             if self.hos_select == "RedOnly":

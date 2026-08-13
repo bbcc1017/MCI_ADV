@@ -4,8 +4,8 @@ import pandas as pd
 import numpy as np
 import json
 
-from EntityManager import EntityManager
-from EventManager import EventManager
+from .EntityManager import EntityManager
+from .EventManager import EventManager
 class ScenarioManager():
     def __init__(self, configs, rng=None):
         if rng is not None:
@@ -74,6 +74,25 @@ class ScenarioManager():
                 raise NotImplementedError("사고 type 정보 반영은 아직 구현 전입니다.")
             assert math.isclose(patient_info['ratio'].sum(), 1.0), "환자 비율 합은 1이어야 합니다."
             reg_prop['patient_info'] = patient_info
+            # [고속화 S2-9] 시뮬 핫패스에서 쓰는 컬럼을 순수 파이썬으로 미리 뽑는다.
+            # 원본은 이벤트마다 `patient_info['treat_tier3'][p_class]` 같은 DataFrame→Series
+            # 라벨 조회를 했고 그게 전체의 약 5% 였다. `patient_info` 자체는 그대로 남겨
+            # RuleManager·ShinHeuristics 등 기존 소비자를 건드리지 않는다.
+            # 라벨(=인덱스) 조회를 위치 조회로 바꾸는 것이므로 기본 RangeIndex 를 전제한다.
+            idx = patient_info.index
+            if not (len(idx) == 0 or list(idx) == list(range(len(idx)))):
+                raise ValueError(
+                    "patient_info.csv 의 인덱스가 0..n-1 이 아니다 — 라벨 조회와 위치 조회가 "
+                    f"어긋나 결과가 달라진다: {list(idx)!r}")
+            reg_prop['patient_info_fast'] = {
+                'ratio': patient_info['ratio'].to_numpy(),
+                'rescue_param_alpha': patient_info['rescue_param_alpha'].tolist(),
+                'rescue_param_beta': patient_info['rescue_param_beta'].tolist(),
+                'treat_tier3': patient_info['treat_tier3'].tolist(),
+                'treat_tier2': patient_info['treat_tier2'].tolist(),
+                'treat_tier3_mean': patient_info['treat_tier3_mean'].tolist(),
+                'treat_tier2_mean': patient_info['treat_tier2_mean'].tolist(),
+            }
             # p_info_dict = patient_info.set_index("type").to_dict(orient="index")
             # reg_prop.update({'Red': p_info_dict['Red'],
             #                  'Yellow': p_info_dict['Yellow'],

@@ -84,6 +84,10 @@ class EntityManager():
         occ(입원 census, 수술완료 시 감소)에 아직 안 잡힌 예약 부하를 나타낸다.
         (2026-07-03 통신축 재정의: occ 게이트 = n_occupied + in_flight < max_send)
         """
+        # [고속화 S1-1] 차량별 파이썬 루프 → bincount. 값은 동일하다.
+        #   원본 순서를 그대로 보존한다: ① float 비교로 carrying 판정
+        #   ② astype(int) 절단 ③ 1..hos_num 범위 확인. 절단을 범위확인보다
+        #   먼저 하는 순서가 중요해서 그대로 뒀다.
         inflight = np.zeros(hos_num, dtype=np.int32)
         for key in ('amb_states', 'uav_states'):
             st = obs.get(key)
@@ -91,7 +95,10 @@ class EntityManager():
                 continue
             st = np.asarray(st)
             carrying = (st[:, 0] >= 1) & (st[:, 2] > 0)
-            for d in st[carrying, 0].astype(int):
-                if 1 <= d <= hos_num:
-                    inflight[d - 1] += 1
+            if not carrying.any():
+                continue
+            d = st[carrying, 0].astype(int)
+            keep = (d >= 1) & (d <= hos_num)
+            if keep.any():
+                inflight += np.bincount(d[keep] - 1, minlength=hos_num).astype(np.int32)
         return inflight

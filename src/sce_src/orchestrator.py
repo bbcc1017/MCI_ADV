@@ -506,6 +506,17 @@ def _pick_first_file(*candidates: Union[str, Path]) -> str:
     return str(candidates[0]) if candidates else ""
 
 
+
+def _run_log_enabled() -> bool:
+    """실행별 로그 파일(experiment_logs/<coord>_<ts>.txt) 기록 여부.
+
+    기본 켜짐 — 대시보드(Generate 페이지)가 결과 카드에 이 경로를 표시한다.
+    `MCI_WRITE_RUN_LOG=0` 으로 끄면 experiment_logs/ 에 아무것도 쓰지 않는다.
+    (시뮬 자체 로그 `sim_*.log` 는 별개이고 기본 꺼짐 — sim_src/main.py 의 --log 참조.)
+    """
+    return os.environ.get("MCI_WRITE_RUN_LOG", "1").strip().lower() not in ("0", "false", "off")
+
+
 def _resolve_runtime_paths(base_path: str) -> Dict[str, str]:
     root = Path(base_path).resolve()
     this_file = Path(__file__).resolve()
@@ -522,10 +533,17 @@ def _resolve_runtime_paths(base_path: str) -> Dict[str, str]:
         root / "main.py",
         this_src_dir / "sim_src" / "main.py",
     )
+    # 고속 실행경로 런처 (src/sim_src_upgrade). 결과는 main.py 와 비트동일하고 시간만 줄어든다.
+    # 없을 수도 있으므로(구 체크아웃) 존재 여부는 호출부에서 확인한다.
+    fast_launcher = _pick_first_file(
+        root / "src" / "sim_src_upgrade" / "drivers" / "run_sim_fast.py",
+        this_src_dir / "sim_src_upgrade" / "drivers" / "run_sim_fast.py",
+    )
 
     return {
         "make_script": make_script,
         "main_py": main_py,
+        "fast_launcher": fast_launcher,
     }
 
 
@@ -537,6 +555,7 @@ class Orchestrator:
         self.paths = {
             "make_script": runtime_paths["make_script"],
             "main_py": runtime_paths["main_py"],
+            "fast_launcher": runtime_paths.get("fast_launcher", ""),
             "scenarios":   os.path.join(self.base_path, "scenarios"),
             "results":     os.path.join(self.base_path, "results"),
             "logs":        os.path.join(self.base_path, "experiment_logs"),
@@ -642,7 +661,8 @@ class Orchestrator:
         if stderr.strip():
             log_head.append(f"--- stderr ---\n{stderr}\n")
         log_head.append(f"=== SCENARIO_GEN_END {now_kst_iso()} (elapsed: {elapsed}s) ===\n\n")
-        write_text(log_file, "".join(log_head), encoding="utf-8")
+        if _run_log_enabled():
+            write_text(log_file, "".join(log_head), encoding="utf-8")
 
         # Initial summary row (attempt not assigned yet → 0)
         row = {
@@ -697,8 +717,26 @@ class Orchestrator:
         }
 
     # ---------- simulation run ----------
-    def run_simulation(self, config_path: str, extra_env: Optional[Dict[str,str]] = None) -> Dict[str,Any]:
+    def run_simulation(self, config_path: str, extra_env: Optional[Dict[str,str]] = None,
+                       use_fast_core: Optional[bool] = None, trace: Optional[bool] = None,
+                       skip_preflight: bool = False) -> Dict[str,Any]:
+        """시뮬레이션 1회 실행.
 
+        Args:
+            use_fast_core: 고속 실행경로(`src/sim_src_upgrade/drivers/run_sim_fast.py`) 사용 여부.
+                **기본 None = 켬** — 대시보드에서 별도 설정 없이 자동 적용된다. 시뮬 로직은
+                `src/sim_src` 와 동일하고 연산시간만 줄어든다(결과·산출 파일 바이트 동일).
+                실행 전 G0 드리프트 검사 + 구·신 코어 소규모 동치검증이 자동으로 돌고,
+                불일치면 즉시 실패한다. 환경변수 `MCI_FAST_CORE=0` 으로 전역 비활성 가능.
+                런처 파일이 없으면 조용히 기존 `main.py` 경로로 폴백한다.
+            trace: `--trace`(환자별 trace JSON 저장) 전달 여부. **기본 None = 켬** —
+                대시보드 애니메이션이 trace JSON 을 쓰므로 항상 생성한다.
+            skip_preflight: 고속 경로의 사전 동치검증 생략(권장하지 않음).
+        """
+        if trace is None:
+            trace = True
+        if use_fast_core is None:
+            use_fast_core = os.environ.get("MCI_FAST_CORE", "1").strip().lower() not in ("0", "false", "off")
         if not exists_file(self.paths["main_py"]):
             raise FileNotFoundError(f"main.py not found: {self.paths['main_py']}")
         if not exists_file(config_path):
@@ -711,10 +749,22 @@ class Orchestrator:
 
         summary_main, summary_legacy = _summary_paths_pair(self.base_path, exp_id2)
 
-        cmd = [
-            self.python_cmd, "-X", "utf8", self.paths["main_py"],
-            "--config_path", config_path,
-        ]
+        sim_args = ["--config_path", config_path]
+        if trace:
+            sim_args.append("--trace")
+
+        launcher = self.paths.get("fast_launcher") or ""
+        if use_fast_core and not exists_file(launcher):
+            # 고속경로 자산이 없는 체크아웃 → 조용히 기존 경로로 폴백(결과 동일, 시간만 손해).
+            use_fast_core = False
+
+        if use_fast_core:
+            cmd = [self.python_cmd, "-X", "utf8", launcher]
+            if skip_preflight:
+                cmd.append("--skip_preflight")
+            cmd += ["--"] + sim_args
+        else:
+            cmd = [self.python_cmd, "-X", "utf8", self.paths["main_py"]] + sim_args
         env = os.environ.copy()
         if extra_env:
             env.update({str(k):str(v) for k,v in extra_env.items()})
@@ -752,7 +802,8 @@ class Orchestrator:
         # Per-run log file
         log_file = os.path.join(self.paths["logs"], f"{coord2}_{ts_short_now()}.txt")
         pieces = []
-        pieces.append(f"=== SIM_START {sim_started} ===\n")
+        pieces.append(f"=== SIM_START {sim_started} "
+                      f"(core={'fast' if use_fast_core else 'origin'}, trace={trace}) ===\n")
         if stdout_text:
             pieces.append(stdout_text)
             if not stdout_text.endswith("\n"):
@@ -760,7 +811,8 @@ class Orchestrator:
         if stderr_text.strip():
             pieces.append(f"--- stderr ---\n{stderr_text}\n")
         pieces.append(f"=== SIM_END {now_kst_iso()} (elapsed: {elapsed}s, rc={proc.returncode}) ===\n\n")
-        write_text(log_file, "".join(pieces), encoding="utf-8")
+        if _run_log_enabled():
+            write_text(log_file, "".join(pieces), encoding="utf-8")
 
         # proc 속성 호환을 위한 네임스페이스 (이하 코드가 proc.stdout 등을 참조하지 않으므로 불필요)
         class _ProcCompat:
@@ -899,4 +951,6 @@ class Orchestrator:
             "stderr": proc.stderr or "",
             "elapsed_sec": elapsed,
             "started_at": sim_started,
+            "sim_core": "fast" if use_fast_core else "origin",
+            "trace": bool(trace),
         }

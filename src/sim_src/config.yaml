@@ -39,6 +39,7 @@ event_info_path: "./src/sim_src/event_info.json"
 
 rule_info:
   isFullFactorial: True
+  include_standard: True
   priority_rule: ["START", "ReSTART"]
   hos_select_rule: ["RedOnly", "YellowNearest"] # ["RedOnly", "YellowHalf", "YellowNearest"]
   red_mode_rule: ["OnlyUAV", "Both_UAVFirst", "Both_AMBFirst", "OnlyAMB"]

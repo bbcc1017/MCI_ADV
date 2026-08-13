@@ -1,5 +1,18 @@
+import copy
 import heapq
+
 import numpy as np
+
+# [고속화 S1-3] 이벤트/액션 디버그 출력 스위치.
+# 원본은 이벤트마다 `print(c_event)` 를 호출한다(스텝당 약 14회). 드라이버들이
+# stdout 을 /dev/null 로 돌려도 튜플 문자열화 비용은 그대로 남아 전체의 약 2.5% 였다.
+# 기본 False = 출력만 없음(상태·RNG 무관) → 결과 동일. 디버깅 시 True 로.
+TRACE_PRINT = False
+
+# [고속화 S2-6] 증분 카운터 상시 검증 스위치. True 면 카운터와 전수 스캔(np.all)이
+# 매 호출마다 일치하는지 확인한다(느림). 동치 게이트에서 한 번은 켜고 돌린다.
+AUDIT_COUNTERS = False
+
 
 class EventManager():
     def __init__(self, ev_info, en_manager, rng=None, enable_trace=False):
@@ -8,6 +21,9 @@ class EventManager():
         self.properties = self.en_manager.en_properties
         self.enable_trace = enable_trace
         self.trace_log = []  # per-event trace records
+        # [고속화 S1-2] GB 일괄이송 후보 순서 캐시 (mode -> (tier2, tier3, all)).
+        # ETA·tier·헬기장은 전부 시나리오 상수라 에피소드 간 불변 → 최초 1회만 계산.
+        self._gb_order = None
 
         if rng is not None:
             self.rng = rng
@@ -18,6 +34,38 @@ class EventManager():
     def set_seed(self, rng):
         self.rng = rng
 
+    # ---------- 복제 안전장치 (S2-11 뷰 캐시 필수 동반) ----------
+    # ★`copy.deepcopy` 는 numpy **뷰**를 독립 배열로 만든다 — 뷰↔원배열 연결이 끊긴다.
+    #   `_amb_t`/`_uav_t` 는 `amb_states[:,1]` 의 뷰라 그냥 복제하면 클론에서 잔여시간 감산이
+    #   차량 상태 배열에 반영되지 않아 조용히 다른 궤적이 된다(NCRP 플래너가 결정마다 복제).
+    #   그래서 복제·역직렬화 후 뷰를 **다시 잡아준다**.
+    _VIEW_ATTRS = ("_amb_t", "_uav_t")
+
+    def _rebind_views(self):
+        st = getattr(self, "status", None)
+        if not st:
+            return
+        self._amb_t = st['ambulance']['amb_states'][:, 1]
+        self._uav_t = st['uav']['uav_states'][:, 1]
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        new = cls.__new__(cls)
+        memo[id(self)] = new
+        for k, v in self.__dict__.items():
+            if k in cls._VIEW_ATTRS:
+                continue
+            setattr(new, k, copy.deepcopy(v, memo))
+        new._rebind_views()
+        return new
+
+    def __getstate__(self):
+        return {k: v for k, v in self.__dict__.items() if k not in self._VIEW_ATTRS}
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._rebind_views()
+
     def start(self):
         self.e_ID = 0 # event 생성 번호 초기화
         self.time = 0 # event clock 초기화
@@ -25,6 +73,27 @@ class EventManager():
         self.rescue_finish = False # 구조 완료 여부 확인
         self.event_queue = [] # event queue 초기화
         self.trace_log = []  # reset trace
+        # [고속화 S2-6] 전수 스캔(np.all) 대신 증분 카운터.
+        # p_states 는 init_en_status 에서 0 으로 새로 만들어지므로 여기서 0 시작이 맞다.
+        # cared(열4)는 3곳에서만, rescued(열1)은 1곳에서만 1이 되고 되돌아가지 않는다
+        # (환자당 최대 1회) → 카운터 == 해당 열의 1 개수. AUDIT_COUNTERS 로 상시 검증 가능.
+        self._n_total = self.status['patient']['p_states'].shape[0]
+        self._n_cared = 0
+        self._n_rescued = 0
+        # [고속화 S2-7] 병원별 이송중(발송·미도착) 대수를 증분 유지한다.
+        # 원본은 호출마다 차량 전체(AMB+UAV)를 훑어 다시 셌고 그게 최대 병목이었다.
+        # 차량 상태(dest, severity)가 바뀌는 지점은 배차 2곳·병원도착 2곳뿐이며
+        # (`_if_move`) 그 외(열1 잔여시간 감산, 현장 도착)는 dest/severity 를 안 건드린다.
+        # init_en_status 가 차량 배열을 0 으로 새로 만들므로 여기서 0 시작이 맞다.
+        self._in_flight_cnt = np.zeros(self.properties['hospital']['hos_num'], dtype=np.int32)
+        # 규칙정책(RuleManager/ShinHeuristics)은 EntityManager 만 넘겨받으므로 여기에 게시한다.
+        # 매 reset 마다 같은 배열 객체로 갱신 — 규칙 쪽은 읽기만 한다.
+        self.en_manager._in_flight_cnt = self._in_flight_cnt
+        # [고속화 S2-11] 차량 잔여시간 열의 뷰를 잡아둔다. 이벤트마다 dict 4단 조회와
+        # `[:,1]` 슬라이스 객체 생성을 반복하던 것을 없앤다(같은 메모리를 가리키는 뷰라
+        # 연산·값은 완전히 동일). 배열은 에피소드 중 재할당되지 않고 in-place 로만 바뀐다.
+        self._amb_t = self.status['ambulance']['amb_states'][:, 1]
+        self._uav_t = self.status['uav']['uav_states'][:, 1]
         # 사고 발생
         init_log = {}
         init_log, _ = self.ev_onset(init_log, None)
@@ -60,15 +129,17 @@ class EventManager():
                 return log, True
 
             c_event = heapq.heappop(self.event_queue)  # event = (event_time, e_ID, ev_name, entity_idx)
-            print(c_event)
+            if TRACE_PRINT:
+                print(c_event)
 
             time_interval = c_event[0] - self.time
             self.time = c_event[0]
-            # 시간 경과에 따른 상태 업데이트
-            self.status['ambulance']['amb_states'][:,1] -= time_interval
-            np.maximum(self.status['ambulance']['amb_states'][:,1], 0, out=self.status['ambulance']['amb_states'][:,1])
-            self.status['uav']['uav_states'][:,1] -= time_interval
-            np.maximum(self.status['uav']['uav_states'][:,1], 0, out=self.status['uav']['uav_states'][:,1])
+            # 시간 경과에 따른 상태 업데이트 ([고속화 S2-11] 캐시한 열 뷰 사용 — 연산 동일)
+            amb_t, uav_t = self._amb_t, self._uav_t
+            amb_t -= time_interval
+            np.maximum(amb_t, 0, out=amb_t)
+            uav_t -= time_interval
+            np.maximum(uav_t, 0, out=uav_t)
             log, stop_condition = getattr(self, "ev_" + c_event[2])(log, c_event[3])
             if stop_condition: # 2. decision 내려야 하는 시점까지 진행
                 break
@@ -78,7 +149,8 @@ class EventManager():
         return log, terminated
 
     def proceed_action(self, action):
-        print("Action:", action)
+        if TRACE_PRINT:
+            print("Action:", action)
         # action[0]: Red = 0, Yellow = 1, Green = 2
         # action[1]: 0: 현장, 1번 병원 ~ N번 병원; 병원 10개일 때 0은 현장, 1번 병원 ~ 9번 병원
         # action[2]: 0: Amb, 1: UAV
@@ -124,6 +196,7 @@ class EventManager():
                 elapsed_time = tranportation_t + self.properties['ambulance']['amb_handover_time'] # 환자 넘기는 시간
                 # 상태 변경
                 self.status['ambulance']['amb_states'][a_idx] = (destination, elapsed_time, p_class+1) # destination, time, severity
+                self._if_move(None, h_idx)                     # [고속화 S2-7] 배차
                 self.status['patient']['p_states'][p_idx, 2] = 1  # move
                 self.status['patient']['p_sent'][h_idx] += 1 # sent record
                 self.add_event(elapsed_time, 'amb_arrival_hospital', (p_idx, a_idx, h_idx))
@@ -134,6 +207,7 @@ class EventManager():
                 elapsed_time = tranportation_t + self.properties['uav']['uav_handover_time'] # 환자 넘기는 시간
                 # 상태 변경
                 self.status['uav']['uav_states'][u_idx] = (destination, elapsed_time, p_class+1) # destination, time, severity
+                self._if_move(None, h_idx)                     # [고속화 S2-7] 배차
                 self.status['patient']['p_states'][p_idx, 2] = 1  # move
                 self.status['patient']['p_sent'][h_idx] += 1  # sent record
                 self.add_event(elapsed_time, 'uav_arrival_hospital', (p_idx, u_idx, h_idx))
@@ -150,8 +224,15 @@ class EventManager():
 
     def check_termination(self):
         # 환자 모두 처치 끝나면 terminated (불필요한 iteration 막을 수 있음.)
-        terminated = np.all(self.status['patient']['p_states'][:,-1] == 1)
-        # or event_queue length로 확인 가능
+        # [고속화 S2-6] np.all(p_states[:,-1]==1) 을 카운터 비교로 대체.
+        # 빈 배열에서 np.all 이 True 인 것과 0>=0 이 True 인 것도 일치한다.
+        terminated = self._n_cared >= self._n_total
+        if AUDIT_COUNTERS:
+            ref = bool(np.all(self.status['patient']['p_states'][:, -1] == 1))
+            if bool(terminated) != ref:
+                raise AssertionError(
+                    f"[AUDIT] cared 카운터 불일치: counter={self._n_cared}/{self._n_total} "
+                    f"→ {terminated}, 전수스캔 → {ref}")
         return terminated
 
     def sample_transportation_time(self, mode, origination, destination):
@@ -201,6 +282,7 @@ class EventManager():
             elapsed_time = tranportation_t + self.properties['uav']['uav_handover_time']  # 환자 넘기는 시간
             # 상태 변경
             self.status['uav']['uav_states'][u_idx] = (destination, elapsed_time, p_class + 1)  # destination, time, severity
+            self._if_move(None, destination - 1)               # [고속화 S2-7] GB 배차
             self.status['patient']['p_states'][p_idx, 2] = 1  # move
             self.status['patient']['p_sent'][destination-1] += 1  # sent record
             self.add_event(elapsed_time, 'uav_arrival_hospital', (p_idx, u_idx, destination - 1))
@@ -220,6 +302,7 @@ class EventManager():
             elapsed_time = tranportation_t + self.properties['ambulance']['amb_handover_time']  # 환자 넘기는 시간
             # 상태 변경
             self.status['ambulance']['amb_states'][a_idx] = (destination, elapsed_time, p_class + 1)  # destination, time, severity
+            self._if_move(None, destination - 1)               # [고속화 S2-7] GB 배차
             self.status['patient']['p_states'][p_idx, 2] = 1  # move
             self.status['patient']['p_sent'][destination-1] += 1  # sent record
             self.add_event(elapsed_time, 'amb_arrival_hospital', (p_idx, a_idx, destination - 1))
@@ -228,11 +311,32 @@ class EventManager():
 
     def _in_flight(self):
         """병원별 이송중(발송·미도착) 환자 수 — 코어 내부용(진실 상태).
-        GB 배차·diversion 의 물리용량 판단에 사용(도착 시 만원 회피)."""
-        return self.en_manager.in_flight_by_hospital(
-            {'amb_states': self.status['ambulance']['amb_states'],
-             'uav_states': self.status['uav']['uav_states']},
-            self.properties['hospital']['hos_num'])
+        GB 배차·diversion 의 물리용량 판단에 사용(도착 시 만원 회피).
+
+        [고속화 S2-7] 전수 재계산 대신 증분 카운터를 돌려준다. 값은 원본과 동일하다.
+        ⚠️ 반환 배열은 **내부 상태 그 자체**다 — 읽기 전용으로만 쓸 것
+        (코어 내 사용처는 전부 `room = ... - self._in_flight()` 형태의 읽기다).
+        """
+        cnt = self._in_flight_cnt
+        if AUDIT_COUNTERS:
+            ref = self.en_manager.in_flight_by_hospital(
+                {'amb_states': self.status['ambulance']['amb_states'],
+                 'uav_states': self.status['uav']['uav_states']},
+                self.properties['hospital']['hos_num'])
+            if not np.array_equal(cnt, ref):
+                raise AssertionError(
+                    f"[AUDIT] in_flight 카운터 불일치\n  counter={cnt}\n  전수스캔={ref}")
+        return cnt
+
+    def _if_move(self, h_from, h_to):
+        """이송중 카운터 이동. h_from/h_to 는 0-based 병원 index, 없으면 None.
+
+        배차=(None → h), 병원 입원/현장 복귀=(h → None), diversion=(h → h')
+        """
+        if h_from is not None:
+            self._in_flight_cnt[h_from] -= 1
+        if h_to is not None:
+            self._in_flight_cnt[h_to] += 1
 
     def default_transportation_GB(self, mode):
         # Rule1: Ver250724 (2026-07-03 정합성 수정)
@@ -246,46 +350,62 @@ class EventManager():
         #    (주석에만 있고 미구현이었던 폴백을 구현 — 도착 시 만원이면 diversion 이 처리)
         # 5. UAV(mode=1)이면 헬기장 있는 병원에만 이송
 
-        destination = None
+        # [고속화 S1-2] ETA 정렬·tier 집합·헬기장 필터는 전부 시나리오 상수다.
+        # 원본은 호출마다 argsort(H) 와 set(numpy배열) 2개를 새로 만들어 전체의 11% 를
+        # 썼다. 여기서는 그 필터를 통과한 후보 순서만 최초 1회 만들어 재사용한다.
+        # 판정 자체(용량 여유 검사와 그 순서)는 원본과 동일하다.
+        order2, order3, order_all = self._gb_candidate_order(mode)
+
         room = ((self.properties['hospital']['hos_max_capa']
                  + self.properties['hospital']['hos_max_queue'])
                 - self.status['hospital']['h_states'][:, -1]
                 - self._in_flight())
-        helipad_idx = self.properties['hospital'].get('hos_helipad_idx', np.array([]))
+
+        for h_idx in order2:
+            if room[h_idx] > 0:
+                return h_idx + 1
+        for h_idx in order3:
+            if room[h_idx] > 0:
+                return h_idx + 1
+        # 규칙 4 폴백: 용량 무시, 등급 무관 수단별 ETA가 가장 짧은 병원.
+        return (order_all[0] + 1) if order_all else None
+
+    def _gb_candidate_order(self, mode):
+        """GB 일괄이송 후보 순서 (tier2 우선 / tier3 / 등급무관) — mode 별 1회 계산.
+
+        원본 `default_transportation_GB` 의 순회 순서를 그대로 재현한다:
+        수단별 평균 ETA 오름차순(`kind='stable'`, 길이 불일치 시 인덱스 순) 위에서
+        tier 소속과 헬기장 보유 여부로 걸러낸 것과 같다.
+        """
+        if self._gb_order is None:
+            self._gb_order = {}
+        cached = self._gb_order.get(mode)
+        if cached is not None:
+            return cached
+
+        hos = self.properties['hospital']
+        hos_num = hos['hos_num']
+        helipad_idx = hos.get('hos_helipad_idx', np.array([]))
         eta_key = 'uav_HtoS_t' if mode == 1 else 'amb_HtoS_t'
         vehicle_key = 'uav' if mode == 1 else 'ambulance'
         eta = np.asarray(self.properties[vehicle_key][eta_key][0], dtype=float)
-        if eta.size == self.properties['hospital']['hos_num']:
+        if eta.size == hos_num:
             sorted_h = np.argsort(eta, kind='stable')
         else:
-            sorted_h = np.arange(self.properties['hospital']['hos_num'])
-        tier2_idx = set(np.asarray(self.properties['hospital']['hos_tier2_idx'], dtype=int))
-        tier3_idx = set(np.asarray(self.properties['hospital']['hos_tier3_idx'], dtype=int))
-        for h_idx in sorted_h:
-            if h_idx not in tier2_idx:
-                continue
-            if mode == 1 and h_idx not in helipad_idx:
-                continue
-            if room[h_idx] > 0:
-                destination = h_idx + 1
-                break
-        if destination is None:
-            for h_idx in sorted_h:
-                if h_idx not in tier3_idx:
-                    continue
-                if mode == 1 and h_idx not in helipad_idx:
-                    continue
-                if room[h_idx] > 0:
-                    destination = h_idx + 1
-                    break
-        if destination is None:
-            # 규칙 4 폴백: 용량 무시, 등급 무관 수단별 ETA가 가장 짧은 병원.
-            for h_idx in sorted_h:
-                if mode == 1 and h_idx not in helipad_idx:
-                    continue
-                destination = h_idx + 1
-                break
-        return destination
+            sorted_h = np.arange(hos_num)
+        tier2_idx = set(np.asarray(hos['hos_tier2_idx'], dtype=int))
+        tier3_idx = set(np.asarray(hos['hos_tier3_idx'], dtype=int))
+        helipad_set = set(np.asarray(helipad_idx, dtype=int).reshape(-1).tolist())
+
+        def _pad_ok(h):
+            return mode != 1 or h in helipad_set
+
+        order2 = [int(h) for h in sorted_h if int(h) in tier2_idx and _pad_ok(int(h))]
+        order3 = [int(h) for h in sorted_h if int(h) in tier3_idx and _pad_ok(int(h))]
+        order_all = [int(h) for h in sorted_h if _pad_ok(int(h))]
+        cached = (order2, order3, order_all)
+        self._gb_order[mode] = cached
+        return cached
 
     def diversion_rule(self, c_hos, pass_to_tier3, pass_to_tier2, mode):
         # Rule1: Ver250724 (2026-07-03 정합성 수정)
@@ -331,10 +451,12 @@ class EventManager():
 
     def sample_service_time(self, h_tier, p_class):
         #   if service time 9999이면 n_idle -= 1, definite cared로 변경, 추가 event 생성 없음
+        # [고속화 S2-9] DataFrame 라벨 조회 → 사전 추출 리스트(값·타입 동일, str 분기 보존)
+        pf = self._p_fast()
         if h_tier == 3:
-            service_mean = self.properties['patient']['patient_info']['treat_tier3_mean'][p_class]
+            service_mean = pf['treat_tier3_mean'][p_class]
         elif h_tier == 2:
-            service_mean = self.properties['patient']['patient_info']['treat_tier2_mean'][p_class]
+            service_mean = pf['treat_tier2_mean'][p_class]
         if isinstance(service_mean, str):
             service_time = np.inf
         else:
@@ -349,14 +471,15 @@ class EventManager():
         rescue_times = []
         # 1. 환자 구조 이벤트 생성
         p_param = self.properties['patient']
+        pf = self._p_fast()   # [고속화 S2-9] 사전 추출 (pvals 값 동일 → RNG 소비 동일)
         p_num = self.rng.multinomial(p_param['incident_size'],
-                                     pvals=p_param['patient_info']['ratio'])
+                                     pvals=pf['ratio'])
         self.status['patient']['p_states'][:,0] = np.repeat([0,1,2,3], p_num)
 
         rescue_max_time = 60
 
         for p_class in range(4):
-            alpha, beta = p_param['patient_info']['rescue_param_alpha'][p_class], p_param['patient_info']['rescue_param_beta'][p_class]
+            alpha, beta = pf['rescue_param_alpha'][p_class], pf['rescue_param_beta'][p_class]
             if alpha != 0 and beta != 0:
                 sampled = self.rng.beta(alpha, beta, size = p_num[p_class]) * rescue_max_time
             else:
@@ -401,7 +524,15 @@ class EventManager():
         self.status['patient']['p_states'][p_idx, 1] = 1 # rescued
         self.status['patient']['p_wait'][p_class][0].append(p_idx)
         self._record_trace("rescue", patient_id=int(p_idx), severity=int(p_class))
-        self.rescue_finish = np.all(self.status['patient']['p_states'][:, 1] == 1) # 최소값이 0이면 아직 다 구조 안 된 경우
+        # [고속화 S2-6] 환자당 p_rescue 이벤트는 정확히 1회 → 카운터가 전수 스캔과 동치.
+        self._n_rescued += 1
+        self.rescue_finish = self._n_rescued >= self._n_total
+        if AUDIT_COUNTERS:
+            ref = bool(np.all(self.status['patient']['p_states'][:, 1] == 1))
+            if bool(self.rescue_finish) != ref:
+                raise AssertionError(
+                    f"[AUDIT] rescued 카운터 불일치: {self._n_rescued}/{self._n_total} "
+                    f"→ {self.rescue_finish}, 전수스캔 → {ref}")
 
         hasAvailableMode = bool(self.status['ambulance']['amb_wait'][0] or self.status['uav']['uav_wait'][0])
         if not hasAvailableMode: # 이송 수단 없으면 next event 수행
@@ -475,6 +606,7 @@ class EventManager():
             # 이벤트 추가
             if service_time == np.inf: # capa 끝까지 점유
                 self.status['patient']['p_states'][p_idx, -1] = 1
+                self._n_cared += 1   # [고속화 S2-6]
             else: # 서비스 종료 이벤트 존재
                 self.add_event(service_time, 'p_def_care', (p_idx, h_idx))
         else: # 대기 시작 (선행 조건에서 max_queue 넘지 않도록 이벤트 추가했었음)
@@ -483,9 +615,30 @@ class EventManager():
             self.status['patient']['p_wait'][p_class][h_idx+1].append(p_idx) # 환자 대기 시작
         return log, False
 
+    def _p_fast(self):
+        """[고속화 S2-9] 핫패스용 patient_info 사전 추출본.
+
+        `ScenarioManager` 가 `patient_info_fast` 로 넣어준다. 구 시나리오 객체를 그대로
+        받은 경우를 대비해 없으면 그 자리에서 만들어 캐시한다(값·타입은 DataFrame 조회와 동일).
+        """
+        pf = self.properties['patient'].get('patient_info_fast')
+        if pf is None:
+            df = self.properties['patient']['patient_info']
+            pf = {
+                'ratio': df['ratio'].to_numpy(),
+                'rescue_param_alpha': df['rescue_param_alpha'].tolist(),
+                'rescue_param_beta': df['rescue_param_beta'].tolist(),
+                'treat_tier3': df['treat_tier3'].tolist(),
+                'treat_tier2': df['treat_tier2'].tolist(),
+                'treat_tier3_mean': df['treat_tier3_mean'].tolist(),
+                'treat_tier2_mean': df['treat_tier2_mean'].tolist(),
+            }
+            self.properties['patient']['patient_info_fast'] = pf
+        return pf
+
     def _can_treat_patient(self, h_idx, p_class):
         h_tier = self.properties['hospital']['hos_tier'][h_idx]
-        p_info = self.properties['patient']['patient_info']
+        p_info = self._p_fast()   # [고속화 S2-9]
         if h_tier == 3:
             return bool(p_info['treat_tier3'][p_class])
         if h_tier == 2:
@@ -501,7 +654,7 @@ class EventManager():
         """
         p_idx, a_idx, h_idx = entity_idx
         p_class = self.status['patient']['p_states'][p_idx, 0]
-        p_info = self.properties['patient']['patient_info']
+        p_info = self._p_fast()   # [고속화 S2-9]
         destination = 0
         handover_time = 0
 
@@ -514,6 +667,7 @@ class EventManager():
             self.status['patient']['p_sent'][destination-1] += 1
             transportation_t = self.sample_transportation_time(mode=0, origination=h_idx + 1, destination=destination)
             self.status['ambulance']['amb_states'][a_idx] = (destination, transportation_t, p_class + 1)
+            self._if_move(h_idx, destination - 1)              # [고속화 S2-7] 등급 불일치 재이송
             self.add_event(transportation_t, 'amb_arrival_hospital', (p_idx, a_idx, destination - 1))
             return log, False
 
@@ -541,9 +695,11 @@ class EventManager():
             # 복귀 leg: 병원 handover(인계) 후 현장 복귀 → 상태 time 도 handover 포함해야
             # amb_arrival_site 이벤트(transportation_t+handover_time)와 일치(obs 충실도).
             self.status['ambulance']['amb_states'][a_idx] = (destination, transportation_t + handover_time, 0)
+            self._if_move(h_idx, None)                         # [고속화 S2-7] 입원 → 현장 복귀
             self.add_event(transportation_t + handover_time, 'amb_arrival_site', (a_idx,))
         else:
             self.status['ambulance']['amb_states'][a_idx] = (destination, transportation_t, p_class + 1)
+            self._if_move(h_idx, destination - 1)              # [고속화 S2-7] 만원 diversion
             self.add_event(transportation_t + handover_time, 'amb_arrival_hospital', (p_idx, a_idx, destination - 1))
         return log, False
 
@@ -556,7 +712,7 @@ class EventManager():
         """
         p_idx, u_idx, h_idx = entity_idx
         p_class = self.status['patient']['p_states'][p_idx, 0]
-        p_info = self.properties['patient']['patient_info']
+        p_info = self._p_fast()   # [고속화 S2-9]
         destination = 0
         handover_time = 0
 
@@ -569,6 +725,7 @@ class EventManager():
             self.status['patient']['p_sent'][destination-1] += 1
             transportation_t = self.sample_transportation_time(mode=1, origination=h_idx + 1, destination=destination)
             self.status['uav']['uav_states'][u_idx] = (destination, transportation_t, p_class + 1)
+            self._if_move(h_idx, destination - 1)              # [고속화 S2-7] 등급 불일치 재이송
             self.add_event(transportation_t, 'uav_arrival_hospital', (p_idx, u_idx, destination - 1))
             return log, False
 
@@ -595,9 +752,11 @@ class EventManager():
         if destination == 0:
             # 복귀 leg: handover 후 현장 복귀 → 상태 time 도 handover 포함(obs 충실도, amb 와 동일).
             self.status['uav']['uav_states'][u_idx] = (destination, transportation_t + handover_time, 0)
+            self._if_move(h_idx, None)                         # [고속화 S2-7] 입원 → 현장 복귀
             self.add_event(transportation_t + handover_time, 'uav_arrival_site', (u_idx,))
         else:
             self.status['uav']['uav_states'][u_idx] = (destination, transportation_t, p_class + 1)
+            self._if_move(h_idx, destination - 1)              # [고속화 S2-7] 만원 diversion
             self.add_event(transportation_t + handover_time, 'uav_arrival_hospital', (p_idx, u_idx, destination - 1))
         return log, False
 
@@ -611,6 +770,7 @@ class EventManager():
         p_idx, h_idx = entity_idx
         # 처치 완료 환자 상태 변경
         self.status['patient']['p_states'][p_idx, -1] = 1
+        self._n_cared += 1   # [고속화 S2-6]
         self._record_trace("care_complete", patient_id=int(p_idx), hospital_id=int(h_idx))
         self.status['hospital']['h_states'][h_idx, -1] -= 1  # n_occupied -= 1 (퇴원 → 입원 정원 반환)
 
@@ -630,6 +790,7 @@ class EventManager():
             # 이벤트 추가
             if service_time == np.inf: # capa 끝까지 점유
                 self.status['patient']['p_states'][new_p_idx, -1] = 1
+                self._n_cared += 1   # [고속화 S2-6]
             else: # 서비스 종료 이벤트 존재
                 self.add_event(service_time, 'p_def_care', (new_p_idx, h_idx))
         else:

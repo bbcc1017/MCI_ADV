@@ -1,21 +1,62 @@
 import argparse
 import yaml
 import os
+import sys
 import json
 import random
 import numpy as np
 import time
+from datetime import datetime
 from scipy.stats import t
 
 from ScenarioManager import ScenarioManager
 from RuleManager import RuleManager
 from MCIEnvironment_gymnasium import MCIEnvironment_gym
 
+
+class _Tee:
+    """stdout 을 콘솔과 파일에 동시 기록."""
+    def __init__(self, *streams):
+        self.streams = streams
+    def write(self, s):
+        for st in self.streams:
+            try:
+                st.write(s)
+            except UnicodeEncodeError:
+                # cp949 콘솔 호환을 위해 ASCII fallback
+                st.write(s.encode('ascii', errors='replace').decode('ascii'))
+    def flush(self):
+        for st in self.streams:
+            st.flush()
+
+
+def _setup_logfile(config_path: str, log_root: str = "experiment_logs",
+                   log_kind: str = "sim") -> 'tuple[str, object]':
+    """experiment_logs/<kind>_<exp_indicator>_<timestamp>.log 파일 핸들 생성."""
+    with open(config_path, 'r', encoding='utf-8') as f:
+        cfg = yaml.safe_load(f)
+    exp_indicator = cfg['run_setting'].get('exp_indicator', 'unknown')
+    os.makedirs(log_root, exist_ok=True)
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    # 파일명에 좌표 그대로 포함 (괄호/콤마 OK on Windows)
+    log_path = os.path.join(log_root, f"{log_kind}_{exp_indicator}_{ts}.log")
+    return log_path, open(log_path, 'w', encoding='utf-8')
+
+
 # parser 객체 생성 및 등록
 parser = argparse.ArgumentParser(description='Run MCI_simulation')
 parser.add_argument('--config_path', default="./config.yaml", help='configuration file(.yaml) 경로')
 parser.add_argument('--trace', action='store_true', default=False,
                     help='Enable per-patient trace logging (saves trace JSON)')
+parser.add_argument('--log_dir', default='experiment_logs',
+                    help='시뮬레이션 로그 저장 디렉터리 (--log 지정 시에만 사용)')
+# ★MCI_ADV: 시뮬 자체 로그 파일은 **기본 꺼짐**. Orchestrator 가 실행마다 stdout 을
+#   experiment_logs/<coord>_<ts>.txt 로 이미 남기므로 중복이다. 필요하면 --log 로 켠다.
+#   (MCI_UAV 정본은 기본 켜짐 + --no_log 로 끄는 반대 규약이다.)
+parser.add_argument('--log', action='store_true', default=False,
+                    help='시뮬레이션 로그 파일 저장 활성 (기본: 저장 안 함)')
+parser.add_argument('--no_log', action='store_true', default=False,
+                    help='[구호환] 로그 비활성 — 이미 기본이라 no-op')
 args = parser.parse_args()
 
 
@@ -68,8 +109,10 @@ class RunManager():
 
         # 5. 시뮬레이션 실행
         output, output_stat = self.run(self.env, self.rules, totalSamples)
-        np.savetxt(os.path.join(output_path, "results_{0}.txt".format(exp_indicator)), output, fmt='%s', delimiter="  ")
-        np.savetxt(os.path.join(output_path, "results_{0}_stat.txt".format(exp_indicator)), output_stat, fmt='%s', delimiter="  ")
+        # MCI_CAP_GATE=psent 일 때 occ 결과를 덮어쓰지 않도록 파일명에 _psent 접미사.
+        _cap_sfx = "" if os.environ.get("MCI_CAP_GATE", "occ").strip().lower() != "psent" else "_psent"
+        np.savetxt(os.path.join(output_path, "results_{0}{1}.txt".format(exp_indicator, _cap_sfx)), output, fmt='%s', delimiter="  ")
+        np.savetxt(os.path.join(output_path, "results_{0}{1}_stat.txt".format(exp_indicator, _cap_sfx)), output_stat, fmt='%s', delimiter="  ")
 
         # Save trace data if enabled
         if self.enable_trace and hasattr(self, '_all_traces') and self._all_traces:
@@ -113,9 +156,9 @@ class RunManager():
                 print(rules[r_idx].rule_name)
                 self.set_random_seed(iter)
                 obs, _ = env.reset()
-                total_Green = (obs['p_states'][:, 0] == 2).sum()
                 done = False
                 cumul_reward = 0
+                cumul_r_woG = 0.0  # 정확 woG — env info['r_woG'] 누적 (2026-07-03 수정)
                 count = 0
                 while not done:
                     action = rules[r_idx].select(obs)
@@ -142,8 +185,10 @@ class RunManager():
                             action_log['green'] += 1
                     # action = env.action_space.sample()
                     obs, reward, done, truncated, info = env.step(action)
+                    done = done or truncated  # OVERTIME 은 truncated 로 옴 (2026-07-03)
 
                     cumul_reward += reward
+                    cumul_r_woG += info.get('r_woG', 0.0)
                     if (r_idx == 0) & (reward < 0.0):
                         print('지금')
                     # print(obs['num_amb'],obs['num_uav'])
@@ -156,9 +201,11 @@ class RunManager():
                 results_rew[r_idx, iter - 1] = cumul_reward
                 results_time[r_idx, iter - 1] = info['time']
                 results_pdr[r_idx, iter - 1] = safe_pdr(cumul_reward, env.preventable)
-                results_rewWOG[r_idx, iter - 1] = cumul_reward - total_Green
-                results_pdrWOG[r_idx, iter - 1] = safe_pdr(cumul_reward - total_Green,
-                                                           env.preventable - total_Green)
+                # 정확 woG(info['r_woG'] 누적)·preventable_woG 사용 — 기존 근사식
+                # (cumul-total_Green)은 미처치 Green 이 있으면(절단·과부하) 과소산출.
+                # 정상 종료(전원 처치)에선 값이 동일해 기존 결과와 정합. (2026-07-03)
+                results_rewWOG[r_idx, iter - 1] = cumul_r_woG
+                results_pdrWOG[r_idx, iter - 1] = safe_pdr(cumul_r_woG, env.preventable_woG)
                 # results_preventable[r_idx, iter - 1] = env.preventable
 
         stat_rew = np.zeros((len(rules), 3), dtype=float)
@@ -199,6 +246,22 @@ class RunManager():
         return output, output_stat
 
 if __name__ == '__main__':
-    start_t = time.time()
-    run_model = RunManager(args)
-    print(f"Computation time(s): {time.time() - start_t}")
+    log_handle = None
+    # ★MCI_ADV: 기본 꺼짐 — `--log` 를 명시할 때만 파일로 남긴다(`--no_log` 는 no-op).
+    if args.log and not args.no_log:
+        try:
+            log_path, log_handle = _setup_logfile(args.config_path, log_root=args.log_dir, log_kind="sim")
+            sys.stdout = _Tee(sys.__stdout__, log_handle)
+            print(f"[LOG] simulation log -> {log_path}")
+        except Exception as e:
+            print(f"[LOG] 로그 파일 설정 실패 (콘솔만 출력): {e}")
+            log_handle = None
+
+    try:
+        start_t = time.time()
+        run_model = RunManager(args)
+        print(f"Computation time(s): {time.time() - start_t}")
+    finally:
+        if log_handle is not None:
+            sys.stdout = sys.__stdout__
+            log_handle.close()
