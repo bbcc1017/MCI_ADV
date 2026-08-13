@@ -115,7 +115,7 @@ BCa 부트스트랩·Friedman·Kruskal-Wallis, 검정력 분석, LaTeX 내보내
 | | |
 |---|---|
 | 결과 | `results_*.txt` · `_stat.txt` · `trace_*.json` **바이트 동일** |
-| 속도 | 실측 **2.1 ~ 2.4×** |
+| 속도 | 대시보드 경로 실측 **1.68×** (이벤트 로그 유지 시) / **1.99×** (`MCI_TRACE_PRINT=0`) |
 | 안전장치 | 실행 전 **G0 드리프트 검사** + **구·신 코어 소규모 동치검증** 자동 수행, 불일치면 즉시 중단 |
 | 끄기 | `MCI_FAST_CORE=0` |
 
@@ -130,9 +130,9 @@ BCa 부트스트랩·Friedman·Kruskal-Wallis, 검정력 분석, LaTeX 내보내
 **일부러 안 건드린 것** — 부동소수 연산 순서, `np.argsort` 의 `kind`, `p_wait[...].pop()` 순서,
 RNG 드로우의 수·순서. 하나라도 바뀌면 궤적이 갈려 비교가 무의미해진다.
 
-> ⚠️ 고속 경로는 이벤트별 콘솔 출력을 내지 않는다(같은 실행의 stdout 3.1MB → 17.8KB).
-> 결과 파일과 trace JSON 은 동일하다. 이벤트 스트림이 필요하면
-> `src/sim_src_upgrade/core/EventManager.py` 의 `TRACE_PRINT = True`.
+> ⚠️ **이벤트 콘솔 출력은 기본 켬.** 대시보드가 `experiment_logs/` 의 이 출력을 파싱해
+> Scenarios 탭·Maps Animation 을 그리기 때문이다. 순수 배치라면 `MCI_TRACE_PRINT=0` 으로
+> 꺼서 더 빠르게 돌릴 수 있고, 출력 여부와 무관하게 결과 파일은 동일하다.
 
 전체 문서 → **[`src/sim_src_upgrade/README.md`](src/sim_src_upgrade/README.md)**
 
@@ -145,7 +145,8 @@ RNG 드로우의 수·순서. 하나라도 바뀌면 궤적이 갈려 비교가 
 | 환경변수 | 기본 | 효과 |
 |---|---|---|
 | `MCI_FAST_CORE` | `1` | `0` 이면 고속경로를 끄고 원본 `src/sim_src` 로 실행 |
-| `MCI_WRITE_RUN_LOG` | `1` | `0` 이면 `experiment_logs/` 에 실행 로그를 쓰지 않는다 |
+| `MCI_WRITE_RUN_LOG` | `1` | `0` 이면 `experiment_logs/` 에 실행 로그를 쓰지 않는다 (대시보드 Scenarios·Animation 탭이 이 로그를 읽으므로 기본 켬) |
+| `MCI_TRACE_PRINT` | `1` | `0` 이면 고속 코어가 이벤트·Action 콘솔 출력을 생략한다(더 빠름, 대시보드 애니메이션 불가) |
 | `MCI_OSRM_URL` | 공개 데모 서버 | 자체 OSRM 인스턴스 주소 |
 | `KAKAO_API_KEY` | — | 카카오 모빌리티 키 (CLI 인자 미지정 시 자동 사용) |
 | `MCI_CAP_GATE` | `occ` | 발송 용량 게이트. `psent` = 병원 실시간 정보 없이 현장 지득분만 |

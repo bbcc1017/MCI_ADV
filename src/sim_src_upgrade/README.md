@@ -60,7 +60,9 @@ python src/sim_src_upgrade/verify/sim_equivalence.py --config "$CFG" --n_eps 10
 | 지표 배열 `(64규칙 × 10에피 × 5지표)` = 3,200 원소 | **전부 비트동일, 최대 절대차 0.0** |
 | `results_*.txt` / `results_*_stat.txt` | 바이트 동일 |
 | `trace_*.json` (5.5MB) | 바이트 동일 |
-| 배속 (동치검증 in-process) | **2.15×** (5.34s → 2.48s) |
+| 배속 (동치검증 in-process, 출력 없음) | **2.15 ~ 2.38×** |
+| 배속 (대시보드 경로 wall, 로그 ON) | **1.68×** (100회: 63.10s → 37.52s) |
+| 배속 (대시보드 경로 wall, `MCI_TRACE_PRINT=0`) | **1.99×** (100회: 65.14s → 32.73s) |
 | G0 드리프트 | PASS — 사본 파생원본 = 현재 `src/sim_src` |
 
 MCI_UAV 쪽 대규모 실측(규칙 전수평가 3.7~4.4×, v16 드라이버 wall 3.34×)은 그 저장소의
@@ -88,8 +90,10 @@ python src/sim_src_upgrade/origin_sync.py --diff EventManager  # 원본 대비 �
 
 실제로 바꾼 것은 이송중 카운트 `bincount` 화, GB 이송 후보 순서 시나리오당 1회 사전계산,
 종료·구조 판정 증분 카운터, 결합 mask 브로드캐스트, `patient_info` DataFrame 조회 제거,
-이벤트별 디버그 `print` 게이트(`TRACE_PRINT=False`) 등이다.
+이벤트별 디버그 `print` 게이트(`TRACE_PRINT`) 등이다.
 
-> ⚠️ 고속 코어는 이벤트별 `print(c_event)` 를 내지 않는다(`TRACE_PRINT` 게이트). 결과
-> 파일과 `trace_*.json` 은 동일하다 — 콘솔에 이벤트 스트림이 필요하면 `core/EventManager.py`
-> 의 `TRACE_PRINT = True` 로 켠다(느려진다).
+> ⚠️ **이벤트 출력은 기본 켬**(`TRACE_PRINT`). 대시보드가 `experiment_logs/` 의 이 출력을
+> 파싱해 Scenarios 탭·Maps Animation 을 그리기 때문이다. 순수 배치라면
+> `MCI_TRACE_PRINT=0` 으로 꺼서 약 1.68× → 약 2.0× 로 올릴 수 있다. 출력 여부는 상태·RNG 와
+> 무관하므로 **결과 파일은 어느 쪽이든 동일**하다(100회 실행 로그 1,350,093줄 중 다른 줄은
+> `Computation time(s)` 1줄뿐).

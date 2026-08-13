@@ -1,13 +1,20 @@
 import copy
 import heapq
+import os
 
 import numpy as np
 
 # [고속화 S1-3] 이벤트/액션 디버그 출력 스위치.
-# 원본은 이벤트마다 `print(c_event)` 를 호출한다(스텝당 약 14회). 드라이버들이
-# stdout 을 /dev/null 로 돌려도 튜플 문자열화 비용은 그대로 남아 전체의 약 2.5% 였다.
-# 기본 False = 출력만 없음(상태·RNG 무관) → 결과 동일. 디버깅 시 True 로.
-TRACE_PRINT = False
+# 원본은 이벤트마다 `print(c_event)` 를, 결정마다 `print("Action:", ...)` 를 호출한다.
+# 출력 여부는 상태·RNG 와 무관하므로 꺼도 **결과는 동일**하고 시간만 줄어든다.
+#
+# ★MCI_ADV 기본값은 **켬**이다. 대시보드(MCI_Streamlit.parse_log_blocks)가
+#   experiment_logs/<coord>_<ts>.txt 에 저장된 이 출력을 파싱해
+#   Scenarios 탭(이벤트 테이블·환자 요약·Patient Story Animation)과
+#   Maps > Animation 모드를 그린다. 끄면 그 화면들이 빈다.
+#   순수 배치(대시보드 미사용)에서는 `MCI_TRACE_PRINT=0` 으로 꺼서 더 빠르게 돌린다.
+#   (MCI_UAV 정본은 로그를 파싱하는 소비자가 없어 기본 꺼짐이다.)
+TRACE_PRINT = os.environ.get("MCI_TRACE_PRINT", "1").strip().lower() not in ("0", "false", "off")
 
 # [고속화 S2-6] 증분 카운터 상시 검증 스위치. True 면 카운터와 전수 스캔(np.all)이
 # 매 호출마다 일치하는지 확인한다(느림). 동치 게이트에서 한 번은 켜고 돌린다.

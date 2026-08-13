@@ -144,12 +144,27 @@ orc.run_simulation(config_path, use_fast_core=False)   # 원본 코어 강제
 `results_*.txt` · `results_*_stat.txt` · `trace_*.json`(5.5MB) **바이트 동일**, in-process
 배속 **2.15×**.
 
-> ⚠️ **콘솔 출력만 다르다.** 고속 코어는 이벤트별 `print(c_event)` 와 `Action:` 출력을
-> `TRACE_PRINT=False` 로 막는다 → 같은 실행의 stdout 이 3.1MB(68,029줄) → 17.8KB(332줄).
-> `Orchestrator.run_simulation` 은 stdout 을 `experiment_logs/` 에 보관만 하고 파싱하지
-> 않으며, 대시보드는 `results_*.txt` 와 `trace_*.json` 을 읽으므로 기능 영향은 없다.
-> 이벤트 스트림이 필요하면 `src/sim_src_upgrade/core/EventManager.py` 의
-> `TRACE_PRINT = True` 로 켠다(느려진다).
+> ⚠️ **콘솔 출력(=대시보드 로그)은 기본값으로 원본과 동일하게 유지한다.**
+> 고속 코어는 이벤트별 `print(c_event)` 와 `Action:` 출력을 `TRACE_PRINT` 로 게이트할 수
+> 있는데, **MCI_ADV 기본값은 켬**이다. 대시보드(`MCI_Streamlit.parse_log_blocks`)가
+> `experiment_logs/<coord>_<ts>.txt` 에 저장된 이 출력을 파싱해 Scenarios 탭(이벤트 테이블·
+> 환자 요약·Patient Story Animation)과 Maps > Animation 을 그리기 때문이다. 끄면 그 화면이 빈다.
+> 실측 확인: 100회 실행 로그 **1,350,093줄 중 다른 줄은 `Computation time(s)` 1줄뿐**
+> (측정값 자체) — 이벤트·Action 스트림은 전부 바이트 동일.
+>
+> 순수 배치(대시보드 미사용)에서는 `MCI_TRACE_PRINT=0` 으로 출력을 꺼서 더 빠르게 돌린다.
+> 출력 여부는 상태·RNG 와 무관하므로 결과 파일은 어느 쪽이든 동일하다.
+
+### 배속 (대시보드 경로 wall, Generate 기본 파라미터 · 환자30 · AMB30 · UAV3)
+
+| 반복수 | 원본 코어 | 고속(기본, 로그 ON) | 고속(`MCI_TRACE_PRINT=0`) |
+|---:|---:|---:|---:|
+| 10 | 7.06s | — | 4.05s (1.74×) |
+| 30 | 19.70s | **11.70s (1.68×)** | 10.34s (1.88×) |
+| 100 | 63.10s | **37.52s (1.68×)** | 32.73s (1.99×) |
+
+세 경우 모두 `results_*.txt` · `_stat.txt` · `trace_*.json` 해시 동일. 반복수가 적을수록
+배속이 낮은 것은 subprocess 기동 + 사전 동치검증(0.3s) 등 고정 오버헤드 약 0.9초 때문이다.
 
 ## 5. 재검증 방법
 
