@@ -1,0 +1,1315 @@
+<title>MCI Console Directions</title>
+
+<style>
+/* ═══════════════════════════════════════════════════
+   PAGE CHROME — theme-aware, deliberately quiet.
+   All color carried by the three mockups below.
+   ═══════════════════════════════════════════════════ */
+:root{
+  --pg:      #F4F6F6;
+  --pg-2:    #FFFFFF;
+  --pg-sunk: #E9EDED;
+  --rule:    #D5DCDC;
+  --rule-2:  #C2CBCB;
+  --tx:      #17201F;
+  --tx-2:    #4A5654;
+  --tx-3:    #77817F;
+  --acc:     #2F6B75;
+  --acc-sub: #DCE9EA;
+
+  --f-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --f-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --f-serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+
+  --mx: 1180px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --pg:      #101414;
+    --pg-2:    #171C1C;
+    --pg-sunk: #0B0E0E;
+    --rule:    #26302F;
+    --rule-2:  #34403F;
+    --tx:      #E4EAE9;
+    --tx-2:    #A3AFAD;
+    --tx-3:    #77817F;
+    --acc:     #63B4BF;
+    --acc-sub: #16292C;
+  }
+}
+:root[data-theme="dark"]{
+  --pg:      #101414;
+  --pg-2:    #171C1C;
+  --pg-sunk: #0B0E0E;
+  --rule:    #26302F;
+  --rule-2:  #34403F;
+  --tx:      #E4EAE9;
+  --tx-2:    #A3AFAD;
+  --tx-3:    #77817F;
+  --acc:     #63B4BF;
+  --acc-sub: #16292C;
+}
+
+*{ box-sizing: border-box; }
+
+body{
+  background: var(--pg);
+  color: var(--tx);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+a{ color: var(--acc); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible{ outline: 2px solid var(--acc); outline-offset: 3px; }
+
+.wrap{
+  max-width: var(--mx);
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+/* ── sticky jump bar ───────────────────────────── */
+.navbar{
+  position: sticky; top: 0; z-index: 40;
+  background: color-mix(in srgb, var(--pg) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rule);
+}
+.navbar .wrap{
+  display: flex; align-items: center; gap: 20px;
+  height: 52px;
+}
+.navbar .brand{
+  font-family: var(--f-mono);
+  font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--tx-3);
+  margin-right: auto;
+  white-space: nowrap;
+}
+.navbar a{
+  font-family: var(--f-mono);
+  font-size: 11.5px; letter-spacing: .06em;
+  text-decoration: none;
+  color: var(--tx-2);
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.navbar a:hover{ color: var(--tx); border-color: var(--rule-2); }
+.navbar a .n{ color: var(--acc); margin-right: 6px; }
+
+/* ── masthead ──────────────────────────────────── */
+.mast{ padding: 64px 0 40px; border-bottom: 1px solid var(--rule); }
+.eyebrow{
+  font-family: var(--f-mono);
+  font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--acc);
+  margin: 0 0 18px;
+}
+h1{
+  font-size: clamp(30px, 4.4vw, 46px);
+  line-height: 1.1;
+  letter-spacing: -0.022em;
+  font-weight: 700;
+  text-wrap: balance;
+  margin: 0 0 20px;
+  max-width: 20ch;
+}
+.lede{
+  font-size: 17px;
+  color: var(--tx-2);
+  max-width: 62ch;
+  margin: 0 0 28px;
+}
+
+/* ── constraint callout ────────────────────────── */
+.callout{
+  background: var(--pg-2);
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--acc);
+  padding: 20px 22px;
+  max-width: 720px;
+}
+.callout h2{
+  font-family: var(--f-mono);
+  font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--tx-3);
+  margin: 0 0 12px; font-weight: 500;
+}
+.callout p{ margin: 0 0 10px; font-size: 14.5px; color: var(--tx-2); }
+.callout p:last-child{ margin-bottom: 0; }
+.callout code, code.inl{
+  font-family: var(--f-mono); font-size: .88em;
+  background: var(--pg-sunk); border: 1px solid var(--rule);
+  padding: 1px 5px; color: var(--tx);
+}
+
+/* ── section scaffolding ───────────────────────── */
+section.dir{ padding: 60px 0 8px; border-bottom: 1px solid var(--rule); }
+section.dir:last-of-type{ border-bottom: 0; }
+
+.dir-head{ display: flex; align-items: baseline; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.dir-num{
+  font-family: var(--f-mono);
+  font-size: 12px; letter-spacing: .1em;
+  color: var(--acc);
+  border: 1px solid var(--acc);
+  padding: 3px 8px;
+}
+.dir-head h2{
+  font-size: clamp(24px, 3vw, 32px);
+  letter-spacing: -0.018em; font-weight: 700;
+  margin: 0;
+}
+.dir-head .ko{
+  font-size: 14px; color: var(--tx-3);
+  font-family: var(--f-mono); letter-spacing: .02em;
+}
+.dir-status{
+  font-family: var(--f-mono);
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--pg); background: var(--acc);
+  padding: 3px 9px; white-space: nowrap;
+}
+.decision{
+  margin-top: 22px; max-width: 720px;
+  background: var(--acc-sub); border: 1px solid var(--acc);
+  border-left-width: 3px; padding: 16px 20px;
+}
+.decision h2{
+  font-family: var(--f-mono);
+  font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--acc); margin: 0 0 10px; font-weight: 600;
+}
+.decision p{ margin: 0; font-size: 14.5px; color: var(--tx); }
+.decision p + p{ margin-top: 8px; color: var(--tx-2); }
+.thesis{
+  font-size: 16.5px; color: var(--tx-2);
+  max-width: 66ch; margin: 0 0 32px;
+}
+.thesis strong{ color: var(--tx); font-weight: 600; }
+
+/* ── spec strip ────────────────────────────────── */
+.spec{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  margin-bottom: 30px;
+}
+.spec > div{ background: var(--pg-2); padding: 16px 18px; }
+.spec h3{
+  font-family: var(--f-mono);
+  font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--tx-3); font-weight: 500;
+  margin: 0 0 12px;
+}
+.swatches{ display: flex; flex-wrap: wrap; gap: 6px; }
+.sw{ width: 34px; }
+.sw i{ display: block; height: 34px; border: 1px solid rgba(128,128,128,.35); }
+.sw span{
+  display: block; font-family: var(--f-mono);
+  font-size: 8.5px; color: var(--tx-3);
+  margin-top: 4px; letter-spacing: -.02em;
+}
+.typelist{ margin: 0; padding: 0; list-style: none; font-size: 13.5px; }
+.typelist li{ margin-bottom: 8px; color: var(--tx-2); line-height: 1.4; }
+.typelist li:last-child{ margin-bottom: 0; }
+.typelist b{ color: var(--tx); font-weight: 600; }
+.typelist em{ font-style: normal; font-family: var(--f-mono); font-size: 11px; color: var(--tx-3); display: block; }
+.costlist{ margin: 0; padding: 0; list-style: none; font-size: 13.5px; color: var(--tx-2); }
+.costlist li{ display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px dotted var(--rule); }
+.costlist li:last-child{ border-bottom: 0; }
+.costlist b{ color: var(--tx); font-weight: 600; font-family: var(--f-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+/* ── mockup frame ──────────────────────────────── */
+.frame-label{
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--f-mono);
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--tx-3);
+  margin-bottom: 10px;
+}
+.frame-label::after{ content: ""; flex: 1; height: 1px; background: var(--rule); }
+.scroller{
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  margin-bottom: 34px;
+  background: var(--pg-sunk);
+}
+
+/* aftermath notes */
+.notes{ margin-bottom: 40px; }
+.notes h3{
+  font-family: var(--f-mono);
+  font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--tx-3); font-weight: 500; margin: 0 0 10px;
+}
+.notes ul{ margin: 0; padding-left: 20px; font-size: 14.5px; color: var(--tx-2); }
+.notes li{ margin-bottom: 7px; }
+.notes li b{ color: var(--tx); font-weight: 600; }
+
+/* ── closing table ─────────────────────────────── */
+.closing{ padding: 56px 0 80px; }
+.closing h2{ font-size: 26px; letter-spacing: -.018em; margin: 0 0 20px; }
+.cmp{ width: 100%; border-collapse: collapse; font-size: 14px; }
+.cmp th, .cmp td{ text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.cmp thead th{
+  font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--tx-3); font-weight: 500;
+  border-bottom: 1px solid var(--rule-2);
+}
+.cmp tbody th{ font-weight: 600; color: var(--tx); white-space: nowrap; }
+.cmp td{ color: var(--tx-2); }
+.cmp tbody tr:last-child th, .cmp tbody tr:last-child td{ border-bottom: 0; }
+.tick{ color: var(--acc); font-weight: 600; }
+
+.shared{
+  margin-top: 40px;
+  background: var(--pg-2); border: 1px solid var(--rule);
+  padding: 22px;
+}
+.shared h3{ margin: 0 0 8px; font-size: 16px; letter-spacing: -.01em; }
+.shared p{ margin: 0 0 14px; font-size: 14.5px; color: var(--tx-2); max-width: 68ch; }
+pre{
+  margin: 0; padding: 16px;
+  background: var(--pg-sunk); border: 1px solid var(--rule);
+  overflow-x: auto;
+  font-family: var(--f-mono); font-size: 12.5px; line-height: 1.65;
+  color: var(--tx-2);
+}
+pre .c{ color: var(--tx-3); }
+pre .s{ color: var(--acc); }
+
+/* ═══════════════════════════════════════════════════
+   MOCKUP — shared structure.
+   Each variant commits to its own palette and does not
+   follow the viewer theme: these are product skins.
+   ═══════════════════════════════════════════════════ */
+.mk{
+  min-width: 900px;
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  background: var(--g);
+  color: var(--t);
+  font-family: var(--f-b);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.mk-side{
+  background: var(--sd);
+  border-right: 1px solid var(--r);
+  padding: 18px 16px 22px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.mk-main{ padding: 20px 24px 28px; min-width: 0; }
+
+.mk-brand{ display: flex; align-items: center; gap: 9px; }
+.mk-brand .mark{
+  width: 26px; height: 26px; flex: none;
+  display: grid; place-items: center;
+  border: 1px solid var(--a1);
+  color: var(--a1);
+  font-family: var(--f-d); font-weight: 700; font-size: 12px;
+  border-radius: var(--rad);
+}
+.mk-brand .nm{ font-family: var(--f-d); font-weight: 700; font-size: 13.5px; letter-spacing: -.01em; }
+.mk-brand .sub{ font-family: var(--f-m); font-size: 8.5px; letter-spacing: .1em; color: var(--m); text-transform: uppercase; }
+
+.mk-field{ display: flex; flex-direction: column; gap: 5px; }
+.mk-field label{
+  font-family: var(--f-m); font-size: 9px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--m);
+}
+.mk-field .inp{
+  background: var(--in); border: 1px solid var(--r);
+  border-radius: var(--rad);
+  padding: 7px 9px; font-size: 11.5px;
+  font-family: var(--f-m);
+  color: var(--t);
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+}
+.mk-field .inp.sel{ border-color: var(--a1); }
+.mk-field .inp .car{ color: var(--m); font-size: 9px; }
+
+.mk-map{
+  border: 1px solid var(--r); border-radius: var(--rad);
+  overflow: hidden; background: var(--in);
+}
+.mk-map svg{ display: block; width: 100%; height: 92px; }
+.mk-map .cap{
+  font-family: var(--f-m); font-size: 9px; color: var(--m);
+  padding: 5px 8px; border-top: 1px solid var(--r);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-tabs{ display: flex; gap: var(--tabgap); margin-bottom: 20px; }
+.mk-tab{
+  padding: var(--tabpad);
+  font-size: 12px; font-weight: 500;
+  color: var(--m);
+  border-radius: var(--rad);
+  white-space: nowrap;
+}
+.mk-tab.on{ color: var(--a1); }
+
+.mk-h1{
+  font-family: var(--f-d);
+  font-size: 21px; font-weight: 700; letter-spacing: -.02em;
+  margin: 0 0 3px;
+}
+.mk-sub{ font-family: var(--f-m); font-size: 10px; color: var(--m); letter-spacing: .05em; margin-bottom: 18px; font-variant-numeric: tabular-nums; }
+
+.mk-kpis{ display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: 20px; }
+.mk-kpi .lb{
+  font-family: var(--f-m); font-size: 8.5px; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--m);
+  margin-bottom: 6px;
+}
+.mk-kpi .vl{
+  font-family: var(--f-d); font-weight: 700;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.mk-kpi .dl{ font-family: var(--f-m); font-size: 9.5px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.up{ color: var(--ok); } .dn{ color: var(--bad); }
+
+.mk-split{ display: grid; grid-template-columns: 1.35fr 1fr; gap: 18px; }
+
+.mk-panel{ background: var(--p); border: 1px solid var(--r); border-radius: var(--rad); overflow: hidden; }
+.mk-panel > .ph{
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 12px; border-bottom: 1px solid var(--r);
+}
+.mk-panel > .ph .tt{ font-family: var(--f-m); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--m); }
+.mk-panel > .ph .badge{
+  font-family: var(--f-m); font-size: 9px; letter-spacing: .06em;
+  color: var(--a1); border: 1px solid var(--a1); padding: 1px 6px; border-radius: var(--rad);
+}
+
+table.mkt{ width: 100%; border-collapse: collapse; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+table.mkt th{
+  font-family: var(--f-m); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--m); font-weight: 500; text-align: right; padding: 7px 12px;
+}
+table.mkt th:first-child{ text-align: left; }
+table.mkt td{ padding: 7px 12px; text-align: right; color: var(--t); }
+table.mkt td:first-child{ text-align: left; font-family: var(--f-m); font-size: 11px; }
+.cld{
+  font-family: var(--f-m); font-size: 10px;
+  border: 1px solid var(--r); padding: 0 5px; border-radius: var(--rad);
+  color: var(--a1);
+}
+
+.triage{ display: flex; }
+.triage .seg{ height: 100%; }
+.tlegend{ display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 12px; }
+.tlegend div{ display: flex; align-items: center; gap: 6px; font-family: var(--f-m); font-size: 9.5px; color: var(--m); font-variant-numeric: tabular-nums; }
+.tlegend i{ width: 8px; height: 8px; flex: none; }
+
+.chartbox{ padding: 12px; }
+.chartbox svg{ display: block; width: 100%; height: 118px; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation: none !important; transition: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════
+   A — DISPATCH CONSOLE
+   Instrument, not document. Square, dense, mono-first.
+   Grid is shared 1px rules — no floating cards.
+   ═══════════════════════════════════════════════════ */
+.mk--a{
+  --g:#0D1418; --sd:#0A1013; --p:#111B21; --in:#0A1215;
+  --r:#20303A; --t:#C9D8DF; --m:#6B808C;
+  --a1:#3BB3C4; --a2:#5FD1A4;
+  --ok:#3FA96B; --bad:#E24B45;
+  --tR:#E23B3B; --tY:#DFA22B; --tG:#2FA84F; --tK:#7C8894;
+  --rad:0px;
+  --tabgap:0px; --tabpad:9px 20px;
+  --f-d:"IBM Plex Sans", system-ui, sans-serif;
+  --f-b:"IBM Plex Sans", system-ui, sans-serif;
+  --f-m:ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+/* everything that carries data is mono in this direction */
+.mk--a .mk-kpi .vl, .mk--a .mk-h1{ font-family: var(--f-m); letter-spacing: -.04em; }
+
+.mk--a .mk-tabs{ border: 1px solid var(--r); }
+.mk--a .mk-tab{
+  border-right: 1px solid var(--r);
+  font-family: var(--f-m); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+}
+.mk--a .mk-tab.on{ background: var(--a1); color: #04171B; font-weight: 600; }
+
+/* status strip — a dispatch board has one; a report doesn't */
+.mk--a .statstrip{
+  display: flex; align-items: stretch;
+  border: 1px solid var(--r); border-bottom: 0;
+  font-family: var(--f-m); font-size: 9.5px;
+}
+.mk--a .statstrip > div{ padding: 6px 12px; border-right: 1px solid var(--r); display: flex; gap: 7px; align-items: center; }
+.mk--a .statstrip .k{ color: var(--m); letter-spacing: .1em; }
+.mk--a .statstrip .v{ color: var(--t); font-variant-numeric: tabular-nums; }
+.mk--a .statstrip .live{ margin-left: auto; border-right: 0; color: var(--a2); }
+.mk--a .statstrip .live i{ width: 6px; height: 6px; background: var(--a2); display: block; }
+
+.mk--a .mk-kpis{ border: 1px solid var(--r); gap: 0; }
+.mk--a .mk-kpi{ padding: 13px 14px; border-right: 1px solid var(--r); }
+.mk--a .mk-kpi:last-child{ border-right: 0; }
+.mk--a .mk-kpi .vl{ font-size: 25px; }
+
+.mk--a table.mkt tbody tr{ border-top: 1px solid var(--r); }
+.mk--a .mk-field .inp{ text-transform: none; }
+
+/* ═══════════════════════════════════════════════════
+   B — ISOCHRONE
+   Cartographic + journal. Light ground, hairlines,
+   serif numerals, booktabs rules, no filled chrome.
+   ═══════════════════════════════════════════════════ */
+.mk--b{
+  --g:#F1F4F3; --sd:#FFFFFF; --p:#FFFFFF; --in:#F7F9F8;
+  --r:#D2DAD8; --t:#17211F; --m:#697672;
+  --a1:#0F6E63; --a2:#8A6A22;
+  --ok:#2A7A45; --bad:#B7332C;
+  --tR:#BE342F; --tY:#A87610; --tG:#2A7A45; --tK:#77817D;
+  --rad:0px;
+  --tabgap:24px; --tabpad:8px 0;
+  --f-d:ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --f-b:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-m:ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+.mk--b .mk-side{ padding-top: 22px; }
+.mk--b .mk-tabs{ border-bottom: 1px solid var(--r); }
+.mk--b .mk-tab{ font-size: 12.5px; padding-bottom: 9px; margin-bottom: -1px; }
+.mk--b .mk-tab.on{ border-bottom: 2px solid var(--a1); font-weight: 600; }
+
+.mk--b .mk-h1{ font-size: 25px; font-weight: 600; letter-spacing: -.012em; }
+
+/* KPIs as a printed figure row: rule above, serif numeral, no box */
+.mk--b .mk-kpis{ gap: 0; border-top: 1px solid #17211F; }
+.mk--b .mk-kpi{ padding: 14px 20px 16px 0; }
+.mk--b .mk-kpi + .mk-kpi{ padding-left: 20px; border-left: 1px solid var(--r); }
+.mk--b .mk-kpi .vl{ font-size: 30px; font-weight: 600; letter-spacing: -.015em; }
+.mk--b .mk-panel{ border-color: var(--r); }
+.mk--b .mk-panel > .ph{ border-bottom: 1px solid #17211F; }
+
+/* booktabs: rule under header, rule at foot, nothing between */
+.mk--b table.mkt thead th{ border-bottom: 1px solid #17211F; color: var(--t); }
+.mk--b table.mkt tbody tr:last-child td{ border-bottom: 1px solid #17211F; }
+.mk--b .cld{ border: 0; padding: 0; font-style: italic; font-family: var(--f-d); font-size: 12px; }
+
+/* ═══════════════════════════════════════════════════
+   C — GOLDEN HOUR
+   Identity is TIME, not glow. Every metric carries a
+   horizontal time-rail; warm = ground units, cool = air.
+   ═══════════════════════════════════════════════════ */
+.mk--c{
+  --g:#131017; --sd:#0E0C12; --p:#1B1721; --in:#100D14;
+  --r:#2E2735; --t:#EDE6EA; --m:#8A7F91;
+  --a1:#FF6B3D; --a2:#4DD6E8;
+  --ok:#4ECB8B; --bad:#FF5A63;
+  --tR:#FF4D4D; --tY:#F2B33D; --tG:#4ECB8B; --tK:#8A7F91;
+  --rad:3px;
+  --tabgap:6px; --tabpad:8px 16px;
+  --f-d:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-b:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-m:ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+.mk--c .mk-h1{ font-weight: 800; letter-spacing: -.035em; font-size: 24px; }
+.mk--c .mk-tab{ background: #1B1721; border: 1px solid var(--r); }
+.mk--c .mk-tab.on{ background: color-mix(in srgb, var(--a1) 16%, #1B1721); border-color: var(--a1); color: var(--a1); font-weight: 600; }
+
+/* the elapsed-time band: the single most characteristic
+   object in this app is the simulation clock */
+.mk--c .clockband{
+  background: var(--p); border: 1px solid var(--r); border-radius: var(--rad);
+  padding: 12px 14px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 14px;
+}
+.mk--c .clockband .big{
+  font-family: var(--f-m); font-size: 22px; font-weight: 700;
+  letter-spacing: -.04em; font-variant-numeric: tabular-nums;
+  color: var(--a1);
+}
+.mk--c .clockband .rail{
+  flex: 1; height: 5px; background: #100D14; border-radius: 3px;
+  position: relative; overflow: hidden;
+}
+.mk--c .clockband .rail > i{
+  position: absolute; inset: 0 auto 0 0; width: 68%;
+  background: linear-gradient(90deg, var(--a2), var(--a1));
+  border-radius: 3px;
+}
+.mk--c .clockband .rail > b{
+  position: absolute; top: -3px; left: 68%; width: 2px; height: 11px;
+  background: var(--t);
+}
+.mk--c .clockband .cap{ font-family: var(--f-m); font-size: 9.5px; color: var(--m); letter-spacing: .1em; white-space: nowrap; }
+
+.mk--c .mk-kpis{ gap: 10px; }
+.mk--c .mk-kpi{
+  background: var(--p); border: 1px solid var(--r); border-radius: var(--rad);
+  padding: 13px 15px 12px;
+}
+.mk--c .mk-kpi .vl{ font-size: 28px; }
+.mk--c .mk-kpi .rail{ height: 3px; background: #100D14; margin-top: 10px; border-radius: 2px; overflow: hidden; }
+.mk--c .mk-kpi .rail > i{ display: block; height: 100%; border-radius: 2px; }
+.mk--c .mk-kpi.crit .vl{ color: var(--a1); }
+.mk--c .mk-kpi.crit{ border-color: color-mix(in srgb, var(--a1) 45%, var(--r)); }
+.mk--c .mk-kpi.crit::after{
+  content:""; display:block;
+}
+.mk--c .pulse{
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--a1); margin-left: 7px; vertical-align: middle;
+  animation: pl 2.4s ease-in-out infinite;
+}
+@keyframes pl{
+  0%,100%{ opacity: 1; transform: scale(1); }
+  50%{ opacity: .35; transform: scale(.72); }
+}
+.mk--c table.mkt tbody tr{ border-top: 1px solid var(--r); }
+.mk--c .mk-tabs{ margin-bottom: 16px; }
+
+@media (max-width: 720px){
+  .wrap{ padding: 0 18px; }
+  .navbar .brand{ display: none; }
+  .mast{ padding-top: 40px; }
+}
+</style>
+
+<nav class="navbar">
+  <div class="wrap">
+    <span class="brand">MCI_ADV · vis_src</span>
+    <a href="#a"><span class="n">A</span>Dispatch</a>
+    <a href="#b"><span class="n">B</span>Isochrone</a>
+    <a href="#c"><span class="n">C</span>Golden Hour</a>
+    <a href="#pick"><span class="n">·</span>비교</a>
+  </div>
+</nav>
+
+<header class="mast">
+  <div class="wrap">
+    <p class="eyebrow">Streamlit Re-skin · 시안 3종</p>
+    <h1>MCI 대시보드를 장비처럼 보이게</h1>
+    <p class="lede">
+      Streamlit 구조는 그대로 두고 CSS 주입만으로 도달 가능한 세 가지 방향.
+      각 시안은 실제 대시보드 화면 — 사이드바 / 탭 / KPI / 결과 테이블 —
+      을 그 스킨으로 그린 목업이다. 색만 바꾼 세 개가 아니라,
+      정보 배치 자체가 서로 다르다.
+    </p>
+
+    <div class="callout">
+      <h2>작업 범위</h2>
+      <p>
+        건드리는 파일은 두 개. <code>src/vis_src/MCI_Streamlit.py:1427</code> 의 CSS 블록과
+        <code>.streamlit/config.toml</code> 의 <code>[theme]</code>.
+        Python 로직·데이터 경로·<code>subprocess</code> 호출부는 손대지 않는다.
+      </p>
+      <p>
+        Streamlit Community Cloud는 <code>unsafe_allow_html=True</code> 와
+        <code>@import</code> 웹폰트를 모두 허용한다. 세 시안 전부 배포된 상태에서 그대로 동작한다.
+        도메인은 <code>*.streamlit.app</code> 로 유지된다.
+      </p>
+    </div>
+
+    <div class="decision">
+      <h2>결정 · 2026-08-14</h2>
+      <p><b>A · Dispatch Console 채택. 적용 완료.</b></p>
+      <p>
+        스타일 정본은 새 파일 <code>src/vis_src/_theme.py</code> 하나로 모았다.
+        4개 페이지에 흩어져 서로 어긋나 있던 <code>&lt;style&gt;</code> 블록 475줄을 걷어내고
+        <code>inject_theme()</code> 호출로 대체했다. Python 로직은 건드리지 않았다.
+        B·C 시안은 기록으로 남긴다.
+      </p>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════ A ══════════════════ -->
+<section class="dir" id="a">
+  <div class="wrap">
+    <div class="dir-head">
+      <span class="dir-num">A</span>
+      <h2>Dispatch Console</h2>
+      <span class="ko">운영 콘솔</span>
+      <span class="dir-status">채택 · 적용 완료</span>
+    </div>
+    <p class="thesis">
+      실제 119 상황실 CAD 화면의 어휘를 빌린다. 둥근 모서리 0, 카드 그림자 0,
+      셀은 공유된 1px 괘선으로 붙어 있다. <strong>모든 수치는 모노스페이스</strong>고
+      숫자 폭이 고정돼 열이 흔들리지 않는다. 색은 청록 하나만 인터랙션에 쓰고,
+      <strong>Red/Yellow/Green/Black은 START 트리아지 프로토콜 색이라 데이터에만 예약</strong>한다.
+      장식용으로 빨강을 쓰지 않는다는 뜻이다.
+    </p>
+
+    <div class="spec">
+      <div>
+        <h3>Palette</h3>
+        <div class="swatches">
+          <div class="sw"><i style="background:#0D1418"></i><span>0D1418</span></div>
+          <div class="sw"><i style="background:#111B21"></i><span>111B21</span></div>
+          <div class="sw"><i style="background:#20303A"></i><span>20303A</span></div>
+          <div class="sw"><i style="background:#C9D8DF"></i><span>C9D8DF</span></div>
+          <div class="sw"><i style="background:#3BB3C4"></i><span>3BB3C4</span></div>
+          <div class="sw"><i style="background:#5FD1A4"></i><span>5FD1A4</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>Type</h3>
+        <ul class="typelist">
+          <li><b>IBM Plex Sans KR</b><em>UI 라벨 · 한글 지원</em></li>
+          <li><b>IBM Plex Mono</b><em>수치 · 시각 · 규칙 ID 전부</em></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Cost</h3>
+        <ul class="costlist">
+          <li>CSS 재작성 <b>~260줄</b></li>
+          <li>Python 변경 <b>0줄</b></li>
+          <li>config.toml <b>5줄</b></li>
+          <li>예상 소요 <b>1일</b></li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="frame-label">Mockup — Analytics 탭</p>
+    <div class="scroller">
+      <div class="mk mk--a">
+        <aside class="mk-side">
+          <div class="mk-brand">
+            <span class="mark">M</span>
+            <span>
+              <span class="nm" style="display:block">MCI_ADV</span>
+              <span class="sub">Dispatch Console</span>
+            </span>
+          </div>
+          <div class="mk-field">
+            <label>Base Path</label>
+            <div class="inp">~/MCI_ADV</div>
+          </div>
+          <div class="mk-field">
+            <label>Experiment</label>
+            <div class="inp sel">exp_20260810_dep_1430<span class="car">▼</span></div>
+          </div>
+          <div class="mk-field">
+            <label>Coordinate</label>
+            <div class="inp sel">(37.4563,126.7052)<span class="car">▼</span></div>
+          </div>
+          <div class="mk-map">
+            <svg viewBox="0 0 200 92" role="img" aria-label="사고 지점 미니맵">
+              <rect width="200" height="92" fill="#0A1215"/>
+              <g stroke="#1A2830" stroke-width="1">
+                <path d="M0 24 H200 M0 48 H200 M0 70 H200 M40 0 V92 M88 0 V92 M136 0 V92"/>
+              </g>
+              <path d="M-4 60 C40 52 60 30 104 34 C142 38 168 22 204 28" fill="none" stroke="#24404A" stroke-width="2.5"/>
+              <path d="M12 92 C36 62 62 66 88 40 C110 18 140 14 168 0" fill="none" stroke="#24404A" stroke-width="1.6"/>
+              <circle cx="104" cy="46" r="15" fill="none" stroke="#3BB3C4" stroke-width="1" opacity=".3"/>
+              <circle cx="104" cy="46" r="8" fill="none" stroke="#3BB3C4" stroke-width="1" opacity=".55"/>
+              <circle cx="104" cy="46" r="3" fill="#3BB3C4"/>
+            </svg>
+            <div class="cap">37.4563 N · 126.7052 E</div>
+          </div>
+        </aside>
+
+        <main class="mk-main">
+          <h1 class="mk-h1">POLICY COMPARISON</h1>
+          <div class="mk-sub">64 RULES × 10 ITERATIONS · RCBD · α = 0.05</div>
+
+          <div class="mk-tabs">
+            <span class="mk-tab">Maps</span>
+            <span class="mk-tab">Scenarios</span>
+            <span class="mk-tab on">Analytics</span>
+            <span class="mk-tab">Data Tables</span>
+            <span class="mk-tab">Rerun</span>
+          </div>
+
+          <div class="statstrip">
+            <div><span class="k">PATIENTS</span><span class="v">30</span></div>
+            <div><span class="k">AMB</span><span class="v">30</span></div>
+            <div><span class="k">UAV</span><span class="v">03</span></div>
+            <div><span class="k">SEED</span><span class="v">0</span></div>
+            <div class="live"><i></i><span>RUN 10/10 COMPLETE</span></div>
+          </div>
+
+          <div class="mk-kpis">
+            <div class="mk-kpi">
+              <div class="lb">Best Reward</div>
+              <div class="vl">812.4</div>
+              <div class="dl up">▲ 5.9% vs R00</div>
+            </div>
+            <div class="mk-kpi">
+              <div class="lb">Makespan</div>
+              <div class="vl">94.2<span style="font-size:12px;color:var(--m)"> min</span></div>
+              <div class="dl up">▼ 11.3 min</div>
+            </div>
+            <div class="mk-kpi">
+              <div class="lb">PDR</div>
+              <div class="vl">6.7<span style="font-size:12px;color:var(--m)"> %</span></div>
+              <div class="dl dn">▲ 0.4 pt</div>
+            </div>
+            <div class="mk-kpi">
+              <div class="lb">Pareto Layer 0</div>
+              <div class="vl">7<span style="font-size:12px;color:var(--m)"> / 64</span></div>
+              <div class="dl" style="color:var(--m)">non-dominated</div>
+            </div>
+          </div>
+
+          <div class="mk-split">
+            <div class="mk-panel">
+              <div class="ph"><span class="tt">EMM + Holm · CLD</span><span class="badge">p &lt; .001</span></div>
+              <table class="mkt">
+                <thead>
+                  <tr><th>Rule</th><th>Reward</th><th>Time</th><th>PDR</th><th>CLD</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>R23</td><td>812.4</td><td>94.2</td><td>6.7</td><td><span class="cld">a</span></td></tr>
+                  <tr><td>R41</td><td>806.9</td><td>95.8</td><td>6.9</td><td><span class="cld">a</span></td></tr>
+                  <tr><td>R07</td><td>791.2</td><td>99.1</td><td>7.4</td><td><span class="cld">ab</span></td></tr>
+                  <tr><td>R58</td><td>774.6</td><td>103.7</td><td>8.1</td><td><span class="cld">b</span></td></tr>
+                  <tr><td>R00</td><td>766.9</td><td>105.5</td><td>8.3</td><td><span class="cld">c</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mk-panel">
+              <div class="ph"><span class="tt">Triage Mix</span></div>
+              <div class="triage" style="height:26px;margin:12px 12px 0">
+                <span class="seg" style="flex:6;background:var(--tR)"></span>
+                <span class="seg" style="flex:9;background:var(--tY)"></span>
+                <span class="seg" style="flex:13;background:var(--tG)"></span>
+                <span class="seg" style="flex:2;background:var(--tK)"></span>
+              </div>
+              <div class="tlegend">
+                <div><i style="background:var(--tR)"></i>RED 6</div>
+                <div><i style="background:var(--tY)"></i>YELLOW 9</div>
+                <div><i style="background:var(--tG)"></i>GREEN 13</div>
+                <div><i style="background:var(--tK)"></i>BLACK 2</div>
+              </div>
+              <div class="chartbox" style="border-top:1px solid var(--r)">
+                <svg viewBox="0 0 240 100" role="img" aria-label="반복별 보상 추이">
+                  <g stroke="#1A2830" stroke-width="1">
+                    <path d="M0 20 H240 M0 45 H240 M0 70 H240"/>
+                  </g>
+                  <path d="M4 78 L30 66 L56 70 L82 52 L108 46 L134 50 L160 34 L186 30 L212 26 L236 22"
+                        fill="none" stroke="#3BB3C4" stroke-width="2"/>
+                  <path d="M4 88 L30 82 L56 84 L82 74 L108 72 L134 76 L160 66 L186 64 L212 62 L236 60"
+                        fill="none" stroke="#5FD1A4" stroke-width="1.4" stroke-dasharray="3 3"/>
+                  <circle cx="236" cy="22" r="3" fill="#3BB3C4"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h3>이 방향이 맞는 경우</h3>
+      <ul>
+        <li><b>발표장이 어둡고</b> 화면이 크다. 대비 높고 밀도 높은 화면이 잘 읽힌다.</li>
+        <li>심사자에게 <b>“연구용 장비”</b> 인상을 주고 싶다. 예쁜 쪽이 아니라 정확한 쪽.</li>
+        <li>트리아지 색을 데이터에만 쓰므로 <b>색 오독 위험이 가장 낮다</b>. 논문 그림과 색 규칙이 일치한다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ B ══════════════════ -->
+<section class="dir" id="b">
+  <div class="wrap">
+    <div class="dir-head">
+      <span class="dir-num">B</span>
+      <h2>Isochrone</h2>
+      <span class="ko">지도 · 논문 톤</span>
+    </div>
+    <p class="thesis">
+      지도와 학술지의 어휘. 밝은 종이 바탕에 헤어라인 괘선,
+      수치는 <strong>세리프 숫자</strong>, 표는 booktabs 규칙(헤더 아래 한 줄, 표 끝 한 줄, 그 사이엔 선 없음)을 따른다.
+      탭은 밑줄만 있고 채워지지 않는다. 대시보드를 <strong>논문 supplementary site</strong>처럼 보이게 만드는 방향이고,
+      빔프로젝터·인쇄·스크린샷 캡처에서 가장 안전하다.
+    </p>
+
+    <div class="spec">
+      <div>
+        <h3>Palette</h3>
+        <div class="swatches">
+          <div class="sw"><i style="background:#F1F4F3"></i><span>F1F4F3</span></div>
+          <div class="sw"><i style="background:#FFFFFF"></i><span>FFFFFF</span></div>
+          <div class="sw"><i style="background:#D2DAD8"></i><span>D2DAD8</span></div>
+          <div class="sw"><i style="background:#17211F"></i><span>17211F</span></div>
+          <div class="sw"><i style="background:#0F6E63"></i><span>0F6E63</span></div>
+          <div class="sw"><i style="background:#8A6A22"></i><span>8A6A22</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>Type</h3>
+        <ul class="typelist">
+          <li><b>Noto Serif KR</b><em>제목 · KPI 숫자</em></li>
+          <li><b>Pretendard</b><em>본문 · 라벨</em></li>
+          <li><b>IBM Plex Mono</b><em>ID · 좌표</em></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Cost</h3>
+        <ul class="costlist">
+          <li>CSS 재작성 <b>~240줄</b></li>
+          <li>Python 변경 <b>0줄</b></li>
+          <li>config.toml <b>5줄</b></li>
+          <li>Folium 타일 교체 <b>1줄</b></li>
+          <li>예상 소요 <b>1일</b></li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="frame-label">Mockup — Analytics 탭</p>
+    <div class="scroller">
+      <div class="mk mk--b">
+        <aside class="mk-side">
+          <div class="mk-brand">
+            <span class="mark">M</span>
+            <span>
+              <span class="nm" style="display:block">MCI_ADV</span>
+              <span class="sub">Simulation Atlas</span>
+            </span>
+          </div>
+          <div class="mk-field">
+            <label>Base Path</label>
+            <div class="inp">~/MCI_ADV</div>
+          </div>
+          <div class="mk-field">
+            <label>Experiment</label>
+            <div class="inp sel">exp_20260810_dep_1430<span class="car">▼</span></div>
+          </div>
+          <div class="mk-field">
+            <label>Coordinate</label>
+            <div class="inp sel">(37.4563,126.7052)<span class="car">▼</span></div>
+          </div>
+          <div class="mk-map">
+            <svg viewBox="0 0 200 92" role="img" aria-label="사고 지점 등시선 미니맵">
+              <rect width="200" height="92" fill="#F7F9F8"/>
+              <g fill="none" stroke="#C7D3CF" stroke-width="1">
+                <ellipse cx="104" cy="46" rx="86" ry="42"/>
+                <ellipse cx="104" cy="46" rx="62" ry="30"/>
+                <ellipse cx="104" cy="46" rx="38" ry="18"/>
+                <ellipse cx="104" cy="46" rx="16" ry="8"/>
+              </g>
+              <path d="M-4 62 C40 54 60 32 104 36 C142 40 168 24 204 30" fill="none" stroke="#AEBCB7" stroke-width="2"/>
+              <circle cx="104" cy="46" r="3.2" fill="#0F6E63"/>
+            </svg>
+            <div class="cap">37.4563 N · 126.7052 E</div>
+          </div>
+        </aside>
+
+        <main class="mk-main">
+          <h1 class="mk-h1">Policy Comparison</h1>
+          <div class="mk-sub">64 rules × 10 iterations · RCBD · α = 0.05</div>
+
+          <div class="mk-tabs">
+            <span class="mk-tab">Maps</span>
+            <span class="mk-tab">Scenarios</span>
+            <span class="mk-tab on">Analytics</span>
+            <span class="mk-tab">Data Tables</span>
+            <span class="mk-tab">Rerun</span>
+          </div>
+
+          <div class="mk-kpis">
+            <div class="mk-kpi">
+              <div class="lb">Best Reward</div>
+              <div class="vl">812.4</div>
+              <div class="dl up">+5.9% vs R00</div>
+            </div>
+            <div class="mk-kpi">
+              <div class="lb">Makespan</div>
+              <div class="vl">94.2<span style="font-size:13px;color:var(--m)"> min</span></div>
+              <div class="dl up">−11.3 min</div>
+            </div>
+            <div class="mk-kpi">
+              <div class="lb">PDR</div>
+              <div class="vl">6.7<span style="font-size:13px;color:var(--m)"> %</span></div>
+              <div class="dl dn">+0.4 pt</div>
+            </div>
+            <div class="mk-kpi">
+              <div class="lb">Pareto Layer 0</div>
+              <div class="vl">7<span style="font-size:13px;color:var(--m)"> / 64</span></div>
+              <div class="dl" style="color:var(--m)">non-dominated</div>
+            </div>
+          </div>
+
+          <div class="mk-split">
+            <div class="mk-panel">
+              <div class="ph"><span class="tt">Table 3 · EMM + Holm, CLD</span><span class="badge">p &lt; .001</span></div>
+              <table class="mkt">
+                <thead>
+                  <tr><th>Rule</th><th>Reward</th><th>Time</th><th>PDR</th><th>CLD</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>R23</td><td>812.4</td><td>94.2</td><td>6.7</td><td><span class="cld">a</span></td></tr>
+                  <tr><td>R41</td><td>806.9</td><td>95.8</td><td>6.9</td><td><span class="cld">a</span></td></tr>
+                  <tr><td>R07</td><td>791.2</td><td>99.1</td><td>7.4</td><td><span class="cld">ab</span></td></tr>
+                  <tr><td>R58</td><td>774.6</td><td>103.7</td><td>8.1</td><td><span class="cld">b</span></td></tr>
+                  <tr><td>R00</td><td>766.9</td><td>105.5</td><td>8.3</td><td><span class="cld">c</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mk-panel">
+              <div class="ph"><span class="tt">Figure 4 · Triage Mix</span></div>
+              <div class="triage" style="height:22px;margin:14px 14px 0">
+                <span class="seg" style="flex:6;background:var(--tR)"></span>
+                <span class="seg" style="flex:9;background:var(--tY)"></span>
+                <span class="seg" style="flex:13;background:var(--tG)"></span>
+                <span class="seg" style="flex:2;background:var(--tK)"></span>
+              </div>
+              <div class="tlegend">
+                <div><i style="background:var(--tR)"></i>Red 6</div>
+                <div><i style="background:var(--tY)"></i>Yellow 9</div>
+                <div><i style="background:var(--tG)"></i>Green 13</div>
+                <div><i style="background:var(--tK)"></i>Black 2</div>
+              </div>
+              <div class="chartbox" style="border-top:1px solid var(--r)">
+                <svg viewBox="0 0 240 100" role="img" aria-label="반복별 보상 추이">
+                  <g stroke="#E2E8E6" stroke-width="1">
+                    <path d="M0 20 H240 M0 45 H240 M0 70 H240"/>
+                  </g>
+                  <path d="M4 78 L30 66 L56 70 L82 52 L108 46 L134 50 L160 34 L186 30 L212 26 L236 22"
+                        fill="none" stroke="#0F6E63" stroke-width="1.8"/>
+                  <path d="M4 88 L30 82 L56 84 L82 74 L108 72 L134 76 L160 66 L186 64 L212 62 L236 60"
+                        fill="none" stroke="#8A6A22" stroke-width="1.3" stroke-dasharray="4 3"/>
+                  <circle cx="236" cy="22" r="2.8" fill="#0F6E63"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h3>이 방향이 맞는 경우</h3>
+      <ul>
+        <li><b>대시보드 스크린샷이 논문·보고서에 실린다.</b> 다크 화면은 인쇄에서 죽는다.</li>
+        <li>밝은 강의실 프로젝터. 다크 테마는 회색으로 뭉개진다.</li>
+        <li>Folium <code class="inl">CartoDB positron</code> 타일과 색이 그대로 맞는다. 지도 탭 손댈 게 거의 없다.</li>
+        <li>단점: 지금 만들어 둔 다크 스크린샷·발표자료와 <b>톤이 끊긴다</b>.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ C ══════════════════ -->
+<section class="dir" id="c">
+  <div class="wrap">
+    <div class="dir-head">
+      <span class="dir-num">C</span>
+      <h2>Golden Hour</h2>
+      <span class="ko">시간축 중심 다크</span>
+    </div>
+    <p class="thesis">
+      이 앱에서 가장 특징적인 물건은 색이 아니라 <strong>시계</strong>다.
+      Patient Story Animation, Gantt trace, 이송 시간 — 전부 시간축이다.
+      그래서 정체성을 시간에 걸었다. 상단에 시뮬레이션 경과 밴드가 있고,
+      KPI마다 목표 대비 진행을 나타내는 타임레일이 깔린다.
+      색은 둘뿐이고 <strong>의미가 배정돼 있다: 따뜻한 주황 = 지상(AMB), 차가운 청록 = 공중(UAV)</strong>.
+      바탕은 순검정이 아니라 자주빛이 섞인 <code class="inl">#131017</code> 이라 주황이 튀지 않고 앉는다.
+    </p>
+
+    <div class="spec">
+      <div>
+        <h3>Palette</h3>
+        <div class="swatches">
+          <div class="sw"><i style="background:#131017"></i><span>131017</span></div>
+          <div class="sw"><i style="background:#1B1721"></i><span>1B1721</span></div>
+          <div class="sw"><i style="background:#2E2735"></i><span>2E2735</span></div>
+          <div class="sw"><i style="background:#EDE6EA"></i><span>EDE6EA</span></div>
+          <div class="sw"><i style="background:#FF6B3D"></i><span>FF6B3D</span></div>
+          <div class="sw"><i style="background:#4DD6E8"></i><span>4DD6E8</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>Type</h3>
+        <ul class="typelist">
+          <li><b>Pretendard ExtraBold</b><em>제목 · KPI</em></li>
+          <li><b>Pretendard</b><em>본문</em></li>
+          <li><b>JetBrains Mono</b><em>시각 · 경과 · ID</em></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Cost</h3>
+        <ul class="costlist">
+          <li>CSS 재작성 <b>~300줄</b></li>
+          <li>Python 변경 <b>~40줄</b></li>
+          <li>config.toml <b>5줄</b></li>
+          <li>예상 소요 <b>2일</b></li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="frame-label">Mockup — Analytics 탭</p>
+    <div class="scroller">
+      <div class="mk mk--c">
+        <aside class="mk-side">
+          <div class="mk-brand">
+            <span class="mark">M</span>
+            <span>
+              <span class="nm" style="display:block">MCI_ADV</span>
+              <span class="sub">Golden Hour</span>
+            </span>
+          </div>
+          <div class="mk-field">
+            <label>Base Path</label>
+            <div class="inp">~/MCI_ADV</div>
+          </div>
+          <div class="mk-field">
+            <label>Experiment</label>
+            <div class="inp sel">exp_20260810_dep_1430<span class="car">▼</span></div>
+          </div>
+          <div class="mk-field">
+            <label>Coordinate</label>
+            <div class="inp sel">(37.4563,126.7052)<span class="car">▼</span></div>
+          </div>
+          <div class="mk-map">
+            <svg viewBox="0 0 200 92" role="img" aria-label="사고 지점 미니맵">
+              <rect width="200" height="92" fill="#100D14"/>
+              <g stroke="#241E2A" stroke-width="1">
+                <path d="M0 24 H200 M0 48 H200 M0 70 H200 M40 0 V92 M88 0 V92 M136 0 V92"/>
+              </g>
+              <path d="M-4 60 C40 52 60 30 104 34 C142 38 168 22 204 28" fill="none" stroke="#3A3042" stroke-width="2.5"/>
+              <path d="M104 46 L172 14" fill="none" stroke="#4DD6E8" stroke-width="1" stroke-dasharray="3 3" opacity=".8"/>
+              <path d="M104 46 L34 72" fill="none" stroke="#FF6B3D" stroke-width="1.4" opacity=".8"/>
+              <circle cx="104" cy="46" r="14" fill="none" stroke="#FF6B3D" stroke-width="1" opacity=".28"/>
+              <circle cx="104" cy="46" r="3.2" fill="#FF6B3D"/>
+              <circle cx="172" cy="14" r="2.4" fill="#4DD6E8"/>
+              <circle cx="34" cy="72" r="2.4" fill="#FF6B3D"/>
+            </svg>
+            <div class="cap">37.4563 N · 126.7052 E</div>
+          </div>
+        </aside>
+
+        <main class="mk-main">
+          <h1 class="mk-h1">Policy Comparison</h1>
+          <div class="mk-sub">64 RULES × 10 ITERATIONS · RCBD · α = 0.05</div>
+
+          <div class="mk-tabs">
+            <span class="mk-tab">Maps</span>
+            <span class="mk-tab">Scenarios</span>
+            <span class="mk-tab on">Analytics</span>
+            <span class="mk-tab">Data Tables</span>
+            <span class="mk-tab">Rerun</span>
+          </div>
+
+          <div class="clockband">
+            <span class="big">T+64:12</span>
+            <span class="rail"><i></i><b></b></span>
+            <span class="cap">GOLDEN HOUR 초과 · 잔여 환자 9</span>
+          </div>
+
+          <div class="mk-kpis">
+            <div class="mk-kpi">
+              <div class="lb">Best Reward</div>
+              <div class="vl">812.4</div>
+              <div class="rail"><i style="width:86%;background:#4DD6E8"></i></div>
+            </div>
+            <div class="mk-kpi">
+              <div class="lb">Makespan</div>
+              <div class="vl">94.2<span style="font-size:13px;color:var(--m)"> min</span></div>
+              <div class="rail"><i style="width:63%;background:#4DD6E8"></i></div>
+            </div>
+            <div class="mk-kpi crit">
+              <div class="lb">PDR <span class="pulse"></span></div>
+              <div class="vl">6.7<span style="font-size:13px;color:var(--m)"> %</span></div>
+              <div class="rail"><i style="width:38%;background:#FF6B3D"></i></div>
+            </div>
+            <div class="mk-kpi">
+              <div class="lb">Pareto Layer 0</div>
+              <div class="vl">7<span style="font-size:13px;color:var(--m)"> / 64</span></div>
+              <div class="rail"><i style="width:11%;background:#4DD6E8"></i></div>
+            </div>
+          </div>
+
+          <div class="mk-split">
+            <div class="mk-panel">
+              <div class="ph"><span class="tt">EMM + Holm · CLD</span><span class="badge">p &lt; .001</span></div>
+              <table class="mkt">
+                <thead>
+                  <tr><th>Rule</th><th>Reward</th><th>Time</th><th>PDR</th><th>CLD</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>R23</td><td>812.4</td><td>94.2</td><td>6.7</td><td><span class="cld">a</span></td></tr>
+                  <tr><td>R41</td><td>806.9</td><td>95.8</td><td>6.9</td><td><span class="cld">a</span></td></tr>
+                  <tr><td>R07</td><td>791.2</td><td>99.1</td><td>7.4</td><td><span class="cld">ab</span></td></tr>
+                  <tr><td>R58</td><td>774.6</td><td>103.7</td><td>8.1</td><td><span class="cld">b</span></td></tr>
+                  <tr><td>R00</td><td>766.9</td><td>105.5</td><td>8.3</td><td><span class="cld">c</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mk-panel">
+              <div class="ph"><span class="tt">Patient Story · R23</span></div>
+              <div style="padding:12px 12px 4px;display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;height:11px;gap:2px">
+                  <span style="flex:12;background:#2E2735;border-radius:2px"></span>
+                  <span style="flex:8;background:#FF6B3D;border-radius:2px"></span>
+                  <span style="flex:26;background:#4DD6E8;border-radius:2px"></span>
+                </div>
+                <div style="display:flex;height:11px;gap:2px">
+                  <span style="flex:20;background:#2E2735;border-radius:2px"></span>
+                  <span style="flex:14;background:#FF6B3D;border-radius:2px"></span>
+                  <span style="flex:18;background:#4DD6E8;border-radius:2px"></span>
+                </div>
+                <div style="display:flex;height:11px;gap:2px">
+                  <span style="flex:6;background:#2E2735;border-radius:2px"></span>
+                  <span style="flex:22;background:#FF6B3D;border-radius:2px"></span>
+                  <span style="flex:20;background:#4DD6E8;border-radius:2px"></span>
+                </div>
+                <div style="display:flex;height:11px;gap:2px">
+                  <span style="flex:30;background:#2E2735;border-radius:2px"></span>
+                  <span style="flex:10;background:#FF6B3D;border-radius:2px"></span>
+                  <span style="flex:12;background:#4DD6E8;border-radius:2px"></span>
+                </div>
+              </div>
+              <div class="tlegend">
+                <div><i style="background:#2E2735"></i>Waiting</div>
+                <div><i style="background:#FF6B3D"></i>AMB Transport</div>
+                <div><i style="background:#4DD6E8"></i>Hospital</div>
+              </div>
+              <div class="chartbox" style="border-top:1px solid var(--r)">
+                <svg viewBox="0 0 240 100" role="img" aria-label="반복별 보상 추이">
+                  <defs>
+                    <linearGradient id="cfill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#FF6B3D" stop-opacity=".34"/>
+                      <stop offset="100%" stop-color="#FF6B3D" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <g stroke="#241E2A" stroke-width="1">
+                    <path d="M0 20 H240 M0 45 H240 M0 70 H240"/>
+                  </g>
+                  <path d="M4 78 L30 66 L56 70 L82 52 L108 46 L134 50 L160 34 L186 30 L212 26 L236 22 L236 100 L4 100 Z"
+                        fill="url(#cfill)"/>
+                  <path d="M4 78 L30 66 L56 70 L82 52 L108 46 L134 50 L160 34 L186 30 L212 26 L236 22"
+                        fill="none" stroke="#FF6B3D" stroke-width="2"/>
+                  <circle cx="236" cy="22" r="3.4" fill="#FF6B3D"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h3>이 방향이 맞는 경우</h3>
+      <ul>
+        <li>“<b>간지</b>”가 1순위. 세 개 중 첫인상이 가장 세다.</li>
+        <li>지금 팔레트(<code class="inl">#141417</code> + amber)와 계열이 이어져서 <b>기존 발표자료가 안 죽는다</b>.</li>
+        <li>단점 하나: 상단 클록 밴드와 KPI 타임레일은 CSS만으로 안 나온다.
+            <b>Python 약 40줄</b>이 필요하다 — <code class="inl">st.markdown</code> HTML 블록 하나와
+            <code class="inl">st.metric</code> 을 커스텀 카드로 교체.</li>
+        <li>트리아지 빨강과 액센트 주황이 인접색이다. <b>Maps 탭에서 구분이 흐려질 수 있어</b>
+            지도 안에서는 액센트를 청록 쪽으로만 쓰도록 규칙을 박아야 한다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 비교 ══════════════════ -->
+<section class="closing" id="pick">
+  <div class="wrap">
+    <h2>고르는 기준</h2>
+    <div style="overflow-x:auto">
+      <table class="cmp">
+        <thead>
+          <tr>
+            <th></th>
+            <th>A · Dispatch</th>
+            <th>B · Isochrone</th>
+            <th>C · Golden Hour</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>첫인상</th>
+            <td>정밀함</td>
+            <td>신뢰감</td>
+            <td class="tick">임팩트</td>
+          </tr>
+          <tr>
+            <th>어두운 발표장</th>
+            <td class="tick">최적</td>
+            <td>불리</td>
+            <td class="tick">최적</td>
+          </tr>
+          <tr>
+            <th>논문 인쇄·스크린샷</th>
+            <td>보통</td>
+            <td class="tick">최적</td>
+            <td>불리</td>
+          </tr>
+          <tr>
+            <th>트리아지 색 충돌</th>
+            <td class="tick">없음</td>
+            <td class="tick">없음</td>
+            <td>주황 ↔ 빨강 주의</td>
+          </tr>
+          <tr>
+            <th>기존 자료와 연속성</th>
+            <td>일부</td>
+            <td>끊김</td>
+            <td class="tick">유지</td>
+          </tr>
+          <tr>
+            <th>Python 수정</th>
+            <td class="tick">0줄</td>
+            <td class="tick">0줄</td>
+            <td>~40줄</td>
+          </tr>
+          <tr>
+            <th>소요</th>
+            <td class="tick">1일</td>
+            <td class="tick">1일</td>
+            <td>2일</td>
+          </tr>
+          <tr>
+            <th>4개 페이지 일괄 적용</th>
+            <td class="tick">가능</td>
+            <td class="tick">가능</td>
+            <td>Generate·Batch는 별도 조정</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="shared">
+      <h3>어느 쪽을 고르든 같이 들어가는 것</h3>
+      <p>
+        지금 <code class="inl">MCI_Streamlit.py:1427</code> 의 CSS 블록에 빠져 있는 부분이다.
+        Streamlit 기본 크롬이 그대로 노출돼 있어서, 어떤 스킨을 씌워도
+        우상단 햄버거·Deploy 버튼·하단 워터마크 때문에 “Streamlit 앱”으로 읽힌다.
+        아래 블록이 그걸 제거하고, CSS를 4개 페이지가 공유하도록 한 파일로 뺀다.
+      </p>
+      <pre><span class="c"># src/vis_src/_theme.py — 새 파일. 4개 페이지가 전부 import.</span>
+<span class="c"># MCI_Streamlit.py / pages/Generate.py / pages/ResultsCompare.py</span>
+<span class="c"># / pages/BatchExperiment.py 각각 맨 위에서 inject_theme() 호출.</span>
+
+_CHROME = <span class="s">"""</span>
+<span class="s">#MainMenu, header[data-testid="stHeader"], footer,</span>
+<span class="s">[data-testid="stToolbar"], [data-testid="stDecoration"],</span>
+<span class="s">[data-testid="stStatusWidget"] { display: none !important; }</span>
+
+<span class="s">[data-testid="stAppViewContainer"] > .main { padding-top: 0 !important; }</span>
+<span class="s">[data-testid="stSidebarNav"] { padding-top: 8px; }   </span><span class="c">/* 페이지 목록을 진짜 내비로 */</span>
+<span class="s">.block-container { padding-top: 1.6rem !important; max-width: 1400px; }</span>
+<span class="s">"""</span></pre>
+      <p style="margin-top:14px;margin-bottom:0">
+        <code class="inl">.streamlit/config.toml</code> 과
+        <code class="inl">src/vis_src/.streamlit/config.toml</code> 은 지금 내용이 갈라질 위험이 있는
+        수동 복제본이다. 선택한 팔레트로 <b>두 파일 모두</b> 갱신한다.
+      </p>
+    </div>
+  </div>
+</section>

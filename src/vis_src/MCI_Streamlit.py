@@ -63,6 +63,12 @@ if ORCHESTRATOR_DIR.is_dir():
     if orch_path not in sys.path:
         sys.path.insert(0, orch_path)
 
+# 대시보드 공용 테마 (vis_src 4개 페이지가 공유)
+_VIS_DIR = str(Path(__file__).resolve().parent)
+if _VIS_DIR not in sys.path:
+    sys.path.insert(0, _VIS_DIR)
+from _theme import inject_theme, page_header
+
 # (선택) 통계 패키지
 try:
     import statsmodels.api as sm
@@ -1423,205 +1429,15 @@ with st.sidebar:
 
 
 
-# CSS: 전역 UI 테마 + 멀티셀렉트 폭 확장
-st.markdown("""
-<style>
-/* ── 원본 보존: 멀티셀렉트 폭 ── */
-.stMultiSelect [data-baseweb="select"]{max-width:100%!important}
+# ── Dispatch Console theme + 콘솔 헤더 ──────────────────────────
+inject_theme()
 
-/* ── 폰트 ── */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
-html, body, .stApp, [data-testid="stAppViewContainer"] {
-    font-family: 'DM Sans', -apple-system, sans-serif !important;
-}
-h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', 'DM Sans', -apple-system, sans-serif !important;
-}
-
-/* ── 배경 ── */
-.stApp {
-    background: #141417;
-}
-
-/* ── 사이드바 ── */
-[data-testid="stSidebar"] {
-    background: #1c1c21 !important;
-    border-right: 1px solid rgba(226, 160, 74, 0.1) !important;
-}
-[data-testid="stSidebar"] .stMarkdown h1,
-[data-testid="stSidebar"] .stMarkdown h2,
-[data-testid="stSidebar"] .stMarkdown h3 {
-    color: #e2a04a !important;
-}
-[data-testid="stSidebar"] label {
-    color: #a1a1aa !important;
-    font-weight: 500;
-    font-size: 0.85rem;
-}
-
-/* ── 메인 타이틀 ── */
-h1 {
-    font-weight: 700 !important;
-    letter-spacing: -0.5px;
-    padding-bottom: 4px;
-    color: #e4e4e7 !important;
-}
-.gradient-text {
-    background: linear-gradient(90deg, #e2a04a 0%, #2dd4bf 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-/* ── 서브헤더 ── */
-h2, h3 {
-    color: #e4e4e7 !important;
-    font-weight: 600 !important;
-    border-bottom: 2px solid rgba(226, 160, 74, 0.18);
-    padding-bottom: 8px;
-    margin-bottom: 16px !important;
-}
-
-/* ── 탭 바 ── */
-.stTabs [data-baseweb="tab-list"] {
-    background: #1c1c21;
-    border-radius: 10px;
-    padding: 4px;
-    gap: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-}
-.stTabs [data-baseweb="tab"] {
-    border-radius: 8px;
-    padding: 10px 22px;
-    font-weight: 500;
-    color: #71717a !important;
-    transition: all 0.2s ease;
-}
-.stTabs [aria-selected="true"] {
-    background: rgba(226, 160, 74, 0.15) !important;
-    color: #e2a04a !important;
-    box-shadow: none;
-    border-bottom: 2px solid #e2a04a;
-}
-.stTabs [data-baseweb="tab"]:hover {
-    color: #d4d4d8 !important;
-    background: rgba(255, 255, 255, 0.04);
-}
-.stTabs [data-baseweb="tab-highlight"] { display: none; }
-.stTabs [data-baseweb="tab-border"] { display: none; }
-
-/* ── 버튼 (primary: amber) ── */
-.stButton > button {
-    border-radius: 8px !important;
-    border: 1px solid rgba(226, 160, 74, 0.4) !important;
-    background: rgba(226, 160, 74, 0.12) !important;
-    color: #e2a04a !important;
-    font-weight: 600 !important;
-    padding: 8px 20px !important;
-    transition: all 0.2s ease !important;
-}
-.stButton > button:hover {
-    background: rgba(226, 160, 74, 0.22) !important;
-    border-color: #e2a04a !important;
-}
-.stButton > button:active { transform: translateY(0); }
-
-/* ── 입력 필드 ── */
-[data-baseweb="input"],
-[data-baseweb="select"] > div,
-.stTextInput > div > div,
-.stNumberInput > div > div > div {
-    background: #1c1c21 !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 8px !important;
-    transition: border-color 0.2s ease;
-}
-[data-baseweb="input"]:focus-within,
-[data-baseweb="select"] > div:focus-within {
-    border-color: rgba(226, 160, 74, 0.5) !important;
-    box-shadow: 0 0 0 2px rgba(226, 160, 74, 0.08) !important;
-}
-
-/* ── 드롭다운 메뉴 ── */
-[data-baseweb="popover"] {
-    border-radius: 8px !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    overflow: hidden;
-}
-[data-baseweb="menu"] { background: #1c1c21 !important; }
-
-/* ── Expander ── */
-[data-testid="stExpander"] {
-    background: #1c1c21 !important;
-    border: 1px solid rgba(255, 255, 255, 0.06) !important;
-    border-radius: 10px !important;
-    overflow: hidden;
-}
-[data-testid="stExpander"]:hover {
-    border-color: rgba(255, 255, 255, 0.12) !important;
-}
-
-/* ── 메트릭 카드 ── */
-[data-testid="stMetric"] {
-    background: #1c1c21;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-left: 3px solid #e2a04a;
-    border-radius: 10px;
-    padding: 18px 20px;
-    transition: all 0.2s ease;
-}
-[data-testid="stMetric"]:hover {
-    border-color: rgba(255, 255, 255, 0.1);
-    border-left-color: #e2a04a;
-}
-[data-testid="stMetricLabel"] {
-    color: #71717a !important;
-    font-size: 0.82rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-[data-testid="stMetricValue"] {
-    color: #e4e4e7 !important;
-    font-weight: 700 !important;
-}
-
-/* ── 데이터프레임 ── */
-[data-testid="stDataFrame"], .stDataFrame {
-    border-radius: 8px !important;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-/* ── 구분선 ── */
-hr {
-    border-color: rgba(255, 255, 255, 0.06) !important;
-    margin: 24px 0 !important;
-}
-
-/* ── 알림 메시지 ── */
-.stAlert, [data-testid="stAlert"] { border-radius: 8px !important; }
-
-/* ── 체크박스/라디오 호버 ── */
-.stCheckbox label:hover, .stRadio label:hover { color: #e2a04a !important; }
-
-/* ── 스크롤바 ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #141417; }
-::-webkit-scrollbar-thumb {
-    background: #3f3f46;
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover { background: #52525b; }
-
-/* ── 캡션/도움말 텍스트: 어두운 배경에서 또렷하게 (흐릿/투명 방지) ── */
-[data-testid="stCaptionContainer"],
-[data-testid="stCaptionContainer"] p,
-[data-testid="stCaptionContainer"] small {
-    color: #b6bcc8 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown('<h1><span>🚑</span> <span class="gradient-text">MCI Disaster Simulation Dashboard</span></h1>', unsafe_allow_html=True)
+_hdr_exp = st.session_state.get("selected_exp") or "\u2014"
+_hdr_coord = st.session_state.get("selected_coord") or "\u2014"
+page_header(
+    "MCI Disaster Simulation Dashboard",
+    f"EXP <b>{_hdr_exp}</b> &nbsp;&middot;&nbsp; COORD <b>{_hdr_coord}</b>",
+)
 
 tabs = st.tabs(["Maps", "Scenarios", "Analytics", "Data Tables", "Rerun"])
 

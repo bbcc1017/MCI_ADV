@@ -200,6 +200,7 @@ MCI_ADV/
 ├── scenarios/              # 마스터 데이터 + 생성된 시나리오
 ├── results/                # 시뮬레이션 결과
 ├── experiment_1/           # 다좌표 배치 실험 파이프라인
+├── docs/design/            # 대시보드 디자인 시안·결정 기록
 ├── SYNC_MCI_UAV.md         # 연구 저장소(MCI_UAV)와의 시뮬 정합성 기록
 └── requirements.txt
 ```

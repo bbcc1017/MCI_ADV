@@ -1,13 +1,16 @@
 [theme]
-# base = "dark" makes Streamlit compute ALL derived colors (captions,
-# secondary/widget text, disabled text, borders) for a dark background.
-# Without it (default "light") those texts stay dark/faded and vanish
-# on the dark custom background.
+# Dispatch Console — 팔레트 정본은 src/vis_src/_theme.py 의 PALETTE.
+# 여기 값은 Streamlit 이 자체 렌더링하는 위젯(데이터프레임 캔버스, 슬라이더,
+# 토스트 등 CSS 로 닿지 않는 것들)에 쓰인다. 두 곳을 항상 같이 고칠 것.
+#
+# base = "dark" 이 있어야 Streamlit 이 파생색(캡션, 보조 텍스트, 비활성 텍스트,
+# 테두리)을 어두운 배경 기준으로 계산한다. 없으면 기본값 "light" 로 남아
+# 해당 텍스트들이 어두운 채로 배경에 묻힌다.
 base = "dark"
-primaryColor = "#e2a04a"
-backgroundColor = "#141417"
-secondaryBackgroundColor = "#1c1c21"
-textColor = "#e2e8f0"
+primaryColor = "#3BB3C4"
+backgroundColor = "#0D1418"
+secondaryBackgroundColor = "#111B21"
+textColor = "#C9D8DF"
 font = "sans serif"
 
 [server]

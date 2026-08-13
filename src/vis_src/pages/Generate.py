@@ -44,110 +44,13 @@ st.set_page_config(
     layout="wide"
 )
 
-# ── Command-Center Theme CSS ──────────────────────────────────────
-st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap');
+# ── Dispatch Console theme (src/vis_src/_theme.py 단일 소스) ──────
+_VIS_DIR = str(Path(__file__).resolve().parent.parent)
+if _VIS_DIR not in sys.path:
+    sys.path.insert(0, _VIS_DIR)
+from _theme import inject_theme
 
-/* ── Global ── */
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-    color: #d4d4d8;
-}
-h1, h2, h3, h4, h5, h6,
-[data-testid="stMarkdownContainer"] h1,
-[data-testid="stMarkdownContainer"] h2,
-[data-testid="stMarkdownContainer"] h3 {
-    font-family: 'Outfit', sans-serif;
-    color: #e2e8f0;
-    -webkit-text-fill-color: #e2e8f0;
-    font-weight: 600;
-}
-.stApp, [data-testid="stAppViewContainer"],
-[data-testid="stHeader"] {
-    background-color: #141417;
-}
-[data-testid="stSidebar"] {
-    background-color: #1a1a1f;
-}
-
-/* ── Buttons ── */
-.stButton > button,
-[data-testid="stFormSubmitButton"] > button {
-    background: linear-gradient(135deg, #e2a04a 0%, #c7893e 100%);
-    color: #141417;
-    border: none;
-    border-radius: 8px;
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 600;
-    transition: opacity .2s;
-}
-.stButton > button:hover,
-[data-testid="stFormSubmitButton"] > button:hover {
-    opacity: .85;
-    color: #141417;
-}
-button[kind="primary"] {
-    background: linear-gradient(135deg, #e2a04a 0%, #c7893e 100%) !important;
-}
-
-/* ── Inputs ── */
-input, textarea, [data-baseweb="input"] input,
-[data-baseweb="textarea"] textarea {
-    background-color: #1e1e23 !important;
-    color: #d4d4d8 !important;
-    border: 1px solid #2a2a30 !important;
-    border-radius: 6px !important;
-}
-input:focus, textarea:focus,
-[data-baseweb="input"] input:focus {
-    border-color: #e2a04a !important;
-    box-shadow: 0 0 0 1px #e2a04a33 !important;
-}
-
-/* ── Tabs ── */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 4px;
-}
-.stTabs [data-baseweb="tab"] {
-    background-color: transparent;
-    color: #d4d4d8;
-    border-radius: 6px 6px 0 0;
-    font-family: 'DM Sans', sans-serif;
-}
-.stTabs [aria-selected="true"] {
-    background-color: #1e1e23;
-    border-bottom: 2px solid #e2a04a;
-}
-
-/* ── Metric cards ── */
-[data-testid="stMetric"] {
-    background: #1e1e23;
-    border: 1px solid #2a2a30;
-    border-radius: 10px;
-    padding: 14px 18px;
-}
-[data-testid="stMetricLabel"] {
-    color: #a1a1aa;
-    font-family: 'DM Sans', sans-serif;
-}
-[data-testid="stMetricValue"] {
-    color: #e2a04a;
-    font-family: 'Outfit', sans-serif;
-}
-
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #141417; }
-::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3a3a40; }
-
-/* ── Captions / helper text: clearly visible on the dark bg (no faded/transparent look) ── */
-[data-testid="stCaptionContainer"],
-[data-testid="stCaptionContainer"] p,
-[data-testid="stCaptionContainer"] small {
-    color: #b6bcc8 !important;
-}
-</style>""", unsafe_allow_html=True)
+inject_theme()
 
 # ─────────────────────────────────────────────────────────────────
 # 유틸리티 함수
