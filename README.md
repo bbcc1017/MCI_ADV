@@ -914,6 +914,48 @@ UI 규약(2026-08-14 개편):
 | 긴 작업 | `st.status` | `st.spinner` 단독 |
 | 참조 표 | `st.popover` | 상시 펼친 markdown |
 | 폭 지정 | `width='stretch'` | `use_container_width=True` (deprecated) |
+| 화면 전환 | `st.segmented_control` + `if _view == ...` | `st.tabs` (아래 성능 항목 참고) |
+| 파일 읽기/파싱 | `@st.cache_data` + `file_sig(path)` 인자 | 무캐시 재파싱, `ttl=` 만으로 무효화 |
+
+#### 성능 구조 (2026-08-14)
+
+Streamlit 은 위젯을 하나만 건드려도 **스크립트를 처음부터 끝까지 다시 실행**한다.
+이 구조 위에서 대시보드가 느려지는 원인은 두 가지였다.
+
+**1. `st.tabs` 는 보이지 않는 탭 본문까지 실행한다.**
+지도 옵션 하나 바꾸면 Analytics 1,400줄(ANOVA·사후검정·부트스트랩 포함)이 같이 돌았다.
+그래서 최상위 5개 화면과 Analytics 7개 서브화면을 `st.segmented_control` + `if` 로 갈랐다.
+선택된 하나만 실행된다.
+
+- 실측(합성 RAW 16룰×6run, folium 스텁): 리런당 **2.84s → 0.80~1.35s**
+- Analytics/Data Tables 화면에서 지도 관련 호출 **42회 → 0회**
+- 화면 본문끼리 서로의 지역변수를 쓰면 이 구조가 깨진다. 실제로 ANOVA 안에만 있던
+  헬퍼 4개(`_small_is_better`, `_emm_pairwise`, `_transform_for_metric`,
+  `_rcbd_posthoc_cld`)와 `dfraw`, `_prep_metric` 을 공유 스코프로 올려야 했다.
+  화면을 추가하거나 옮길 때는 AST 로 교차 참조가 없는지 먼저 확인할 것.
+
+**2. 캐시 키가 경로 + TTL 뿐이었다.**
+파일이 바뀌어도 TTL 이 끝날 때까지 헌 값이 나오고, 안 바뀌어도 TTL 이 지나면 다시 팠다.
+이제 `file_sig(path)`/`dir_sig(folder)` 가 만드는 `(경로, mtime_ns, size)` 를 캐시 인자로
+같이 넘긴다. **내용이 바뀐 경우에만** 다시 계산한다.
+
+```python
+dfraw = parse_raw_results(rpath, file_sig(rpath))
+blocks = load_log_blocks(log_path, file_sig(log_path))
+```
+
+주의: `st.cache_data` 는 **밑줄로 시작하는 인자를 해시에서 제외**한다. 시그니처를 받는
+인자 이름에 밑줄을 붙이면 캐시가 영영 갱신되지 않는다.
+
+그 밖에:
+- 사이드바 미니맵 `st_folium(..., returned_objects=[])` — 없으면 미니맵을 팬/줌 할 때마다
+  컴포넌트가 값을 돌려주고 스크립트 전체가 다시 돈다.
+- 로그 텍스트/blocks/환자요약, trace JSON, 편집용 CSV, Batch 결과 HTML(수 MB) 캐시.
+- 선택 상태(`exp`/`coord`/`view`)를 쿼리 파라미터로 왕복 → 새로고침 복원 + 화면 공유.
+
+남은 비용: Maps 화면 자체는 여전히 매 리런 folium 지도를 새로 만든다(경로 JSON 42개
+파싱은 캐시되지만 마커·폴리라인 생성과 HTML 직렬화는 남는다). 지도 HTML 을 입력 키로
+캐시해 `components.html` 로 그리는 방식이 다음 후보다.
 
 #### 탭별 기능
 

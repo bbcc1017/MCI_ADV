@@ -100,6 +100,27 @@ else:
     if IS_CLOUD and st.session_state.base_path != CLOUD_BASE_PATH:
         st.session_state.base_path = CLOUD_BASE_PATH
 
+# ── URL 딥링크 ─────────────────────────────────────────────────
+# 선택 상태가 세션에만 있으면 새로고침 한 번에 날아가고, 보고 있는 화면을
+# 그대로 남에게 넘길 방법도 없다. exp / coord / view 를 쿼리 파라미터로
+# 왕복시킨다. 아래 기본값 초기화보다 반드시 먼저 와야 덮이지 않는다.
+VIEW_ICONS = {
+    "Maps": ":material/map:",
+    "Scenarios": ":material/description:",
+    "Analytics": ":material/query_stats:",
+    "Data Tables": ":material/table_chart:",
+    "Rerun": ":material/restart_alt:",
+}
+VIEWS = list(VIEW_ICONS)
+
+for _ss_key, _qp_key in (("selected_exp", "exp"), ("selected_coord", "coord")):
+    _qp_val = st.query_params.get(_qp_key)
+    if _qp_val and _ss_key not in st.session_state:
+        st.session_state[_ss_key] = _qp_val
+_qp_view = st.query_params.get("view")
+if _qp_view in VIEWS and "main_view" not in st.session_state:
+    st.session_state.main_view = _qp_view
+
 if "selected_exp" not in st.session_state:
     st.session_state.selected_exp = ""
 if "selected_coord" not in st.session_state:
@@ -158,7 +179,8 @@ def _split_factors(rule_label: str):
     yellow_action = pick_mode(parts[3] if len(parts) > 3 else "", "Yellow")
     return phase, red_policy, red_action, yellow_action
 
-def parse_raw_all_metrics(raw_path: str) -> dict:
+@st.cache_data(show_spinner=False, max_entries=8)
+def parse_raw_all_metrics(raw_path: str, sig: Tuple = ()) -> dict:
     """
     results_{coord}.txt 전체를 읽어 메트릭별 wide 테이블을 반환.
     반환: {metric_name: DataFrame(64행 × [ScenarioIdx, Phase, RedPolicy, RedAction, YellowAction, metric 1회..R회])}
@@ -260,8 +282,8 @@ def _split_factors(rule_label: str):
     yellow_action = pick_mode(parts[3] if len(parts)>3 else "", "Yellow")
     return phase, red_policy, red_action, yellow_action
 
-@st.cache_data(ttl=600)
-def parse_raw_results(raw_path: str) -> pd.DataFrame:
+@st.cache_data(show_spinner=False, max_entries=8)
+def parse_raw_results(raw_path: str, sig: Tuple = ()) -> pd.DataFrame:
     """
     results_(lat,lon).txt → long DF
     columns: ['rule','Phase','RedPolicy','RedAction','YellowAction','run','metric','value']
@@ -358,6 +380,32 @@ def exists_file(p: Union[str, Path]) -> bool:
 def base_ok(base_path: str) -> bool:
     s = Path(base_path)
     return s.is_dir() and (s / "scenarios").is_dir()
+
+
+# ------------------------------
+# 캐시 키
+# ------------------------------
+# 경로만 키로 쓰면 두 가지가 같이 틀어진다: 파일이 바뀌어도 TTL 이 끝날 때까지
+# 헌 값이 나오고, 아무것도 안 바뀌어도 TTL 이 지나면 다시 판다. 캐시 함수에
+# file_sig(path) 를 같이 넘기면 "내용이 바뀌었을 때만" 다시 계산한다.
+#
+# 주의: st.cache_data 는 밑줄로 시작하는 인자를 해시에서 제외한다. 시그니처를
+# 받는 인자 이름에 밑줄을 붙이면 안 된다.
+def file_sig(path: Union[str, Path]) -> Tuple[str, int, int]:
+    """(경로, mtime_ns, size). 파일이 없으면 존재하지 않음을 뜻하는 값."""
+    try:
+        stt = os.stat(str(path))
+        return (str(path), stt.st_mtime_ns, stt.st_size)
+    except OSError:
+        return (str(path), 0, -1)
+
+
+def dir_sig(folder: Union[str, Path], pattern: str = "*") -> Tuple:
+    """디렉터리 안 파일들의 시그니처 묶음. 파일 추가/삭제/수정 모두 잡는다."""
+    p = Path(folder)
+    if not p.is_dir():
+        return ()
+    return tuple(sorted(file_sig(f) for f in p.glob(pattern) if f.is_file()))
 
 # --- NEW: scenarios + results 통합 실험 목록 (scenarios 우선) ---
 @st.cache_data(ttl=60)
@@ -502,8 +550,8 @@ def read_excel_hospital(base_path: str) -> Optional[pd.DataFrame]:
                 st.warning(f"Excel load failed: {excel_path} ({e})")
     return None
 
-@st.cache_data(ttl=300)
-def read_experiment_summary_csv(base_path: str, exp_id: str) -> Optional[pd.DataFrame]:
+@st.cache_data(show_spinner=False)
+def read_experiment_summary_csv(base_path: str, exp_id: str, sig: Tuple = ()) -> Optional[pd.DataFrame]:
     folder = Path(base_path) / "scenarios" / exp_id
     if not folder.is_dir():
         return None
@@ -602,8 +650,8 @@ def get_patient_count(base_path: str, exp_id: str, coord: str) -> Optional[int]:
     return None
 
 
-@st.cache_data(ttl=600, show_spinner=False)
-def _load_scenario_csvs(bp: str, exp: str, coord: str):
+@st.cache_data(show_spinner=False)
+def _load_scenario_csvs(bp: str, exp: str, coord: str, sig: Tuple = ()):
     """Load & rename scenario CSVs (cached at top level).
 
     신포맷(통합 hospital_info.csv + amb_station_info.csv)과 구포맷(분리 파일) 모두 인식.
@@ -912,6 +960,45 @@ def build_patient_summary(events: List[Dict]) -> pd.DataFrame:
             "Remarks": remark,
         })
     return pd.DataFrame(rows)
+
+
+# ------------------------------
+# 로그 / trace / CSV 캐시 진입점
+# ------------------------------
+# 위 파서들은 순수 함수라 그대로 두고, 파일에서 읽어오는 경로만 캐시한다.
+# 시그니처(file_sig)가 같으면 같은 파일이므로 다시 읽거나 파싱하지 않는다.
+# 로그 한 건이 수십 MB 까지 가므로 max_entries 로 메모리를 묶어 둔다.
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def load_log_text(log_path: str, sig: Tuple) -> str:
+    return _read_text_any(log_path)
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def load_log_blocks(log_path: str, sig: Tuple) -> List[Dict]:
+    return parse_log_blocks(_read_text_any(log_path))
+
+
+@st.cache_data(show_spinner=False, max_entries=16)
+def load_patient_summary(log_path: str, sig: Tuple, rule: str,
+                         iter_no: Optional[int]) -> pd.DataFrame:
+    """선택된 (rule, iter) 블록의 환자 요약. 블록 파싱 결과를 재사용한다."""
+    blocks = load_log_blocks(log_path, sig)
+    cand = [b for b in blocks
+            if b.get("rule") == rule and (iter_no is None or b.get("iter") == iter_no)]
+    return build_patient_summary(cand[0]["events"]) if cand else pd.DataFrame()
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def load_trace_json(trace_path: str, sig: Tuple) -> dict:
+    with open(trace_path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+@st.cache_data(show_spinner=False, max_entries=32)
+def load_csv_cached(path: str, sig: Tuple) -> pd.DataFrame:
+    return read_csv_smart(path)
+
 
 # experiment_logs 내 파일만 고르도록 제한
 
@@ -1426,7 +1513,9 @@ with st.sidebar:
                 .leaflet-bottom.leaflet-right { bottom: auto !important; top: 6px !important; right: 8px !important; }
                 </style>
                 """))
-                st_folium(m, width='stretch', height=260)
+                # returned_objects=[] 가 없으면 미니맵을 팬/줌 할 때마다 컴포넌트가
+                # 값을 돌려주고, 그 값이 세션을 바꿔 스크립트 전체가 다시 실행된다.
+                st_folium(m, width='stretch', height=260, returned_objects=[])
 
             except Exception:
                 # (폴백) streamlit 기본 지도 (타일 커스텀 불가)
@@ -1446,18 +1535,33 @@ page_header(
     fields={"EXP": _hdr_exp, "COORD": _hdr_coord},
 )
 
-tabs = st.tabs([
-    ":material/map: Maps",
-    ":material/description: Scenarios",
-    ":material/query_stats: Analytics",
-    ":material/table_chart: Data Tables",
-    ":material/restart_alt: Rerun",
-])
+# ── 뷰 전환 ────────────────────────────────────────────────────
+# 예전에는 st.tabs 였다. Streamlit 은 위젯을 하나만 건드려도 스크립트를 처음부터
+# 다시 실행하는데, st.tabs 는 화면에 보이지 않는 탭의 본문까지 전부 실행한다.
+# 그래서 지도 옵션 하나 바꾸면 Analytics 1,400줄(ANOVA·부트스트랩 포함)이 같이
+# 돌았다. 뷰를 if 로 가르면 선택된 하나만 실행된다.
+#
+# 다섯 개 본문이 서로의 지역변수를 쓰지 않는다는 것은 AST 로 확인했다. 새 뷰를
+# 추가하거나 본문을 옮길 때 그 조건을 깨지 않도록 주의할 것.
+_view = st.segmented_control(
+    "View", VIEWS, key="main_view",
+    format_func=lambda v: f"{VIEW_ICONS[v]} {v}",
+    label_visibility="collapsed",
+) or VIEWS[0]
+
+# 현재 보고 있는 화면을 URL 에 남긴다(딥링크/새로고침 복원용).
+st.query_params.from_dict({
+    k: v for k, v in (
+        ("view", _view),
+        ("exp", st.session_state.get("selected_exp") or ""),
+        ("coord", st.session_state.get("selected_coord") or ""),
+    ) if v
+})
 
 # ------------------------------
 # Scenarios 탭
 # ------------------------------
-with tabs[1]:
+if _view == "Scenarios":
     st.subheader("Selected Scenario")
     bp = st.session_state.base_path; exp = st.session_state.selected_exp; coord = st.session_state.selected_coord
 
@@ -1471,7 +1575,7 @@ with tabs[1]:
         yaml_path = find_yaml_in_coord(bp, exp, coord)
         st.write("**YAML**:", yaml_path or "(none)")
         
-        smdf = read_experiment_summary_csv(bp, exp)
+        smdf = read_experiment_summary_csv(bp, exp, dir_sig(Path(bp) / "scenarios" / exp, "*.csv"))
         info, site_addr = summarize_experiment(smdf) if smdf is not None else ({}, None)
         lat, lon = coord_center(coord)
 
@@ -1530,8 +1634,9 @@ with tabs[1]:
 
         if logs:
             log_sel = st.selectbox("Select Log File (experiment_logs/<coord>)", logs)
-            log_text = _read_text_any(log_sel)
-            blocks = parse_log_blocks(log_text)
+            _log_sig = file_sig(log_sel)
+            log_text = load_log_text(log_sel, _log_sig)
+            blocks = load_log_blocks(log_sel, _log_sig)
             # (Unlabeled) 블록 숨김
             rule_list = [b["rule"] for b in blocks if b.get("rule")!="(Unlabeled)"] if blocks else []
             if not rule_list:
@@ -1562,7 +1667,8 @@ with tabs[1]:
 
 
                 st.markdown("#### Patient Story (Summary)")
-                psum = build_patient_summary(blk["events"]) if blk else pd.DataFrame()
+                psum = (load_patient_summary(log_sel, _log_sig, sel_rule, sel_iter)
+                        if blk else pd.DataFrame())
                 if psum.empty:
                     st.caption("No patient events found.")
                 else:
@@ -1821,8 +1927,7 @@ with tabs[1]:
             _trace_path = _trace_dir / _trace_sel
 
             try:
-                with open(_trace_path, "r", encoding="utf-8") as _tf:
-                    _trace_data = json.load(_tf)
+                _trace_data = load_trace_json(str(_trace_path), file_sig(_trace_path))
 
                 _trace_keys = list(_trace_data.keys())
                 if not _trace_keys:
@@ -1931,7 +2036,7 @@ with tabs[1]:
 # ------------------------------
 # Maps 탭 (복수선택 + UAV 출동/이송 토글 + 범례 강화)
 # ------------------------------
-with tabs[0]:
+if _view == "Maps":
     st.subheader("Map Visualization")
     bp   = st.session_state.base_path
     exp  = st.session_state.selected_exp
@@ -1965,7 +2070,8 @@ with tabs[0]:
     hosp_xl   = read_excel_hospital(bp)   # 엑셀(요양기관명, 종별코드, x/y좌표, 전화/주소 등)
 
     # road/euc CSV (표/거리 참조용) — cached (top-level function)
-    hinfo_df, center_df, ambinfo_df, dist_road_df, hinfo_euc_df, dist_euc_df = _load_scenario_csvs(bp, exp, coord)
+    hinfo_df, center_df, ambinfo_df, dist_road_df, hinfo_euc_df, dist_euc_df = _load_scenario_csvs(
+        bp, exp, coord, dir_sig(Path(bp) / "scenarios" / exp / coord, "*.csv"))
     dist_road_map = dict(zip(dist_road_df["Index"], dist_road_df["distance"])) if not dist_road_df.empty else {}
     dur_road_map = dict(zip(dist_road_df["Index"], dist_road_df["duration"])) if not dist_road_df.empty and "duration" in dist_road_df.columns else {}
     dist_euc_map  = dict(zip(dist_euc_df["Index"], dist_euc_df["distance"])) if not dist_euc_df.empty else {}
@@ -2605,7 +2711,7 @@ with tabs[0]:
                 _anim_log_path = _anim_log_cands[[Path(p).name for p in _anim_log_cands].index(_anim_log_sel)]
 
                 try:
-                    _anim_blocks = parse_log_blocks(open(_anim_log_path, "r", encoding="utf-8-sig").read())
+                    _anim_blocks = load_log_blocks(_anim_log_path, file_sig(_anim_log_path))
                     # Preserve log order for rules; exclude (Unlabeled) — env init artifact
                     _anim_rules = list(dict.fromkeys(
                         b["rule"] for b in _anim_blocks
@@ -3036,7 +3142,8 @@ def gen_scenario_keys() -> pd.DataFrame:
     return df
 
 
-def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+@st.cache_data(show_spinner=False, max_entries=8)
+def parse_stat_file(stat_path: str, sig: Tuple = ()) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     STAT 파일을 RAW 기준으로 재정렬
     ✅ 누락된 시나리오도 처리 (UAV=0 케이스 대응)
@@ -3087,7 +3194,7 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         st.error("RAW file not found!")
         return pd.DataFrame(), pd.DataFrame()
     
-    dfraw = parse_raw_results(raw_path)
+    dfraw = parse_raw_results(raw_path, file_sig(raw_path))
     reward_data = dfraw[dfraw["metric"] == "Reward"]
     
     # RAW의 룰 순서 (실제 실행된 순서)
@@ -3204,7 +3311,7 @@ RAW_RE = re.compile(r'^(START|ReSTART),\s*(RedOnly|YellowNearest),\s*Red\s+([A-Z
 # ------------------------------
 
 # ===== Analysis 탭 =====
-with tabs[2]:
+if _view == "Analytics":
     st.subheader("RAW Result Analysis (results_{coord}.txt)")
 
     bp   = st.session_state.base_path
@@ -3232,16 +3339,148 @@ with tabs[2]:
         if not st.session_state.get("analytics_loaded", False):
             st.caption("Click 'Load Analysis Data' above to view analysis. (Disabled by default for faster tab loading)")
         else:
-            analytics_tabs = st.tabs(["RAW Data", "STAT Summary", "ANOVA Suite",
-                                       "Pareto Dominance", "Bootstrap / Non-Parametric",
-                                       "Power Analysis", "Export"])
+            # 서브뷰가 공유하는 원본과 헬퍼.
+            # 예전에는 ANOVA 서브탭 안쪽 깊은 곳에서 만들어졌고, 나머지 서브탭들이
+            # `'dfraw' in dir()` 로 그 존재를 더듬어 썼다(ANOVA 가 그 지점까지
+            # 실행되지 않으면 조용히 빈 표가 됐다). 서브뷰를 하나만 실행하도록
+            # 바꾸면서 공유 스코프로 끌어올린다. 파서는 캐시돼 있어 추가 비용 없다.
+            dfraw = (parse_raw_results(rpath, file_sig(rpath)) if rpath
+                     else pd.DataFrame(columns=["rule", "Phase", "RedPolicy", "RedAction",
+                                                "YellowAction", "run", "metric", "value"]))
 
-            # ── RAW Data sub-tab ──
-            with analytics_tabs[0]:
+            def _prep_metric(dfraw_all: pd.DataFrame, metric_name: str):
+                """raw(long)에서 metric 행 추출 + rule 컬럼 보정."""
+                dsub = dfraw_all[dfraw_all["metric"] == metric_name].copy()
+                if dsub.empty:
+                    return pd.DataFrame()
+                if "rule" not in dsub.columns:
+                    dsub["rule"] = dsub[["Phase", "RedPolicy", "RedAction", "YellowAction"]].agg(", ".join, axis=1)
+                return dsub
+
+            # ANOVA 서브뷰 안에 있던 순수 헬퍼들. Pareto / Bootstrap / Power / Export 가
+            # 이 함수들을 쓰는데, 서브뷰를 하나만 실행하도록 바꾸면 ANOVA 를 열지 않는 한
+            # 정의되지 않는다. 자유변수가 없는 순수 함수라 그대로 끌어올렸다.
+            def _small_is_better(m: str) -> bool:
+                # Time, PDR(woG 포함)=작을수록 좋음 / Reward류=클수록 좋음
+                return (m == "Time") or m.startswith("PDR")
+
+            def _emm_pairwise(model_obj, data, rule_col, block_col, yvar, alpha_val):
+                """
+                Estimated Marginal Means (EMM) pairwise comparison.
+                Uses RCBD model's MS_residual as the pooled error term.
+                Pairwise differences tested with t-distribution, Holm-corrected.
+                """
+                # 예전에는 ANOVA 서브탭이 모듈 스코프에 import 해 둔 sps 를 빌려 썼다.
+                # 서브뷰를 하나만 실행하면 ANOVA 를 열지 않는 한 그 이름이 없다.
+                # 옆 헬퍼들(welch_holm_posthoc, _rcbd_posthoc_cld)과 같은 방식으로
+                # 함수 안에서 직접 가져온다.
+                from scipy import stats as sps
+
+                ms_res = model_obj.mse_resid
+                df_res = model_obj.df_resid
+                rules = sorted(data[rule_col].unique())
+                n_per_cell = data.groupby(rule_col).size()
+
+                # EMM = marginal mean of each rule (averaged over blocks)
+                emm = data.groupby(rule_col)[yvar].mean()
+
+                pairs, pvals, diffs = [], [], []
+                for g1, g2 in itertools.combinations(rules, 2):
+                    diff = emm[g1] - emm[g2]
+                    n1, n2 = n_per_cell[g1], n_per_cell[g2]
+                    se = np.sqrt(ms_res * (1.0/n1 + 1.0/n2))
+                    t_stat = diff / se if se > 0 else 0
+                    p_val = 2.0 * (1.0 - sps.t.cdf(abs(t_stat), df_res))
+                    pairs.append((g1, g2))
+                    pvals.append(p_val)
+                    diffs.append(diff)
+
+                from statsmodels.stats.multitest import multipletests
+                reject, p_adj, _, _ = multipletests(pvals, method="holm", alpha=alpha_val)
+                ph = pd.DataFrame({
+                    "group1": [p[0] for p in pairs],
+                    "group2": [p[1] for p in pairs],
+                    "diff": diffs,
+                    "p-adj": p_adj,
+                    "reject": reject,
+                })
+                return ph, emm
+
+            def _transform_for_metric(d: pd.DataFrame, metric_name: str, eps: float = 1e-6):
+                """
+                변환 스케일:
+                - PDR(woG 포함): logit
+                - Time, Reward(woG 포함): 원척도
+                """
+                d = d.copy(); yvar = "value"
+                if metric_name.startswith("PDR"):
+                    d[yvar] = np.log((d[yvar] + eps)/(1 - d[yvar] + eps))  # logit
+                    scale = "logit"
+                else:
+                    scale = "original"
+                return d, yvar, scale
+
+            def _rcbd_posthoc_cld(d: pd.DataFrame, yvar: str, alpha: float = 0.05, prefer_small_is_A: bool = False):
+                """
+                RCBD: y ~ C(rule) + C(run), EMM-based pairwise t-tests using
+                the model's MS_residual as pooled error, Holm-corrected.
+                CLD via absorption algorithm (Piepho 2004).
+                prefer_small_is_A=True  → ascending sort (a = smallest = Best)
+                prefer_small_is_A=False → descending sort (a = largest = Best)
+                """
+                from scipy import stats as sps
+
+                posthoc = pd.DataFrame()
+                explain = ""
+
+                # Fit RCBD model for this metric
+                try:
+                    rcbd_model = smf.ols(f"{yvar} ~ C(rule) + C(run)", data=d).fit()
+                    posthoc_emm, emm_means = _emm_pairwise(rcbd_model, d, "rule", "run", yvar, alpha)
+                    posthoc = posthoc_emm
+                    means_for_cld = emm_means.sort_values(ascending=prefer_small_is_A)
+                    explain = "EMM pairwise t-tests (RCBD MS_residual) + Holm"
+                except Exception as e_emm:
+                    # Fallback: block-adjusted Games-Howell
+                    dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
+                    dd_work = _make_dd_work(dd, yvar)
+                    means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
+                        ascending=prefer_small_is_A)
+                    try:
+                        import pingouin as pg
+                        gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
+                        posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
+                        posthoc["reject"] = posthoc["p-adj"] < alpha
+                        explain = f"Games-Howell block-adjusted (EMM failed: {e_emm})"
+                    except Exception:
+                        y_post = dd_work["__y__"]; grp_post = dd_work["rule"]
+                        posthoc = welch_holm_posthoc(
+                            pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
+                            "rule", "y", alpha=alpha)
+                        explain = f"Welch t + Holm block-adjusted (EMM failed: {e_emm})"
+
+                # --- CLD 산출
+                if posthoc.empty or (("p-adj" not in posthoc.columns) and ("reject" not in posthoc.columns)):
+                    return means_for_cld, pd.DataFrame(), explain
+
+                cld = cld_from_pairs(means_for_cld, posthoc, alpha=alpha)
+                return means_for_cld, cld, explain
+
+            # 서브탭도 같은 이유로 if 로 가른다. st.tabs 였을 때는 Export 를 보려고
+            # 눌러도 ANOVA·부트스트랩(9,999회 × 룰 수)이 매 리런마다 같이 돌았다.
+            _AN_VIEWS = ["RAW Data", "STAT Summary", "ANOVA Suite", "Pareto Dominance",
+                         "Bootstrap / Non-Parametric", "Power Analysis", "Export"]
+            _an_view = st.segmented_control(
+                "Analysis view", _AN_VIEWS, key="analytics_view",
+                label_visibility="collapsed",
+            ) or _AN_VIEWS[0]
+
+            # ── RAW Data sub-view ──
+            if _an_view == "RAW Data":
                 raw_tables = {}
                 if rpath and os.path.exists(rpath):
                     with st.spinner("Parsing RAW results... (large files may take a moment)"):
-                        raw_tables = parse_raw_all_metrics(rpath)  # {metric: df}
+                        raw_tables = parse_raw_all_metrics(rpath, file_sig(rpath))  # {metric: df}
 
                     if raw_tables:
                         # 파일에 실제 들어있는 지표만 옵션으로 노출
@@ -3261,7 +3500,7 @@ with tabs[2]:
                     st.warning("RAW (results_*.txt) file not found.")
 
             # ── STAT Summary sub-tab ──
-            with analytics_tabs[1]:
+            if _an_view == "STAT Summary":
                 st.subheader("STAT Summary Analysis (_stat.txt)")
                 st.info(
                 "results/exp_YYYYMMDD_HHMMSS/(lat,lon)/results_{coord}.txt (Raw), results_{coord}_stat.txt (Stat)\n\n"
@@ -3270,7 +3509,7 @@ with tabs[2]:
 
             wide, long_df = (pd.DataFrame(), pd.DataFrame())
             if spath and os.path.exists(spath):
-                wide, long_df = parse_stat_file(spath)
+                wide, long_df = parse_stat_file(spath, file_sig(spath))
 
             if not wide.empty:
                 display = wide.rename(columns={
@@ -3569,12 +3808,12 @@ with tabs[2]:
                 return pd.DataFrame({"rule": df["rule"].values, "__y__": y_s.values})
 
 
-            with analytics_tabs[2]:
+            if _an_view == "ANOVA Suite":
               st.markdown("#### ANOVA (One-way / RCBD / Reduced Factorial)")
               if not rpath:
                 st.caption(f"Raw file (results_{coord}.txt) not found; skipping ANOVA.")
               else:
-                dfraw = parse_raw_results(rpath)  # 반드시 long 형식
+                dfraw = parse_raw_results(rpath, file_sig(rpath))  # 반드시 long 형식
                 if dfraw.empty:
                     st.caption("RAW parsing result is empty. Check file format.")
                 else:
@@ -3726,46 +3965,8 @@ with tabs[2]:
                             st.markdown("##### Post-hoc Tests")
                             posthoc = pd.DataFrame(); explain = ""
 
-                            def _small_is_better(m: str) -> bool:
-                                # Time, PDR(woG 포함)=작을수록 좋음 / Reward류=클수록 좋음
-                                return (m == "Time") or m.startswith("PDR")
 
                             # --- EMM-based post-hoc for RCBD; Games-Howell for One-way ---
-                            def _emm_pairwise(model_obj, data, rule_col, block_col, yvar, alpha_val):
-                                """
-                                Estimated Marginal Means (EMM) pairwise comparison.
-                                Uses RCBD model's MS_residual as the pooled error term.
-                                Pairwise differences tested with t-distribution, Holm-corrected.
-                                """
-                                ms_res = model_obj.mse_resid
-                                df_res = model_obj.df_resid
-                                rules = sorted(data[rule_col].unique())
-                                n_per_cell = data.groupby(rule_col).size()
-
-                                # EMM = marginal mean of each rule (averaged over blocks)
-                                emm = data.groupby(rule_col)[yvar].mean()
-
-                                pairs, pvals, diffs = [], [], []
-                                for g1, g2 in itertools.combinations(rules, 2):
-                                    diff = emm[g1] - emm[g2]
-                                    n1, n2 = n_per_cell[g1], n_per_cell[g2]
-                                    se = np.sqrt(ms_res * (1.0/n1 + 1.0/n2))
-                                    t_stat = diff / se if se > 0 else 0
-                                    p_val = 2.0 * (1.0 - sps.t.cdf(abs(t_stat), df_res))
-                                    pairs.append((g1, g2))
-                                    pvals.append(p_val)
-                                    diffs.append(diff)
-
-                                from statsmodels.stats.multitest import multipletests
-                                reject, p_adj, _, _ = multipletests(pvals, method="holm", alpha=alpha_val)
-                                ph = pd.DataFrame({
-                                    "group1": [p[0] for p in pairs],
-                                    "group2": [p[1] for p in pairs],
-                                    "diff": diffs,
-                                    "p-adj": p_adj,
-                                    "reject": reject,
-                                })
-                                return ph, emm
 
                             if mode == "One-way + Block(run) (RCBD recommended)":
                                 # EMM-based pairwise comparison using RCBD model error
@@ -3847,74 +4048,7 @@ with tabs[2]:
                                     # ================== A그룹 교집합 (Reward ∩ Time ∩ PDR, RCBD 기준) ==================구해도 좋습니다.")
                                     st.markdown("### A-Group Intersection (Reward ∩ Time(asc) ∩ PDR(asc), RCBD)")
 
-                                    def _prep_metric(dfraw_all: pd.DataFrame, metric_name: str):
-                                        """raw(long)에서 metric 행 추출 + rule 컬럼 보정."""
-                                        dsub = dfraw_all[dfraw_all["metric"] == metric_name].copy()
-                                        if dsub.empty:
-                                            return pd.DataFrame()
-                                        if "rule" not in dsub.columns:
-                                            dsub["rule"] = dsub[["Phase","RedPolicy","RedAction","YellowAction"]].agg(", ".join, axis=1)
-                                        return dsub
 
-                                    def _transform_for_metric(d: pd.DataFrame, metric_name: str, eps: float = 1e-6):
-                                        """
-                                        변환 스케일:
-                                        - PDR(woG 포함): logit
-                                        - Time, Reward(woG 포함): 원척도
-                                        """
-                                        d = d.copy(); yvar = "value"
-                                        if metric_name.startswith("PDR"):
-                                            d[yvar] = np.log((d[yvar] + eps)/(1 - d[yvar] + eps))  # logit
-                                            scale = "logit"
-                                        else:
-                                            scale = "original"
-                                        return d, yvar, scale
-
-                                    def _rcbd_posthoc_cld(d: pd.DataFrame, yvar: str, alpha: float = 0.05, prefer_small_is_A: bool = False):
-                                        """
-                                        RCBD: y ~ C(rule) + C(run), EMM-based pairwise t-tests using
-                                        the model's MS_residual as pooled error, Holm-corrected.
-                                        CLD via absorption algorithm (Piepho 2004).
-                                        prefer_small_is_A=True  → ascending sort (a = smallest = Best)
-                                        prefer_small_is_A=False → descending sort (a = largest = Best)
-                                        """
-                                        from scipy import stats as sps
-
-                                        posthoc = pd.DataFrame()
-                                        explain = ""
-
-                                        # Fit RCBD model for this metric
-                                        try:
-                                            rcbd_model = smf.ols(f"{yvar} ~ C(rule) + C(run)", data=d).fit()
-                                            posthoc_emm, emm_means = _emm_pairwise(rcbd_model, d, "rule", "run", yvar, alpha)
-                                            posthoc = posthoc_emm
-                                            means_for_cld = emm_means.sort_values(ascending=prefer_small_is_A)
-                                            explain = "EMM pairwise t-tests (RCBD MS_residual) + Holm"
-                                        except Exception as e_emm:
-                                            # Fallback: block-adjusted Games-Howell
-                                            dd = block_adjust(d, yvar, block_col="run").rename(columns={"y_adj": yvar})
-                                            dd_work = _make_dd_work(dd, yvar)
-                                            means_for_cld = _means_series(dd_work, "rule", "__y__").sort_values(
-                                                ascending=prefer_small_is_A)
-                                            try:
-                                                import pingouin as pg
-                                                gh = pg.pairwise_gameshowell(dv="__y__", between="rule", data=dd_work)
-                                                posthoc = gh.rename(columns={"A":"group1","B":"group2","pval":"p-adj"})
-                                                posthoc["reject"] = posthoc["p-adj"] < alpha
-                                                explain = f"Games-Howell block-adjusted (EMM failed: {e_emm})"
-                                            except Exception:
-                                                y_post = dd_work["__y__"]; grp_post = dd_work["rule"]
-                                                posthoc = welch_holm_posthoc(
-                                                    pd.DataFrame({"rule": grp_post.values, "y": y_post.values}),
-                                                    "rule", "y", alpha=alpha)
-                                                explain = f"Welch t + Holm block-adjusted (EMM failed: {e_emm})"
-
-                                        # --- CLD 산출
-                                        if posthoc.empty or (("p-adj" not in posthoc.columns) and ("reject" not in posthoc.columns)):
-                                            return means_for_cld, pd.DataFrame(), explain
-
-                                        cld = cld_from_pairs(means_for_cld, posthoc, alpha=alpha)
-                                        return means_for_cld, cld, explain
 
                                     with st.expander("A-Group Intersection (Reward up, Time down, PDR down)", expanded=True):
                                         alpha_int = st.slider("Alpha for intersection", 0.001, 0.1, 0.05, 0.001, key="alpha_intersect_all")
@@ -3995,7 +4129,7 @@ with tabs[2]:
             # ══════════════════════════════════════════════════════════════
             # TAB 4: Pareto Dominance Analysis
             # ══════════════════════════════════════════════════════════════
-            with analytics_tabs[3]:
+            if _an_view == "Pareto Dominance":
                 st.subheader("Multi-Objective Dominance Analysis")
                 st.caption("Statistical Pareto efficiency: rule A dominates B iff A is significantly better on at least one metric AND not significantly worse on any metric.")
 
@@ -4164,7 +4298,7 @@ with tabs[2]:
             # ══════════════════════════════════════════════════════════════
             # TAB 5: Bootstrap / Non-Parametric Alternatives
             # ══════════════════════════════════════════════════════════════
-            with analytics_tabs[4]:
+            if _an_view == "Bootstrap / Non-Parametric":
                 st.subheader("Bootstrap CI & Non-Parametric Tests")
                 st.caption("When ANOVA normality assumptions are violated, use these robust alternatives.")
 
@@ -4377,7 +4511,7 @@ with tabs[2]:
             # ══════════════════════════════════════════════════════════════
             # TAB 6: Power Analysis
             # ══════════════════════════════════════════════════════════════
-            with analytics_tabs[5]:
+            if _an_view == "Power Analysis":
                 st.subheader("Power Analysis & Sample Size Recommendation")
                 st.caption("Assess whether the current sample size provides adequate statistical power to detect meaningful differences.")
 
@@ -4496,7 +4630,7 @@ with tabs[2]:
             # ══════════════════════════════════════════════════════════════
             # TAB 7: Publication Export
             # ══════════════════════════════════════════════════════════════
-            with analytics_tabs[6]:
+            if _an_view == "Export":
                 st.subheader("Publication-Quality Export")
                 st.caption("Export ANOVA tables, CLD results, and figures in publication-ready formats.")
 
@@ -4605,7 +4739,7 @@ with tabs[2]:
 # ------------------------------
 # Data Tables 탭 (편집/읽기 분리 + 파일명 라벨)
 # ------------------------------
-with tabs[3]:
+if _view == "Data Tables":
     st.subheader("CSV Tables (Edit/Save)")
     bp = st.session_state.base_path
     exp = st.session_state.selected_exp
@@ -4623,7 +4757,7 @@ with tabs[3]:
         else:
             labels = {p: os.path.basename(p) for p in csvs_editable}
             target = st.selectbox("CSV to Edit", options=list(labels.keys()), format_func=lambda p: labels[p])
-            df = read_csv_smart(target)
+            df = load_csv_cached(target, file_sig(target))
             edit = st.data_editor(df, width='stretch', num_rows="dynamic", height=400)
             c1, c2, c3 = st.columns(3)
             with c1:
@@ -4666,7 +4800,7 @@ with tabs[3]:
         st.markdown("#### Fire Station Master (read-only)")
         global_center_csv = Path(bp) / "scenarios" / "안전센터와 소방서.csv"
         if global_center_csv.is_file():
-            cdf = read_csv_smart(str(global_center_csv))
+            cdf = load_csv_cached(str(global_center_csv), file_sig(global_center_csv))
             st.dataframe(cdf.head(200), width='stretch', height=260)
         else:
             st.caption("Fire station CSV not found")
@@ -4697,7 +4831,7 @@ if "env_txt2" not in st.session_state:
 # ──────────────────────────────────────────────────────────────────────────────
 # Rerun 탭 (기존 시나리오 재실행)
 # ──────────────────────────────────────────────────────────────────────────────
-with tabs[4]:
+if _view == "Rerun":
     st.subheader("Re-run Existing Scenario")
     st.info("This tab operates **independently** from the sidebar. Select an existing scenario to modify parameters and re-run.")
 

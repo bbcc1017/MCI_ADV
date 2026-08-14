@@ -101,9 +101,24 @@ def _resolve_shp(shp_name: str) -> Path:
     return EXP1_DIR / shp_name
 
 
+def _file_sig(path: Path) -> tuple:
+    """(경로, mtime_ns, size). 캐시 키. 파일이 바뀔 때만 다시 읽는다."""
+    try:
+        stt = path.stat()
+        return (str(path), stt.st_mtime_ns, stt.st_size)
+    except OSError:
+        return (str(path), 0, -1)
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def _read_html_cached(path: str, sig: tuple) -> str:
+    return Path(path).read_text(encoding="utf-8")
+
+
 def _embed_html(html_path: Path, height: int = 600):
+    # 결과 지도 HTML 은 좌표 수천 개면 수 MB 가 된다. 리런마다 다시 읽지 않는다.
     if html_path.exists():
-        html_content = html_path.read_text(encoding="utf-8")
+        html_content = _read_html_cached(str(html_path), _file_sig(html_path))
         components.html(html_content, height=height, scrolling=True)
     else:
         st.warning(f"HTML file not found: {html_path}")
@@ -283,12 +298,15 @@ with st.expander("Step 2: View Coordinates", expanded=False,
         if not coords_csv_path.exists():
             st.info(f"No `coords.csv` found in `scenarios/{s2_exp_id}/`. Complete **Step 1** first.")
         else:
-            tab_table, tab_map = st.tabs([":material/table_chart: Table", ":material/map: Map"])
-            with tab_table:
+            _c_view = st.segmented_control(
+                "Coord view", ["Table", "Map"], key="s2_coord_view",
+                label_visibility="collapsed",
+            ) or "Table"
+            if _c_view == "Table":
                 df = pd.read_csv(coords_csv_path)
                 st.metric("Total coordinates", len(df), border=True)
                 st.dataframe(df, width='stretch', height=400)
-            with tab_map:
+            if _c_view == "Map":
                 preview_html = coords_csv_path.parent / "coords_preview.html"
                 if not preview_html.exists():
                     pts_for_map = list(zip(df["latitude"].tolist(), df["longitude"].tolist()))
@@ -667,18 +685,20 @@ with st.expander("Step 5: Visualize Results", expanded=False):
                                           expanded=False)
 
             # Display results
-            tab_map, tab_hist, tab_heatmap, tab_effects = st.tabs([
-                ":material/map: Results Map",
-                ":material/bar_chart: Histogram",
-                ":material/grid_on: Rule Heatmap",
-                ":material/insights: Factor Main Effects",
-            ])
-            with tab_map:
+            # st.tabs 였을 때는 보이지 않는 탭의 본문(수 MB HTML, PDF→이미지 변환)까지
+            # 매 리런 실행됐다. 선택된 것 하나만 실행한다.
+            _RES_VIEWS = ["Results Map", "Histogram", "Rule Heatmap", "Factor Main Effects"]
+            _res_view = st.segmented_control(
+                "Result view", _RES_VIEWS, key="s5_result_view",
+                label_visibility="collapsed",
+            ) or _RES_VIEWS[0]
+
+            if _res_view == "Results Map":
                 if viz_out_path.exists():
                     _embed_html(viz_out_path, height=700)
                 else:
                     st.caption("No map generated yet. Click **Generate Visualization** above.")
-            with tab_hist:
+            if _res_view == "Histogram":
                 hist_png = viz_dir / "coords_map_hist.png"
                 hist_pdf = viz_dir / "coords_map_hist.pdf"
                 if hist_png.exists():
@@ -706,7 +726,7 @@ with st.expander("Step 5: Visualize Results", expanded=False):
                 if not hist_png.exists() and not hist_pdf.exists():
                     st.caption("No histogram generated yet. Click **Generate Visualization** "
                                "above.")
-            with tab_heatmap:
+            if _res_view == "Rule Heatmap":
                 heatmap_png = viz_dir / "coords_map_rule_heatmap.png"
                 heatmap_pdf = viz_dir / "coords_map_rule_heatmap.pdf"
                 if heatmap_png.exists():
@@ -720,7 +740,7 @@ with st.expander("Step 5: Visualize Results", expanded=False):
                     )
                 if not heatmap_png.exists() and not heatmap_pdf.exists():
                     st.caption("No rule heatmap yet. Click **Generate Visualization** above.")
-            with tab_effects:
+            if _res_view == "Factor Main Effects":
                 effects_png = viz_dir / "coords_map_rule_effects.png"
                 effects_pdf = viz_dir / "coords_map_rule_effects.pdf"
                 if effects_png.exists():
