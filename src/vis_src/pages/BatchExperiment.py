@@ -189,18 +189,20 @@ _SKIP = "__SKIP__"
 # PAGE START
 # ===========================================================================
 
-st.set_page_config(page_title="Batch Experiment", page_icon="⚗️", layout="wide")
+st.set_page_config(page_title="Batch Experiment", page_icon=":material/science:", layout="wide")
 
 # ── Dispatch Console theme (src/vis_src/_theme.py 단일 소스) ──────
 _VIS_DIR = str(Path(__file__).resolve().parent.parent)
 if _VIS_DIR not in sys.path:
     sys.path.insert(0, _VIS_DIR)
-from _theme import inject_theme
+from _theme import inject_theme, page_header, kpi_row
 
 inject_theme()
 
-st.title("Batch Experiment Pipeline")
-st.caption("End-to-end workflow: coordinate generation → scenario → simulation → visualization")
+page_header(
+    "Batch Experiment Pipeline",
+    subtitle="coordinate generation → scenario → simulation → visualization",
+)
 
 if not _IMPORTS_OK:
     st.error(
@@ -213,7 +215,8 @@ if not _IMPORTS_OK:
 # STEP 1 — Generate Random Coordinates
 # ===========================================================================
 
-with st.expander("Step 1: Generate Random Coordinates", expanded=False):
+with st.expander("Step 1: Generate Random Coordinates", expanded=False,
+                 icon=":material/location_on:"):
     col1, col2, col3 = st.columns(3)
     with col1:
         n_coords = st.number_input("Number of coordinates", min_value=1, max_value=50000,
@@ -229,9 +232,9 @@ with st.expander("Step 1: Generate Random Coordinates", expanded=False):
             value=True,
             key="s1_use_kakao",
             help=(
-                "✅ Checked → Kakao API mode. Folder name gets a `_dep_<YYYYMMDDHHMM>` suffix "
+                "Checked → Kakao API mode. Folder name gets a `_dep_<YYYYMMDDHHMM>` suffix "
                 "from the departure time below.\n\n"
-                "⬜ Unchecked → OSRM (open-source) mode. Departure time is meaningless for OSRM, "
+                "Unchecked → OSRM (open-source) mode. Departure time is meaningless for OSRM, "
                 "so the folder gets an `_osrm` suffix instead."
             ),
         )
@@ -271,7 +274,8 @@ with st.expander("Step 1: Generate Random Coordinates", expanded=False):
 # STEP 2 — View Coordinates
 # ===========================================================================
 
-with st.expander("Step 2: View Coordinates", expanded=False):
+with st.expander("Step 2: View Coordinates", expanded=False,
+                 icon=":material/table_chart:"):
     s2_exp_id = _experiment_selectbox("Experiment Folder", key="s2_expid")
     if s2_exp_id is not None:
         coords_csv_path = _scenario_dir(s2_exp_id) / "coords.csv"
@@ -279,11 +283,11 @@ with st.expander("Step 2: View Coordinates", expanded=False):
         if not coords_csv_path.exists():
             st.info(f"No `coords.csv` found in `scenarios/{s2_exp_id}/`. Complete **Step 1** first.")
         else:
-            tab_table, tab_map = st.tabs(["Table", "Map"])
+            tab_table, tab_map = st.tabs([":material/table_chart: Table", ":material/map: Map"])
             with tab_table:
                 df = pd.read_csv(coords_csv_path)
-                st.metric("Total coordinates", len(df))
-                st.dataframe(df, use_container_width=True, height=400)
+                st.metric("Total coordinates", len(df), border=True)
+                st.dataframe(df, width='stretch', height=400)
             with tab_map:
                 preview_html = coords_csv_path.parent / "coords_preview.html"
                 if not preview_html.exists():
@@ -296,7 +300,8 @@ with st.expander("Step 2: View Coordinates", expanded=False):
 # STEP 3 — Generate Scenarios & Run Simulations
 # ===========================================================================
 
-with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False):
+with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False,
+                 icon=":material/play_arrow:"):
     st.markdown("Runs scenario generation + simulation per coordinate.")
 
     # --- Experiment folder selection ---
@@ -312,11 +317,11 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
     if _is_osrm_folder:
         is_use_time_bool = False
         departure_time = ""
-        st.info("🛣️ OSRM mode (folder ends with `_osrm`). Kakao API key not required.")
+        st.info("OSRM mode (folder ends with `_osrm`). Kakao API key not required.")
     elif _dep_match:
         is_use_time_bool = True
         departure_time = _dep_match.group(1)
-        st.info(f"🗾 Kakao mode (folder has `_dep_` suffix). Departure time: `{departure_time}`.")
+        st.info(f"Kakao mode (folder has `_dep_` suffix). Departure time: `{departure_time}`.")
     else:
         # Legacy folder with no recognizable suffix — let the user pick.
         is_use_time_bool = st.checkbox(
@@ -403,12 +408,13 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
             with open(progress_file, encoding="utf-8") as f:
                 progress_data = json.load(f)
             stats = calc_stats(progress_data)
-            col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
-            col_m1.metric("Done", f"{stats['done']}/{stats['total']}")
-            col_m2.metric("Sim OK", stats["sim_ok"])
-            col_m3.metric("Sim Fail", stats["sim_fail"])
-            col_m4.metric("Failed", stats["failed"])
-            col_m5.metric("Pending", stats["pending"])
+            kpi_row([
+                ("Done", f"{stats['done']}/{stats['total']}"),
+                ("Sim OK", stats["sim_ok"]),
+                ("Sim Fail", stats["sim_fail"]),
+                ("Failed", stats["failed"]),
+                ("Pending", stats["pending"]),
+            ])
             st.progress(stats["done"] / max(stats["total"], 1))
             st.caption(f"Today API usage: {stats['today_calls']} / {daily_limit}")
         else:
@@ -543,7 +549,7 @@ with st.expander("Step 3: Generate Scenarios & Run Simulations", expanded=False)
                             f"Batch complete: {len(results_summary)} coords processed, "
                             f"{session_calls} API calls used."
                         )
-                        st.dataframe(pd.DataFrame(results_summary), use_container_width=True)
+                        st.dataframe(pd.DataFrame(results_summary), width='stretch')
 
 
 # ===========================================================================
@@ -566,13 +572,14 @@ with st.expander("Step 4: Progress Dashboard", expanded=False):
             stats = calc_stats(prog)
             total = max(stats["total"], 1)
 
-            col1, col2, col3, col4, col5, col6 = st.columns(6)
-            col1.metric("Total", stats["total"])
-            col2.metric("Done", stats["done"])
-            col3.metric("Sim OK", stats["sim_ok"])
-            col4.metric("Sim Fail", stats["sim_fail"])
-            col5.metric("Failed", stats["failed"])
-            col6.metric("Pending", stats["pending"])
+            kpi_row([
+                ("Total", stats["total"]),
+                ("Done", stats["done"]),
+                ("Sim OK", stats["sim_ok"]),
+                ("Sim Fail", stats["sim_fail"]),
+                ("Failed", stats["failed"]),
+                ("Pending", stats["pending"]),
+            ])
 
             st.progress(stats["done"] / total)
             st.caption(f"Completion: {stats['done']/total*100:.1f}% — "
@@ -597,7 +604,7 @@ with st.expander("Step 4: Progress Dashboard", expanded=False):
                         "error": v.get("error", v.get("sim_error", ""))[:80],
                     })
             if rows:
-                st.dataframe(pd.DataFrame(rows), use_container_width=True, height=400)
+                st.dataframe(pd.DataFrame(rows), width='stretch', height=400)
             else:
                 st.caption("No entries match the selected filter.")
 
@@ -626,14 +633,17 @@ with st.expander("Step 5: Visualize Results", expanded=False):
                 outlier_n = st.number_input("Outlier count (each side)", value=3, min_value=0,
                                             key="s5_outlier")
             with col_v3:
-                hist_fmt = st.radio("Histogram format", ["pdf", "png"], horizontal=True,
-                                    key="s5_fmt")
+                hist_fmt = st.segmented_control("Histogram format", ["pdf", "png"],
+                                                default="pdf", key="s5_fmt_seg") or "pdf"
 
             viz_dir = s5_sce_dir
             viz_out_path = viz_dir / "coords_map.html"
 
-            if st.button("Generate Visualization", key="s5_gen"):
-                with st.spinner("Collecting data and building visualizations..."):
+            if st.button("Generate Visualization", key="s5_gen",
+                         type="primary", icon=":material/insights:"):
+                # st.status: 어느 단계에서 오래 걸리는지 보이고, 끝나면 접힌다.
+                with st.status("Collecting data and building visualizations...",
+                               expanded=True) as viz_status:
                     coords = viz_load_coords(coords_csv_path)
                     with open(progress_file, encoding="utf-8") as f:
                         prog = json.load(f)
@@ -641,18 +651,27 @@ with st.expander("Step 5: Visualize Results", expanded=False):
                     if results_dir is None:
                         st.error("Could not auto-detect results directory. "
                                  "Make sure simulations have completed successfully.")
+                        viz_status.update(label="Results directory not found", state="error")
                     else:
+                        st.write(f"Results dir: `{results_dir}`")
                         data = collect_data(coords, prog, results_dir)
                         ranges = compute_ranges(data, clip_pct)
+                        st.write(f"Collected {len(data)} coordinate records — building map")
                         build_map(data, viz_out_path, ranges, clip_pct, outlier_n)
+                        st.write(f"Building histograms ({hist_fmt})")
                         build_histograms(data, viz_out_path, ranges, clip_pct, outlier_n,
                                          hist_fmt)
+                        st.write("Building rule analysis")
                         build_rule_analysis(prog, results_dir, viz_out_path)
-                        st.success("Visualization generated!")
+                        viz_status.update(label="Visualization generated", state="complete",
+                                          expanded=False)
 
             # Display results
             tab_map, tab_hist, tab_heatmap, tab_effects = st.tabs([
-                "Results Map", "Histogram", "Rule Heatmap", "Factor Main Effects"
+                ":material/map: Results Map",
+                ":material/bar_chart: Histogram",
+                ":material/grid_on: Rule Heatmap",
+                ":material/insights: Factor Main Effects",
             ])
             with tab_map:
                 if viz_out_path.exists():
@@ -663,7 +682,7 @@ with st.expander("Step 5: Visualize Results", expanded=False):
                 hist_png = viz_dir / "coords_map_hist.png"
                 hist_pdf = viz_dir / "coords_map_hist.pdf"
                 if hist_png.exists():
-                    st.image(str(hist_png), use_container_width=True)
+                    st.image(str(hist_png), width='stretch')
                 if hist_pdf.exists():
                     try:
                         from PIL import Image
@@ -673,8 +692,7 @@ with st.expander("Step 5: Visualize Results", expanded=False):
                         page = doc[0]
                         pix = page.get_pixmap(dpi=200)
                         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                        st.image(img, caption="Histogram (PDF preview)",
-                                 use_container_width=True)
+                        st.image(img, caption="Histogram (PDF preview)", width='stretch')
                         doc.close()
                     except ImportError:
                         st.info("Install `PyMuPDF` (`pip install pymupdf`) for inline PDF "
@@ -692,7 +710,7 @@ with st.expander("Step 5: Visualize Results", expanded=False):
                 heatmap_png = viz_dir / "coords_map_rule_heatmap.png"
                 heatmap_pdf = viz_dir / "coords_map_rule_heatmap.pdf"
                 if heatmap_png.exists():
-                    st.image(str(heatmap_png), use_container_width=True)
+                    st.image(str(heatmap_png), width='stretch')
                 if heatmap_pdf.exists():
                     st.download_button(
                         "Download Rule Heatmap (PDF)",
@@ -706,7 +724,7 @@ with st.expander("Step 5: Visualize Results", expanded=False):
                 effects_png = viz_dir / "coords_map_rule_effects.png"
                 effects_pdf = viz_dir / "coords_map_rule_effects.pdf"
                 if effects_png.exists():
-                    st.image(str(effects_png), use_container_width=True)
+                    st.image(str(effects_png), width='stretch')
                 if effects_pdf.exists():
                     st.download_button(
                         "Download Main Effects (PDF)",

@@ -40,15 +40,15 @@ KST = timezone(timedelta(hours=9))
 # Page config
 st.set_page_config(
     page_title="Create New Scenario",
-    page_icon="➕",
-    layout="wide"
+    page_icon=":material/add_location_alt:",
+    layout="wide",
 )
 
 # ── Dispatch Console theme (src/vis_src/_theme.py 단일 소스) ──────
 _VIS_DIR = str(Path(__file__).resolve().parent.parent)
 if _VIS_DIR not in sys.path:
     sys.path.insert(0, _VIS_DIR)
-from _theme import inject_theme
+from _theme import inject_theme, page_header
 
 inject_theme()
 
@@ -281,31 +281,34 @@ def _write_label_map(base_path: str, rows: list[dict]):
 # ─────────────────────────────────────────────────────────────────
 # 메인 UI
 # ─────────────────────────────────────────────────────────────────
-st.title("Scenario Generation & Execution")
-st.info("💡 This page operates **completely independently** from the main app's sidebar settings. You can generate new scenarios even without existing ones!")
+page_header(
+    "Scenario Generation & Execution",
+    subtitle="메인 앱 사이드바 설정과 <b>독립</b>으로 동작 — 기존 시나리오가 없어도 생성 가능",
+)
 
 # ─────────────────────────────────────────────────────────────────
 # 1. 프로젝트 경로 (base_path) 입력
 # ─────────────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown("### Project Path Setup")
+st.subheader("1 · Project Path Setup")
 
 col_path, col_btn = st.columns([4, 1])
 with col_path:
     generate_bp_input = st.text_input(
-        "🗂️ Project Path (base_path)",
+        "Project Path (base_path)",
         value=st.session_state.generate_base_path,
         placeholder="e.g. C:\\Users\\USER\\MCI_ADV",
         help="Enter the project root path containing the scenarios folder",
         disabled=IS_CLOUD,
     )
     if IS_CLOUD:
-        st.caption(f"☁️ Cloud: base_path is fixed to `{CLOUD_BASE_PATH}`.")
+        st.caption(f"Cloud: base_path is fixed to `{CLOUD_BASE_PATH}`.")
 
 with col_btn:
     st.write("")  # 정렬용
     st.write("")  # 정렬용
-    if (not IS_CLOUD) and st.button("✅ Confirm Path", key="gen_check_path"):
+    if (not IS_CLOUD) and st.button("Confirm Path", key="gen_check_path",
+                                    icon=":material/check:"):
         st.session_state.generate_base_path = generate_bp_input
 
 
@@ -313,15 +316,15 @@ bp = st.session_state.generate_base_path
 
 # 경로 유효성 검사
 if not bp:
-    st.warning("⚠️ Please enter the project path above and click **✅ Confirm Path**.")
+    st.warning("Please enter the project path above and click **Confirm Path**.")
     st.stop()
 
 if not base_ok(bp):
-    st.error(f"❌ Invalid path: `{bp}`")
+    st.error(f"Invalid path: `{bp}`")
     st.caption("• Check that the path exists\n• Check that the `scenarios` folder is present")
     st.stop()
 
-st.success(f"✅ Valid path: `{bp}`")
+st.success(f"Valid path: `{bp}`")
 
 # ─────────────────────────────────────────────────────────────────
 # 2. Orchestrator 로드
@@ -329,7 +332,7 @@ st.success(f"✅ Valid path: `{bp}`")
 try:
     from orchestrator import Orchestrator
 except Exception as e:
-    st.error("❌ `src/sce_src/orchestrator.py` not found.")
+    st.error("`src/sce_src/orchestrator.py` not found.")
     st.exception(e)
     st.stop()
 
@@ -337,10 +340,10 @@ except Exception as e:
 # 3. 시나리오 생성 UI
 # ─────────────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown("### 1️⃣ Scenario Generation")
+st.subheader("2 · Scenario Generation")
 
 # API 키 입력 및 저장
-st.markdown("#### 🔑 Kakao REST API Key")
+st.markdown("#### Kakao REST API Key")
 
 # session_state 초기화
 if "kakao_api_key" not in st.session_state:
@@ -372,7 +375,7 @@ with col_key:
         disabled=IS_CLOUD and has_cloud_key,   # ✅ Cloud+Secrets면 입력 잠금
     )
     if IS_CLOUD and has_cloud_key:
-        st.caption("☁️ API key automatically loaded from Cloud Secrets.")
+        st.caption("API key automatically loaded from Cloud Secrets.")
 
 
 with col_save:
@@ -381,19 +384,19 @@ with col_save:
 
     # ✅ 로컬은 기존 그대로 "저장" 사용
     # ✅ Cloud는 Secrets가 없을 때만 수동 입력 허용(예외 케이스)
-    if ((not IS_CLOUD) or (IS_CLOUD and not has_cloud_key)) and st.button("✅ Save", key="save_api_key"):
+    if ((not IS_CLOUD) or (IS_CLOUD and not has_cloud_key)) and st.button("Save", key="save_api_key", icon=":material/save:"):
         if api_key_input and api_key_input.strip():
             st.session_state.kakao_api_key = api_key_input.strip()
-            st.success("✅ API key saved!")
+            st.success("API key saved!")
         else:
-            st.error("⚠️ Please enter an API key.")
+            st.error("Please enter an API key.")
 
 
 # 상태 표시
 if st.session_state.kakao_api_key:
-    st.caption(f"✅ API key stored ({len(st.session_state.kakao_api_key)} chars)")
+    st.caption(f"API key stored ({len(st.session_state.kakao_api_key)} chars)")
 else:
-    st.caption("⚠️ No API key")
+    st.caption("No API key")
 
 # 모든 용도에 동일한 키 사용
 kakao_api_key = st.session_state.kakao_api_key
@@ -401,16 +404,16 @@ kakao_api_key = st.session_state.kakao_api_key
 # ─────────────────────────────────────────────────────────────
 # Road data provider selection (Kakao API ↔ OSRM)
 # ─────────────────────────────────────────────────────────────
-st.markdown("#### 🛣️ Road Data Provider")
+st.markdown("#### Road Data Provider")
 is_use_time = st.checkbox(
     "Use Kakao Mobility API duration (real-time traffic)",
     value=True,
     key="is_use_time_checkbox",
     help=(
-        "✅ Checked → Calls the Kakao Mobility API. Real-time/predicted duration (minutes) "
+        "Checked → Calls the Kakao Mobility API. Real-time/predicted duration (minutes) "
         "for the given departure time is saved to CSV and used by the simulator as "
         "'duration × duration_coeff'. **Requires a Kakao REST API key.**\n\n"
-        "⬜ Unchecked → Calls the open-source OSRM service "
+        "Unchecked → Calls the open-source OSRM service "
         "(https://router.project-osrm.org). Both road distance (km) and duration (min) "
         "are saved with the same schema, but the **first simulation runs in "
         "distance/velocity mode** (ScenarioManager branch). No API key needed — "
@@ -420,11 +423,11 @@ is_use_time = st.checkbox(
     ),
 )
 if not is_use_time:
-    st.caption("ℹ️ OSRM mode: no Kakao key required. The OSRM URL comes from the "
+    st.caption("OSRM mode: no Kakao key required. The OSRM URL comes from the "
                "`MCI_OSRM_URL` environment variable, or the default demo server.")
 
 # 운행시간 모드 선택
-st.markdown("#### 📍 Departure Time Setup")
+st.markdown("#### Departure Time Setup")
 
 # session_state 초기화 (한 번만)
 if "departure_date_value" not in st.session_state:
@@ -479,16 +482,16 @@ duration_coeff = st.number_input(
 )
 
 st.markdown("---")
-st.markdown("### Coordinate Search")
+st.subheader("3 · Coordinate Search")
 
 # Search type selector
-search_type = st.radio(
+search_type = st.segmented_control(
     "Search Method",
     ["Keyword Search", "Address Search"],
-    horizontal=True,
-    key="search_type_radio",
-    help="Keyword: search by name (e.g. Incheon Airport) | Address: road/lot number"
-)
+    default="Keyword Search",
+    key="search_type_seg",
+    help="Keyword: search by name (e.g. Incheon Airport) | Address: road/lot number",
+) or "Keyword Search"
 
 # session_state 초기화
 if "search_type" not in st.session_state:
@@ -538,7 +541,7 @@ with st.form(key="search_form"):
 if search_button and search_keyword:
     # REST API 키 확인
     if not kakao_api_key or not kakao_api_key.strip():
-        st.error("⚠️ Please enter the Kakao REST API key and click '✅ Save' first!")
+        st.error("Please enter the Kakao REST API key and click **Save** first!")
     else:
         # Route to appropriate search based on selected type
         if search_type == "Keyword Search":
@@ -580,12 +583,12 @@ if search_button and search_keyword:
                         # Normalize keyword results
                         normalized = [normalize_search_result(doc, "Keyword Search") for doc in documents]
                         st.session_state.search_results = normalized
-                        st.success(f"✅ {len(documents)} places found!")
+                        st.success(f"{len(documents)} places found!")
                     else:
-                        st.warning("⚠️ No search results.")
+                        st.warning("No search results.")
                         st.session_state.search_results = []
                 elif response.status_code == 401:
-                    st.error("❌ API key auth failed (401 Unauthorized)")
+                    st.error("API key auth failed (401 Unauthorized)")
                     st.caption("Check if your REST API key is correct.")
                     try:
                         error_data = response.json()
@@ -593,7 +596,7 @@ if search_button and search_keyword:
                     except:
                         st.code(response.text)
                 elif response.status_code == 403:
-                    st.error("❌ Access denied (403 Forbidden)")
+                    st.error("Access denied (403 Forbidden)")
                     st.caption("Check platform settings and API key permissions.")
                     try:
                         error_data = response.json()
@@ -601,7 +604,7 @@ if search_button and search_keyword:
                     except:
                         st.code(response.text)
                 else:
-                    st.error(f"❌ API error (status: {response.status_code})")
+                    st.error(f"API error (status: {response.status_code})")
                     try:
                         error_data = response.json()
                         st.code(error_data, language="json")
@@ -609,9 +612,9 @@ if search_button and search_keyword:
                         st.code(response.text)
 
             except requests.exceptions.Timeout:
-                st.error("❌ Request timeout. Check network connection.")
+                st.error("Request timeout. Check network connection.")
             except requests.exceptions.RequestException as e:
-                st.error(f"❌ Search failed: {e}")
+                st.error(f"Search failed: {e}")
                 if hasattr(e, 'response') and e.response is not None:
                     st.caption(f"Status code: {e.response.status_code}")
                     try:
@@ -619,7 +622,7 @@ if search_button and search_keyword:
                     except:
                         st.code(e.response.text)
             except Exception as e:
-                st.error(f"❌ Unexpected error: {e}")
+                st.error(f"Unexpected error: {e}")
                 import traceback
                 st.code(traceback.format_exc())
 
@@ -632,10 +635,10 @@ if search_button and search_keyword:
             if success:
                 if documents:
                     st.session_state.search_results = documents
-                    st.success(f"✅ {len(documents)} addresses found!")
+                    st.success(f"{len(documents)} addresses found!")
                 else:
-                    st.warning("⚠️ No results. Please check the address.")
-                    st.info("""💡 **Address Search Tips:**
+                    st.warning("No results. Please check the address.")
+                    st.info("""**Address Search Tips:**
 - Road name: `Seoul Gangnam-gu Teheran-ro 152`
 - Lot number: `Seoul Gangnam-gu Yeoksam-dong 737`
 - Abbreviated: `Gangnam-gu Teheran-ro 152`
@@ -644,13 +647,13 @@ if search_button and search_keyword:
             else:
                 # Display error based on status code
                 if status_code == 401:
-                    st.error(f"❌ {error_msg}")
+                    st.error(f"{error_msg}")
                     st.caption("Check if your REST API key is correct.")
                 elif status_code == 403:
-                    st.error(f"❌ {error_msg}")
+                    st.error(f"{error_msg}")
                     st.caption("Check platform settings and API key permissions.")
                 else:
-                    st.error(f"❌ {error_msg}")
+                    st.error(f"{error_msg}")
 
 # ─────────────────────────────────────────────────────────────────
 # 검색 결과 표시
@@ -713,7 +716,7 @@ if st.session_state.search_results:
         col1, col2 = st.columns([4, 1])
         with col1:
             st.write(f"**{idx+1}. {place_name}**")
-            st.caption(f"📍 {address}")
+            st.caption(f"{address}")
             st.caption(f"Coords: ({lat:.6f}, {lon:.6f})")
         with col2:
             if st.button("Select", key=f"select_{idx}"):
@@ -721,22 +724,22 @@ if st.session_state.search_results:
                 st.session_state.selected_lon = lon
                 st.session_state.selected_place_name = place_name
                 st.session_state.selected_place_index = idx  # 선택된 인덱스 저장
-                st.success(f"✅ '{place_name}' selected!")
+                st.success(f"'{place_name}' selected!")
                 st.rerun()
             if st.button("Add to List", key=f"addlist_{idx}"):
                 disp_label = place_name or address or f"{lat:.5f},{lon:.5f}"
                 _append_coord_row(disp_label, lat, lon, address, add_preset_choice, place.get("search_type", "manual"))
-                st.success(f"📌 Added to list: {disp_label}")
+                st.success(f"Added to list: {disp_label}")
 
         if idx < len(st.session_state.search_results) - 1:
             st.markdown("---")
 
 # 선택된 좌표 표시
 if st.session_state.selected_place_name:
-    st.info(f"📌 Selected place: **{st.session_state.selected_place_name}** ({st.session_state.selected_lat:.6f}, {st.session_state.selected_lon:.6f})")
+    st.info(f"Selected place: **{st.session_state.selected_place_name}** ({st.session_state.selected_lat:.6f}, {st.session_state.selected_lon:.6f})")
 
 st.markdown("---")
-st.markdown("### 3️⃣ Scenario Parameters")
+st.subheader("4 · Scenario Parameters")
 colA, colB, colC = st.columns(3)
 with colA:
     latitude  = st.number_input("Latitude", value=st.session_state.selected_lat, format="%.6f")
@@ -756,10 +759,11 @@ with colC:
     buffer_ratio = st.number_input("buffer_ratio", value=1.5, min_value=1.0, step=0.1)
 
 
-if st.button("📦 Generate Scenario", key="btn_generate_scenario"):
+if st.button("Generate Scenario", key="btn_generate_scenario",
+                 type="primary", icon=":material/build:"):
         # API 키 검증 (is_use_time=True 모드에서만 카카오 키 필수)
     if is_use_time and (not kakao_api_key or not kakao_api_key.strip()):
-        st.error("⚠️ Kakao API key is required when 'Use Kakao API duration' is checked. "
+        st.error("Kakao API key is required when 'Use Kakao API duration' is checked. "
                  "Uncheck it to use the OSRM backend instead.")
         st.stop()
 
@@ -808,7 +812,8 @@ if st.button("📦 Generate Scenario", key="btn_generate_scenario"):
             except Exception as lm_err:
                 st.warning(f"label_map update failed: {lm_err}")
 
-        st.success("✅ Scenario generated!")
+        st.success("Scenario generated!")
+        st.toast("Scenario generated", icon=":material/check_circle:")
         st.write(f"• Exp ID: `{res['exp_id']}`")
         st.write(f"• Coord: `{res['coord']}`")
         st.write(f"• CONFIG_PATH: `{res['config_path']}`")
@@ -816,7 +821,7 @@ if st.button("📦 Generate Scenario", key="btn_generate_scenario"):
         st.write(f"• Log file: `{res['log_file']}`")
 
     except Exception as e:
-        st.error("❌ Scenario generation error")
+        st.error("Scenario generation error")
         st.exception(e)
 
 # ─────────────────────────────────────────────────────────────────
@@ -824,11 +829,12 @@ if st.button("📦 Generate Scenario", key="btn_generate_scenario"):
 # ─────────────────────────────────────────────────────────────────
 if st.session_state.gen_state and st.session_state.gen_state.get("config_path"):
     st.markdown("---")
-    st.markdown("### 4️⃣ Run Generated Scenario Immediately")
+    st.subheader("5 · Run Generated Scenario Immediately")
     st.info("Run simulation for the scenario generated above.")
     st.code(f"CONFIG: {st.session_state.gen_state.get('config_path')}")
 
-    if st.button("▶️ Run Simulation Now", key="btn_immediate_run"):
+    if st.button("Run Simulation Now", key="btn_immediate_run",
+                 type="primary", icon=":material/play_arrow:"):
         try:
             orc_imm = Orchestrator(base_path=bp)
             res_imm = orc_imm.run_simulation(config_path=st.session_state.gen_state["config_path"])
@@ -843,19 +849,20 @@ if st.session_state.gen_state and st.session_state.gen_state.get("config_path"):
                 "log_file": res_imm["log_file"]
             })
 
-            st.success("✅ Simulation complete!")
+            st.success("Simulation complete!")
+            st.toast("Simulation complete", icon=":material/check_circle:")
             st.write(f"• Log file: `{res_imm['log_file']}`")
             st.caption("Check results in the main app Scenarios/Maps tabs.")
 
         except Exception as e_imm:
-            st.error("❌ Simulation execution error")
+            st.error("Simulation execution error")
             st.exception(e_imm)
 
 # ------------------------------
 # 5. 일괄(멀티) 시나리오 생성/실행
 # ------------------------------
 st.markdown("---")
-st.markdown("### 4️⃣ Batch Scenario Generation/Execution")
+st.subheader("6 · Batch Scenario Generation / Execution")
 st.caption("Generate scenarios from the coordinate list at once, and optionally run simulations.")
 
 # 프리셋 편집
@@ -978,7 +985,10 @@ with col_b1:
     if re.search(r"\s", batch_prefix or "") or any(ord(ch) > 127 for ch in batch_prefix):
         st.warning("exp_id prefix should use ASCII characters only.")
 with col_b2:
-    do_run = st.radio("Execution Mode", ["Generate Only", "Generate + Simulate"], horizontal=True)
+    do_run = st.segmented_control(
+        "Execution Mode", ["Generate Only", "Generate + Simulate"],
+        default="Generate Only", key="batch_exec_mode_seg",
+    ) or "Generate Only"
 
 if st.button("Batch Run", type="primary", key="btn_batch_run"):
     rows = [r for r in st.session_state.batch_coord_rows if pd.notna(r.get("lat")) and pd.notna(r.get("lon"))]
@@ -1079,4 +1089,4 @@ if st.session_state.batch_run_log:
     st.dataframe(pd.DataFrame(st.session_state.batch_run_log), width='stretch', hide_index=True)
 
 st.markdown("---")
-st.caption("💡 Check generated scenarios in the main app, or modify and re-run existing ones.")
+st.caption("Check generated scenarios in the main app, or modify and re-run existing ones.")

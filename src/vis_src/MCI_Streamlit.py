@@ -67,7 +67,7 @@ if ORCHESTRATOR_DIR.is_dir():
 _VIS_DIR = str(Path(__file__).resolve().parent)
 if _VIS_DIR not in sys.path:
     sys.path.insert(0, _VIS_DIR)
-from _theme import inject_theme, page_header
+from _theme import inject_theme, page_header, kpi_row, PALETTE
 
 # (선택) 통계 패키지
 try:
@@ -1336,7 +1336,11 @@ def get_total_samples_from_yaml(yaml_path: Optional[str]) -> int:
 # ------------------------------
 # 페이지 공통 설정 + CSS(멀티셀렉트 ellipsis 완화)
 # ------------------------------
-st.set_page_config(page_title="MCI Streamlit", page_icon="📊", layout="wide")
+st.set_page_config(
+    page_title="MCI Dispatch Console",
+    page_icon=":material/crisis_alert:",
+    layout="wide",
+)
 
 
 with st.sidebar:
@@ -1350,13 +1354,13 @@ with st.sidebar:
     )
 
     if IS_CLOUD:
-        st.caption(f"☁️ Cloud mode: base_path is fixed to `{CLOUD_BASE_PATH}`.")
+        st.caption(f"Cloud mode: base_path is fixed to `{CLOUD_BASE_PATH}`.")
 
     # 로컬에서만 버튼 동작
     if (not IS_CLOUD) and st.button("Set base_path"):
         st.session_state.base_path = norm(base_input)
         if base_ok(norm(base_input)):
-            st.success("✅ base_path set! Select a scenario or create a new one in the Generate tab.")
+            st.success("base_path set! Select a scenario or create a new one in the Generate tab.")
     if st.session_state.base_path and not base_ok(st.session_state.base_path):
         st.warning("Invalid base_path. (scenarios folder required)")
     # (removed guidance text for cleaner UI)
@@ -1396,11 +1400,14 @@ with st.sidebar:
                 import folium
                 from streamlit_folium import st_folium
 
-                chosen_tile = "CartoDB positron"
+                # 사이드바가 딥네이비이므로 미니맵도 어두운 타일로 맞춘다.
+                # (본문 Maps 탭 지도는 그대로 Light/Dark 선택을 따른다.)
+                chosen_tile = "CartoDB dark_matter"
 
                 m = folium.Map(location=(lat, lon), zoom_start=12, control_scale=True, tiles=chosen_tile)
                 folium.CircleMarker(
                     location=(lat, lon), radius=5, weight=1, opacity=0.9,
+                    color=PALETTE["sidebar_accent"],
                     fill=True, fill_opacity=0.8, tooltip=f"{lat:.6f}, {lon:.6f}"
                 ).add_to(m)
                 # ★ 라이센스 표출 크기 최소화! (저작권 위반?)
@@ -1429,17 +1436,23 @@ with st.sidebar:
 
 
 
-# ── Dispatch Console theme + 콘솔 헤더 ──────────────────────────
+# ── Dispatch Light theme + 콘솔 헤더 ────────────────────────────
 inject_theme()
 
 _hdr_exp = st.session_state.get("selected_exp") or "\u2014"
 _hdr_coord = st.session_state.get("selected_coord") or "\u2014"
 page_header(
     "MCI Disaster Simulation Dashboard",
-    f"EXP <b>{_hdr_exp}</b> &nbsp;&middot;&nbsp; COORD <b>{_hdr_coord}</b>",
+    fields={"EXP": _hdr_exp, "COORD": _hdr_coord},
 )
 
-tabs = st.tabs(["Maps", "Scenarios", "Analytics", "Data Tables", "Rerun"])
+tabs = st.tabs([
+    ":material/map: Maps",
+    ":material/description: Scenarios",
+    ":material/query_stats: Analytics",
+    ":material/table_chart: Data Tables",
+    ":material/restart_alt: Rerun",
+])
 
 # ------------------------------
 # Scenarios 탭
@@ -1493,13 +1506,13 @@ with tabs[1]:
 
         # 디버깅: total_samples 값 확인
         if total_samples > 0:
-            st.caption(f"🔍 Detected simulation iterations: {total_samples} (latest run in summary CSV)")
+            st.caption(f"Detected simulation iterations: {total_samples} (latest run in summary CSV)")
 
         # total_samples 기반 조건부 로딩 (101회 이상은 버튼도 비활성화)
         if total_samples >= 101:
-            st.warning(f"⚠️ Simulation iterations ({total_samples}) >= 101. Log viewer disabled.")
-            st.info(f"📁 Check log files directly: `experiment_logs/{coord}_*.txt`")
-            st.caption(f"💡 For performance, logs with 101+ iterations should be checked in the source folder.")
+            st.warning(f"Simulation iterations ({total_samples}) >= 101. Log viewer disabled.")
+            st.info(f"Check log files directly: `experiment_logs/{coord}_*.txt`")
+            st.caption(f"For performance, logs with 101+ iterations should be checked in the source folder.")
 
             # 버튼 비활성화 상태로 표시
             st.button("Load Log Files", key="load_logs_btn_disabled", disabled=True, help="Log viewer is disabled for 101+ iterations")
@@ -1512,7 +1525,7 @@ with tabs[1]:
             if st.session_state.get("logs_loaded", False):
                 logs = experiment_log_candidates(bp, exp, coord)
             else:
-                st.info("💡 Click 'Load Log Files' above to view logs. (Disabled by default for faster tab loading)")
+                st.info("Click 'Load Log Files' above to view logs. (Disabled by default for faster tab loading)")
                 logs = None
 
         if logs:
@@ -1556,9 +1569,10 @@ with tabs[1]:
                     st.dataframe(psum, width='stretch', height=340)
                     _suffix = f"_iter{sel_iter}" if sel_iter is not None else ""
                     st.download_button(
-                        "⬇️ Patient Timeline (csv)",
+                        "Patient Timeline (csv)",
                         psum.to_csv(index=False).encode('utf-8-sig'),
-                        file_name=f"patient_timeline{_suffix}.csv"
+                        file_name=f"patient_timeline{_suffix}.csv",
+                        icon=":material/download:",
                     )
 
                     # ── Patient Story Animation ──
@@ -1776,16 +1790,17 @@ with tabs[1]:
                 ev_df = pd.DataFrame(blk["events"]).rename(columns={"t":"Time","eid":"EventID","ev":"Event","p":"Patient","a":"Ambulance","u":"UAV","h":"Hospital"}) if blk else pd.DataFrame()
                 st.dataframe(ev_df, width='stretch', height=320)
                 _suffix = f"_iter{sel_iter}" if sel_iter is not None else ""
-                st.download_button("⬇️ Full Events (csv)", ev_df.to_csv(index=False).encode('utf-8-sig'), file_name=f"events_all{_suffix}.csv")
+                st.download_button("Full Events (csv)", ev_df.to_csv(index=False).encode('utf-8-sig'),
+                                   file_name=f"events_all{_suffix}.csv", icon=":material/download:")
 
             st.markdown("#### View Raw Log")
             with st.expander("Expand Raw Text", expanded=False):
                 st.code(log_text[:30000] + ("\n... (생략)" if len(log_text) > 30000 else ""))
                 st.download_button("Download Raw Log", log_text, file_name=os.path.basename(log_sel))
 
-            st.markdown("---")
-            st.markdown("### Action/Rule Reference")
-            st.markdown(ACTION_TOOLTIP_MD)
+            # 참조 표는 상시 펼쳐 두면 로그 화면을 밀어낸다. 필요할 때만 띄운다.
+            with st.popover("Action / Rule reference", icon=":material/help:"):
+                st.markdown(ACTION_TOOLTIP_MD)
         else:
             st.info("No log files found for this combination.")
 
@@ -1901,12 +1916,13 @@ with tabs[1]:
                             _n_diversion = sum(1 for e in _events if e["event"] == "diversion")
                             _n_care = sum(1 for e in _events if e["event"] == "care_complete")
 
-                            col_t1, col_t2, col_t3, col_t4, col_t5 = st.columns(5)
-                            col_t1.metric("Rescues", _n_rescue)
-                            col_t2.metric("Transports", _n_transport)
-                            col_t3.metric("Arrivals", _n_arrival)
-                            col_t4.metric("Diversions", _n_diversion)
-                            col_t5.metric("Completed", _n_care)
+                            kpi_row([
+                                ("Rescues", _n_rescue),
+                                ("Transports", _n_transport),
+                                ("Arrivals", _n_arrival),
+                                ("Diversions", _n_diversion),
+                                ("Completed", _n_care),
+                            ])
 
             except Exception as e_trace:
                 st.error(f"Failed to load trace: {e_trace}")
@@ -1921,7 +1937,11 @@ with tabs[0]:
     exp  = st.session_state.selected_exp
     coord= st.session_state.selected_coord
 
-    _map_mode = st.radio("Mode", ["Static Map", "Animation"], horizontal=True, key="map_mode_radio")
+    # segmented_control 은 선택 해제가 가능하므로(None) 기본값을 되살려 준다.
+    _map_mode = st.segmented_control(
+        "Mode", ["Static Map", "Animation"],
+        default="Static Map", key="map_mode_seg",
+    ) or "Static Map"
 
     # ── 지도는 '최상단' 컨테이너에 그렸다가, 옵션을 아래에 배치 ─────────────
     map_holder = st.container()
@@ -1971,11 +1991,15 @@ with tabs[0]:
         return "Hospital"
 
     # ── 지도 테마(지도 바로 위) ─────────────────────────────────────────────
-    theme = st.radio("Map Theme", ["Light","Dark"], horizontal=True, key="theme_radio_maps_bottom")
-    if theme == "Light":
-        tile_name = st.selectbox("Light Tile", ["OpenStreetMap","CartoDB Positron"], index=0, key="light_tile_select")
-    else:
-        tile_name = "CartoDB Dark_Matter"
+    with st.container(horizontal=True, gap="medium", vertical_alignment="bottom"):
+        theme = st.segmented_control(
+            "Map Theme", ["Light", "Dark"],
+            default="Light", key="theme_seg_maps_bottom",
+        ) or "Light"
+        if theme == "Light":
+            tile_name = st.selectbox("Light Tile", ["OpenStreetMap","CartoDB Positron"], index=0, key="light_tile_select")
+        else:
+            tile_name = "CartoDB Dark_Matter"
 
     if not (bp and exp and coord):
         st.info("Select base_path / Experiment / Coord from the sidebar.")
@@ -3024,12 +3048,12 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     with open(stat_path, "r", encoding="utf-8") as f:
         lines = [ln.strip() for ln in f if ln.strip()]
     
-    st.caption(f"📊 STAT file: {len(lines)} lines total")
+    st.caption(f"STAT file: {len(lines)} lines total")
     
     # 예상 라인 수 확인
     expected = 320  # 64 × 5
     if len(lines) != expected:
-        st.warning(f"⚠️ STAT line count mismatch: {len(lines)} (expected: {expected})")
+        st.warning(f"STAT line count mismatch: {len(lines)} (expected: {expected})")
         st.caption(f"→ {expected - len(lines)} scenarios may be missing")
     
     # 2. 각 줄을 파싱하여 딕셔너리에 저장
@@ -3060,7 +3084,7 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     raw_path = stat_path.replace("_stat.txt", ".txt")
     
     if not os.path.exists(raw_path):
-        st.error("❌ RAW file not found!")
+        st.error("RAW file not found!")
         return pd.DataFrame(), pd.DataFrame()
     
     dfraw = parse_raw_results(raw_path)
@@ -3069,7 +3093,7 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # RAW의 룰 순서 (실제 실행된 순서)
     rule_order = reward_data[reward_data["run"] == 1]["rule"].tolist()
     
-    st.info(f"✅ RAW file: {len(rule_order)} scenarios confirmed")
+    st.info(f"RAW file: {len(rule_order)} scenarios confirmed")
     
     # 4. RAW 순서대로 STAT 데이터 매칭
     result_rows = []
@@ -3108,7 +3132,7 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
                     row[f"M{m_idx+1}_ci"] = np.nan
         else:
             # STAT에 없는 룰 → RAW에서 직접 계산
-            st.warning(f"⚠️ Not in STAT: {rule}")
+            st.warning(f"Not in STAT: {rule}")
             missing_count += 1
             
             # RAW 데이터에서 직접 통계 계산
@@ -3142,7 +3166,7 @@ def parse_stat_file(stat_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         result_rows.append(row)
     
     if missing_count > 0:
-        st.warning(f"⚠️ {missing_count} scenarios computed directly from RAW")
+        st.warning(f"{missing_count} scenarios computed directly from RAW")
     
     wide = pd.DataFrame(result_rows)
     
@@ -3200,13 +3224,13 @@ with tabs[2]:
         rpath = results_raw_path(bp, exp, coord)    # 기존 함수
 
         # 성능 최적화: 버튼 클릭 시에만 Analytics 데이터 로드
-        st.info("💡 Large simulation results may take time to load. Click the button below to start analysis.")
+        st.info("Large simulation results may take time to load. Click the button below to start analysis.")
 
         if st.button("Load Analysis Data", key="load_analytics_btn", help="Parse and analyze RAW results"):
             st.session_state.analytics_loaded = True
 
         if not st.session_state.get("analytics_loaded", False):
-            st.caption("💡 Click 'Load Analysis Data' above to view analysis. (Disabled by default for faster tab loading)")
+            st.caption("Click 'Load Analysis Data' above to view analysis. (Disabled by default for faster tab loading)")
         else:
             analytics_tabs = st.tabs(["RAW Data", "STAT Summary", "ANOVA Suite",
                                        "Pareto Dominance", "Bootstrap / Non-Parametric",
@@ -3578,8 +3602,14 @@ with tabs[2]:
                         if "rule" not in d.columns:
                             d["rule"] = d[["Phase","RedPolicy","RedAction","YellowAction"]].agg(", ".join, axis=1)
 
-                        mode = st.radio("Analysis Type", ["One-way (rule only)","One-way + Block(run) (RCBD recommended)","Reduced Factorial (main + 2-way)"],
-                                        index=1, horizontal=True)
+                        # 옵션 문자열은 아래 분기가 그대로 비교하므로 바꾸지 않는다.
+                        _anova_modes = ["One-way (rule only)",
+                                        "One-way + Block(run) (RCBD recommended)",
+                                        "Reduced Factorial (main + 2-way)"]
+                        mode = st.segmented_control(
+                            "Analysis Type", _anova_modes,
+                            default=_anova_modes[1], key="anova_mode_seg",
+                        ) or _anova_modes[1]
                         if "Block" in mode or "Factorial" in mode:
                             st.caption("RCBD assumes Common Random Numbers (CRN): all 64 rules within each run share the same random seed, so `run` is a valid block variable.")
 
@@ -3640,7 +3670,7 @@ with tabs[2]:
                                         p_nonadd = float(anova_aug.loc["_fitted_sq", "PR(>F)"])
                                         st.write(f"Tukey Non-additivity: p={p_nonadd:.3g}")
                                         if p_nonadd < alpha:
-                                            st.warning("⚠️ Significant block×treatment interaction detected (Tukey non-additivity p < alpha). RCBD additivity assumption may be violated.")
+                                            st.warning("Significant block×treatment interaction detected (Tukey non-additivity p < alpha). RCBD additivity assumption may be violated.")
                                 except Exception as e_tukey:
                                     st.caption(f"Tukey non-additivity test skipped: {e_tukey}")
 
@@ -4143,8 +4173,11 @@ with tabs[2]:
                 else:
                     _bs_metric = st.selectbox("Metric", ["Reward", "Time", "PDR", "Reward w.o.G", "PDR w.o.G"],
                                               key="bs_metric_sel")
-                    _bs_method = st.radio("Method", ["BCa Bootstrap CI", "Friedman Test (RCBD alternative)",
-                                                     "Kruskal-Wallis (One-way alternative)"], key="bs_method")
+                    _bs_methods = ["BCa Bootstrap CI", "Friedman Test (RCBD alternative)",
+                                   "Kruskal-Wallis (One-way alternative)"]
+                    _bs_method = st.segmented_control(
+                        "Method", _bs_methods, default=_bs_methods[0], key="bs_method_seg",
+                    ) or _bs_methods[0]
 
                     _bs_raw = _prep_metric(dfraw, _bs_metric) if 'dfraw' in dir() else pd.DataFrame()
                     if _bs_raw.empty:
@@ -4598,21 +4631,23 @@ with tabs[3]:
                     write_csv_smart(edit, target)
                     st.success("Save complete")
             with c2:
-                if st.button("🔄 Refresh"):
+                if st.button("Refresh", icon=":material/refresh:"):
                     st.rerun()
             with c3:
                 yaml_path = find_yaml_in_coord(bp, exp, coord)
-                if yaml_path and st.button("▶️ Re-run with Modified Values"):
+                if yaml_path and st.button("Re-run with Modified Values",
+                                           type="primary", icon=":material/play_arrow:"):
                     try:
                         from orchestrator import Orchestrator
                         with st.spinner("Running simulation..."):
                             orc = Orchestrator(base_path=bp)
                             result = orc.run_simulation(config_path=yaml_path)
                         if result["ok"]:
-                            st.success("✅ Simulation complete!")
+                            st.success("Simulation complete!")
+                            st.toast("Simulation complete", icon=":material/check_circle:")
                             st.write(f"• Log file: `{result['log_file']}`")
                         else:
-                            st.error(f"❌ Execution failed (code: {result['returncode']})")
+                            st.error(f"Execution failed (code: {result['returncode']})")
                             with st.expander("stdout"):
                                 st.text(result.get("stdout", ""))
                             with st.expander("stderr"):
@@ -4663,8 +4698,8 @@ if "env_txt2" not in st.session_state:
 # Rerun 탭 (기존 시나리오 재실행)
 # ──────────────────────────────────────────────────────────────────────────────
 with tabs[4]:
-    st.subheader("🔄 Re-run Existing Scenario")
-    st.info("💡 This tab operates **independently** from the sidebar. Select an existing scenario to modify parameters and re-run.")
+    st.subheader("Re-run Existing Scenario")
+    st.info("This tab operates **independently** from the sidebar. Select an existing scenario to modify parameters and re-run.")
 
     # ─────────────────────────────────────────────────────────────────
     # Rerun 탭 전용 base_path 입력
@@ -4682,7 +4717,7 @@ with tabs[4]:
     col_path, col_btn = st.columns([4, 1])
     with col_path:
         rerun_bp_input = st.text_input(
-            "🗂️ Project Path (base_path)",
+            "Project Path (base_path)",
             value=st.session_state.rerun_base_path,
             placeholder="e.g. C:\\Users\\USER\\MCI_ADV",
             help="Enter the project root path containing the scenarios folder",
@@ -4690,12 +4725,13 @@ with tabs[4]:
             disabled=IS_CLOUD,
         )
         if IS_CLOUD:
-            st.caption(f"☁️ Cloud: fixed to `{CLOUD_BASE_PATH}`.")
+            st.caption(f"Cloud: fixed to `{CLOUD_BASE_PATH}`.")
 
     with col_btn:
         st.write("")  # 정렬용
         st.write("")  # 정렬용
-        if (not IS_CLOUD) and st.button("✅ Confirm Path", key="rerun_check_path"):
+        if (not IS_CLOUD) and st.button("Confirm Path", key="rerun_check_path",
+                                        icon=":material/check:"):
             st.session_state.rerun_base_path = rerun_bp_input
 
 
@@ -4703,15 +4739,15 @@ with tabs[4]:
 
     # 경로 유효성 검사
     if not bp_rerun:
-        st.warning("⚠️ Enter the project path above and click **✅ Confirm Path**.")
+        st.warning("Enter the project path above and click **Confirm Path**.")
         st.stop()
 
     if not base_ok(bp_rerun):
-        st.error(f"❌ Invalid path: `{bp_rerun}`")
+        st.error(f"Invalid path: `{bp_rerun}`")
         st.caption("• Check if the path exists\n• Check if the `scenarios` folder is present")
         st.stop()
 
-    st.success(f"✅ Valid path: `{bp_rerun}`")
+    st.success(f"Valid path: `{bp_rerun}`")
 
     # ─────────────────────────────────────────────────────────────────
     # Orchestrator 로드
@@ -4719,7 +4755,7 @@ with tabs[4]:
     try:
         from orchestrator import Orchestrator
     except Exception as e:
-        st.error("❌ `src/sce_src/orchestrator.py` not found.")
+        st.error("`src/sce_src/orchestrator.py` not found.")
         st.exception(e)
         st.stop()
 
@@ -4732,11 +4768,11 @@ with tabs[4]:
     # 실험/좌표 목록 만들기
     exps_rerun = list_experiments_any(bp_rerun)
     if not exps_rerun:
-        st.warning("⚠️ No experiments found in scenarios folder.")
+        st.warning("No experiments found in scenarios folder.")
         st.stop()
 
     sel_exp_rerun = st.selectbox(
-        "📂 Select Experiment Folder",
+        "Select Experiment Folder",
         options=exps_rerun,
         key="sel_exp_rerun",
         help="Select an experiment folder from scenarios"
@@ -4744,11 +4780,11 @@ with tabs[4]:
 
     coords_rerun = list_coords_from_scenarios(bp_rerun, sel_exp_rerun) if sel_exp_rerun else []
     if not coords_rerun:
-        st.warning(f"⚠️ No coordinate folders in experiment `{sel_exp_rerun}`.")
+        st.warning(f"No coordinate folders in experiment `{sel_exp_rerun}`.")
         st.stop()
 
     sel_coord_rerun = st.selectbox(
-        "📍 Select Coordinate Folder",
+        "Select Coordinate Folder",
         options=coords_rerun,
         key="sel_coord_rerun",
         help="Select a coordinate folder from the experiment"
@@ -4761,10 +4797,10 @@ with tabs[4]:
         cfg_path_rerun = os.path.join(bp_rerun, "scenarios", sel_exp_rerun, sel_coord_rerun, f"config_{sel_coord_rerun}.yaml")
 
         if not os.path.exists(cfg_path_rerun):
-            st.error(f"❌ CONFIG file not found: `{cfg_path_rerun}`")
+            st.error(f"CONFIG file not found: `{cfg_path_rerun}`")
             st.stop()
 
-        st.success(f"✅ CONFIG file: `{os.path.basename(cfg_path_rerun)}`")
+        st.success(f"CONFIG file: `{os.path.basename(cfg_path_rerun)}`")
 
         try:
             with open(cfg_path_rerun, "r", encoding="utf-8") as f:
@@ -4784,7 +4820,7 @@ with tabs[4]:
             # ─────────────────────────────────────────────────────────────────
             st.markdown("---")
             st.markdown("### 🔧 Edit Parameters")
-            st.caption("⚠️ Changing departure time, incident size, or coordinates requires scenario regeneration (API re-call)")
+            st.caption("Changing departure time, incident size, or coordinates requires scenario regeneration (API re-call)")
 
             col1, col2 = st.columns(2)
 
@@ -4867,13 +4903,14 @@ with tabs[4]:
             # 실행 버튼
             # ─────────────────────────────────────────────────────────────────
             st.markdown("---")
-            if st.button("▶️ Apply Changes & Run Simulation", key="btn_rerun_execute"):
+            if st.button("Apply Changes & Run Simulation", key="btn_rerun_execute",
+                         type="primary", icon=":material/play_arrow:"):
                 try:
                     # YAML 백업 생성 (타임스탬프) - 수정 전에 백업
                     import shutil
                     backup_path_rerun = cfg_path_rerun.replace(".yaml", f"_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}.yaml")
                     shutil.copy(cfg_path_rerun, backup_path_rerun)
-                    st.info(f"📦 Original YAML backup: `{os.path.basename(backup_path_rerun)}`")
+                    st.info(f"Original YAML backup: `{os.path.basename(backup_path_rerun)}`")
 
                     # YAML 파일을 문자열로 읽어서 직접 수정 (주석과 형식 유지)
                     with open(cfg_path_rerun, "r", encoding="utf-8") as f:
@@ -4952,7 +4989,7 @@ with tabs[4]:
                     with open(cfg_path_rerun, "w", encoding="utf-8") as f:
                         f.write(yaml_text_rerun)
 
-                    st.success("✅ YAML file updated!")
+                    st.success("YAML file updated!")
 
                     # 시뮬레이션 실행
                     with st.spinner("Running simulation..."):
@@ -4960,23 +4997,24 @@ with tabs[4]:
                         res_rerun = orc_rerun.run_simulation(config_path=cfg_path_rerun)
 
                     if res_rerun["ok"]:
-                        st.success("✅ Simulation complete!")
+                        st.success("Simulation complete!")
+                        st.toast("Simulation complete", icon=":material/check_circle:")
                         st.write(f"• Exp ID: `{res_rerun['exp_id']}`")
                         st.write(f"• Coord: `{res_rerun['coord']}`")
                         st.write(f"• Log file: `{res_rerun['log_file']}`")
                         st.write(f"• Summary CSV has been auto-updated")
-                        st.caption("💡 Check results in the Scenarios/Maps tabs.")
+                        st.caption("Check results in the Scenarios/Maps tabs.")
                     else:
-                        st.error(f"❌ Simulation failed (code: {res_rerun['returncode']})")
+                        st.error(f"Simulation failed (code: {res_rerun['returncode']})")
                         with st.expander("stdout"):
                             st.text(res_rerun.get("stdout", ""))
                         with st.expander("stderr"):
                             st.text(res_rerun.get("stderr", ""))
 
                 except Exception as e_rerun:
-                    st.error("❌ Simulation execution error")
+                    st.error("Simulation execution error")
                     st.exception(e_rerun)
 
         except Exception as e_yaml_rerun:
-            st.error(f"❌ YAML file read failed: {e_yaml_rerun}")
+            st.error(f"YAML file read failed: {e_yaml_rerun}")
             st.exception(e_yaml_rerun)

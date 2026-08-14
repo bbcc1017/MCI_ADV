@@ -234,7 +234,7 @@ MCI_ADV/
 │   │
 │   └── vis_src/                          # 시각화/대시보드
 │       ├── MCI_Streamlit.py              # 메인 대시보드
-│       ├── _theme.py                     # Dispatch Console 테마 (4개 페이지 공용)
+│       ├── _theme.py                     # Dispatch Light 테마 (4개 페이지 공용)
 │       └── pages/
 │           ├── Generate.py               # 시나리오 생성 UI
 │           ├── ResultsCompare.py         # 결과 비교 페이지
@@ -871,26 +871,49 @@ streamlit run MCI_Streamlit.py
 streamlit run pages/Generate.py
 ```
 
-#### 테마 (Dispatch Console)
+#### 테마 (Dispatch Light)
 
 대시보드 4개 페이지는 `src/vis_src/_theme.py` 하나에서 스타일을 받는다. 예전에는 각
-페이지가 자기 `<style>` 블록을 따로 들고 있어 서로 어긋났고, 메인 대시보드만 제대로
-스킨이 적용돼 있었다.
+페이지가 자기 `<style>` 블록을 따로 들고 있어 서로 어긋났다.
 
-- 색을 바꾸려면 `_theme.py` 의 `PALETTE` 를 고친다. 여기가 정본이다.
-- Streamlit 이 자체 렌더링해서 CSS 가 닿지 않는 위젯(데이터프레임 캔버스, 슬라이더,
-  토스트)은 `.streamlit/config.toml` 이 담당한다. 저장소 루트와 `src/vis_src/` 두 곳에
+밝은 본문 + 딥네이비 사이드바. 주광 환경에서 읽히는 것을 우선하고, 상황실 느낌은
+사이드바와 액션 색(EMS 블루 `#0B63CE`)에서 낸다. 라벨·본문은 산세리프, **숫자·ID·시각만
+모노(tabular-nums)** 로 둔다.
+
+**색·모양은 config 우선, CSS 는 나머지만.** Streamlit 1.44+ 의 고급 테마 옵션이
+데이터프레임 캔버스·슬라이더·alert·코드블록·사이드바까지 닿는다. config 로 표현되는 것을
+CSS 로 다시 쓰면 Streamlit DOM 이 바뀔 때 먼저 깨진다.
+
+- `.streamlit/config.toml` — 팔레트, 반경, 폰트, 의미색(red/orange/green/blue/gray),
+  차트 기본 색 순서, `[theme.sidebar]` 서브테마. 저장소 루트와 `src/vis_src/` 두 곳에
   있고 **항상 같은 값을 유지**해야 한다.
+- `_theme.py` — `PALETTE` (Python 쪽 정본, folium/plotly 호출부가 참조), 헤더 장식,
+  tabular-nums, 사이드바 nav 활성 표시, plotly / altair 템플릿 등록, 공용 헬퍼.
+- plotly / altair 는 `inject_theme()` 이 라이브러리 기본 템플릿으로 등록하므로 개별
+  차트 호출부는 손댈 필요가 없다.
 - `TRIAGE` 색(Red/Yellow/Green/Black)은 START 분류 프로토콜 색이라 데이터 표현에만
   쓴다. 버튼·강조·테두리 같은 장식에 쓰지 않는다.
-- 시안 3종 비교 문서: `docs/design/dashboard_redesign_pitch.html`
+- `docs/design/dashboard_redesign_pitch.html` — 다크 시안 3종 비교 문서(이전 단계 기록).
 
 ```python
-from _theme import inject_theme, page_header
+from _theme import inject_theme, page_header, kpi_row, triage_badges
 
-inject_theme()                       # st.set_page_config() 직후 1회
-page_header("제목", "부제 <b>강조</b>")   # 콘솔 헤더 (선택)
+inject_theme()                                   # st.set_page_config() 직후 1회
+page_header("제목", fields={"EXP": exp, "COORD": coord})   # 헤더 + 상태 스트립
+kpi_row([("Rescues", 12), ("Transports", 9)])    # 테두리 metric 스트립
+triage_badges({"red": 8, "yellow": 14, "green": 6, "black": 2})
 ```
+
+UI 규약(2026-08-14 개편):
+
+| 용도 | 쓰는 것 | 쓰지 않는 것 |
+|---|---|---|
+| 2~3지 모드 선택 | `st.segmented_control` | `st.radio(horizontal=True)` |
+| KPI 행 | `kpi_row()` / `st.metric(border=True)` | `st.columns` + 수동 카드 CSS |
+| 버튼·다운로드 아이콘 | `icon=":material/...:"` | 라벨 문자열 앞 이모지 |
+| 긴 작업 | `st.status` | `st.spinner` 단독 |
+| 참조 표 | `st.popover` | 상시 펼친 markdown |
+| 폭 지정 | `width='stretch'` | `use_container_width=True` (deprecated) |
 
 #### 탭별 기능
 

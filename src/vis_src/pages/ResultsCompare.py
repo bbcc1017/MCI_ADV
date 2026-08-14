@@ -235,35 +235,37 @@ def list_results_experiments(base_path: str) -> list[str]:
 # ------------------------------
 # UI
 # ------------------------------
-st.set_page_config(page_title="Results Compare", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Results Compare", page_icon=":material/insights:", layout="wide")
 
 # ── Dispatch Console theme (src/vis_src/_theme.py 단일 소스) ──────
 _VIS_DIR = str(Path(__file__).resolve().parent.parent)
 if _VIS_DIR not in sys.path:
     sys.path.insert(0, _VIS_DIR)
-from _theme import inject_theme
+from _theme import inject_theme, page_header
 
 inject_theme()
 
-st.title("Simulation Results Comparison")
-st.caption("PDR is shown as percent; PDR/Time axes are reversed so lower is better.")
+page_header(
+    "Simulation Results Comparison",
+    subtitle="PDR 은 % 표기, PDR/Time 축은 <b>낮을수록 좋음</b> 방향으로 뒤집혀 있다",
+)
 
 # base_path
 if "base_path_compare" not in st.session_state:
     st.session_state.base_path_compare = CLOUD_BASE_PATH if IS_CLOUD else DEFAULT_LOCAL_BASE_PATH
 
-col_bp, = st.columns(1)
-with col_bp:
+with st.container(horizontal=True, vertical_alignment="bottom", gap="small"):
     bp_input = st.text_input(
         "base_path (MCI_ADV root)",
         value=st.session_state.base_path_compare,
         placeholder="e.g. C:\\Users\\USER\\MCI_ADV",
         disabled=IS_CLOUD,
+        width=520,
     )
-    if st.button("Apply", key="btn_set_bp"):
+    if st.button("Apply", key="btn_set_bp", icon=":material/check:"):
         st.session_state.base_path_compare = bp_input.strip()
-    if IS_CLOUD:
-        st.info(f"Cloud mode detected: fixed to `{CLOUD_BASE_PATH}`")
+if IS_CLOUD:
+    st.info(f"Cloud mode detected: fixed to `{CLOUD_BASE_PATH}`")
 bp = st.session_state.base_path_compare
 if not bp or not Path(bp).is_dir():
     st.stop()
@@ -328,6 +330,7 @@ st.download_button(
     agg.to_csv(index=False).encode("utf-8-sig"),
     file_name=f"results_compare_{metric_sel}.csv",
     mime="text/csv",
+    icon=":material/download:",
 )
 
 # Top-N bar with ±1 SD error bars
