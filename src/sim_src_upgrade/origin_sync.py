@@ -60,14 +60,28 @@ def write() -> dict:
     return payload
 
 
+def drift_modules() -> list[str]:
+    """드리프트된 모듈 이름 목록 (없으면 빈 리스트).
+
+    매니페스트가 아예 없으면 "기준 미기록"이므로 전 모듈을 드리프트로 본다 —
+    호출부가 예외 없이 폴백 판단만 하고 싶을 때 쓴다.
+    """
+    if not os.path.exists(MANIFEST):
+        return list(MODULES)
+    try:
+        with open(MANIFEST, "r", encoding="utf-8") as f:
+            recorded = json.load(f).get("modules", {})
+    except Exception:
+        return list(MODULES)
+    current = origin_hashes()
+    return [m for m in MODULES if recorded.get(m) != current[m]]
+
+
 def check(strict: bool = True) -> bool:
     """원본 sha256 이 파생 시점과 같은지 확인. 다르면 (strict 면) 예외."""
     if not os.path.exists(MANIFEST):
         raise FileNotFoundError(f"G0 매니페스트 없음: {MANIFEST} (origin_sync.py --write 먼저)")
-    with open(MANIFEST, "r", encoding="utf-8") as f:
-        recorded = json.load(f)["modules"]
-    current = origin_hashes()
-    drift = [m for m in MODULES if recorded.get(m) != current[m]]
+    drift = drift_modules()
     if drift and strict:
         raise RuntimeError(
             "G0 드리프트: src/sim_src 가 사본 파생 이후 변경됨 → " + ", ".join(drift) +

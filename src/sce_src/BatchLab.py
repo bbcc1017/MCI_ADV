@@ -600,6 +600,9 @@ if st.button("Run batch now", type="primary"):
                     sim = orc.run_simulation(config_path=gen["config_path"], extra_env=env)
                     record["status"] = "simulated" if sim.get("ok") else f"sim failed ({sim.get('returncode')})"
                     record["log_file"] = sim.get("log_file") or record["log_file"]
+                    if not sim.get("ok"):
+                        tail = (sim.get("error_tail") or "").splitlines()
+                        record["error"] = sim.get("artifact_error") or (tail[-1] if tail else "")
                 run_log.append(record)
             except Exception as e:
                 record["status"] = "error"

@@ -836,8 +836,9 @@ if st.session_state.gen_state and st.session_state.gen_state.get("config_path"):
     if st.button("Run Simulation Now", key="btn_immediate_run",
                  type="primary", icon=":material/play_arrow:"):
         try:
-            orc_imm = Orchestrator(base_path=bp)
-            res_imm = orc_imm.run_simulation(config_path=st.session_state.gen_state["config_path"])
+            with st.spinner("Running simulation..."):
+                orc_imm = Orchestrator(base_path=bp)
+                res_imm = orc_imm.run_simulation(config_path=st.session_state.gen_state["config_path"])
 
             # 최신 상태 업데이트
             st.session_state.gen_state.update({
@@ -849,10 +850,37 @@ if st.session_state.gen_state and st.session_state.gen_state.get("config_path"):
                 "log_file": res_imm["log_file"]
             })
 
-            st.success("Simulation complete!")
-            st.toast("Simulation complete", icon=":material/check_circle:")
-            st.write(f"• Log file: `{res_imm['log_file']}`")
-            st.caption("Check results in the main app Scenarios/Maps tabs.")
+            # 종료코드 0 이어도 결과 파일이 안 나왔으면 실패다 — orchestrator 가 산출물까지
+            # 검증해 ok 로 알려준다. 여기서 ok 를 안 보면 "완료"만 뜨고 results/ 는 빈다.
+            if res_imm.get("ok"):
+                st.success("Simulation complete!")
+                st.toast("Simulation complete", icon=":material/check_circle:")
+                st.write(f"• Log file: `{res_imm['log_file']}`")
+                st.write(f"• Results: `{res_imm.get('output_dir') or '?'}` "
+                         f"({len(res_imm.get('artifacts') or [])} files, "
+                         f"core={res_imm.get('sim_core')}, {res_imm.get('elapsed_sec')}s)")
+                if res_imm.get("sim_core") == "origin":
+                    # 고속 코어 게이트(G0 드리프트/사전점검)가 걸려 원본 코어로 돌았다.
+                    # 결과는 정확하지만 느리다 — 로그의 [G0] 줄에 이유가 있다.
+                    st.info("Ran on the original sim core (fast-core gate not satisfied). "
+                            "Results are correct but slower — see the `[G0]` lines in the log file.")
+                st.caption("Check results in the main app Scenarios/Maps tabs.")
+            else:
+                st.error(f"Simulation failed (code: {res_imm.get('returncode')})")
+                if res_imm.get("artifact_error"):
+                    st.warning(res_imm["artifact_error"])
+                if res_imm.get("error_tail"):
+                    st.code(res_imm["error_tail"], language="text")
+                st.write(f"• Log file: `{res_imm.get('log_file')}`")
+                # 이벤트 trace 출력이 켜져 있으면 stdout 이 수만 줄이다 → 꼬리만 보여준다.
+                def _tail(txt: str, n: int = 200) -> str:
+                    lines = (txt or "").splitlines()
+                    head = f"... (앞 {len(lines) - n} 줄 생략, 전문은 로그 파일)\n" if len(lines) > n else ""
+                    return head + "\n".join(lines[-n:])
+                with st.expander("stdout (tail)"):
+                    st.text(_tail(res_imm.get("stdout", "")))
+                with st.expander("stderr (tail)"):
+                    st.text(_tail(res_imm.get("stderr", "")))
 
         except Exception as e_imm:
             st.error("Simulation execution error")
@@ -1071,6 +1099,10 @@ if st.button("Batch Run", type="primary", key="btn_batch_run"):
                     sim = orc.run_simulation(config_path=gen["config_path"], extra_env=env)
                     rec["status"] = "simulated" if sim.get("ok") else f"sim fail ({sim.get('returncode')})"
                     rec["log_file"] = sim.get("log_file") or rec["log_file"]
+                    if not sim.get("ok"):
+                        # 실패 이유를 로그 테이블에 같이 남긴다 — rc 만 보면 원인을 모른다.
+                        tail = (sim.get("error_tail") or "").splitlines()
+                        rec["error"] = sim.get("artifact_error") or (tail[-1] if tail else "")
                 run_log.append(rec)
             except Exception as e:
                 rec["status"] = "error"

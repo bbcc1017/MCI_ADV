@@ -391,6 +391,50 @@ def _yaml_safe_load(path: str) -> Dict[str,Any]:
     except Exception:
         return {}
 
+def _cap_gate_suffix(env: Optional[Dict[str,str]] = None) -> str:
+    """`sim_src/main.py:113` 과 같은 규칙 — psent 게이트일 때만 파일명 접미사."""
+    src = env if env is not None else os.environ
+    val = (src.get("MCI_CAP_GATE", "occ") or "occ").strip().lower()
+    return "_psent" if val == "psent" else ""
+
+
+def expected_result_artifacts(base_path: str, config_path: str,
+                              env: Optional[Dict[str,str]] = None,
+                              trace: bool = False) -> Tuple[str, list, list]:
+    """이 config 로 시뮬이 성공했다면 존재해야 하는 결과 파일 경로.
+
+    `main.py` 는 `run_setting.output_path` + `exp_indicator` 를 이어 붙이고,
+    상대경로는 **cwd 기준**으로 해석한다. Orchestrator 는 cwd 를 `base_path` 로 두고
+    실행하므로 여기서도 같은 기준으로 절대경로화한다.
+
+    Returns:
+        (출력 디렉터리, 필수 파일 목록, 선택 파일 목록)
+        YAML 을 못 읽거나 output_path 가 없으면 ("", [], []) — 이 경우 호출부는
+        파일 검사를 건너뛰고 종료코드만 본다(예전 동작).
+    """
+    y = _yaml_safe_load(config_path) or {}
+    run = y.get("run_setting", {}) or {}
+    out = run.get("output_path")
+    ind = run.get("exp_indicator")
+    if not out or not ind:
+        return "", [], []
+    out_dir = out if os.path.isabs(out) else os.path.normpath(os.path.join(base_path, out))
+    out_dir = os.path.join(out_dir, str(ind))
+    sfx = _cap_gate_suffix(env)
+    required = [
+        os.path.join(out_dir, f"results_{ind}{sfx}.txt"),
+        os.path.join(out_dir, f"results_{ind}{sfx}_stat.txt"),
+    ]
+    # trace JSON 은 trace 가 켜져 있고 궤적이 하나라도 수집됐을 때만 생성된다 → 선택.
+    optional = [os.path.join(out_dir, f"trace_{ind}.json")] if trace else []
+    return out_dir, required, optional
+
+
+def _tail_lines(text: str, n: int = 25) -> str:
+    lines = [ln for ln in (text or "").splitlines() if ln.strip()]
+    return "\n".join(lines[-n:])
+
+
 def extract_params_from_yaml(config_path: str) -> Dict[str,Any]:
     meta = {
         "환자수": None,
@@ -727,8 +771,15 @@ class Orchestrator:
                 **기본 None = 켬** — 대시보드에서 별도 설정 없이 자동 적용된다. 시뮬 로직은
                 `src/sim_src` 와 동일하고 연산시간만 줄어든다(결과·산출 파일 바이트 동일).
                 실행 전 G0 드리프트 검사 + 구·신 코어 소규모 동치검증이 자동으로 돌고,
-                불일치면 즉시 실패한다. 환경변수 `MCI_FAST_CORE=0` 으로 전역 비활성 가능.
+                불일치면 **런처가 원본 코어로 내려가 그대로 실행한다**(결과는 원본 기준
+                으로 정확, 시간만 손해). 반환값 `sim_core` 에 실제 사용 코어가 담긴다.
+                환경변수 `MCI_FAST_CORE=0` 으로 전역 비활성 가능.
                 런처 파일이 없으면 조용히 기존 `main.py` 경로로 폴백한다.
+
+        Returns:
+            dict — `ok` 은 **종료코드 0 + 결과 파일이 이번 실행에서 실제로 생성됨**
+            둘 다 만족할 때만 True. 실패 원인은 `artifact_error` / `error_tail` /
+            `missing_artifacts` 에 담긴다. 호출부는 반드시 `ok` 를 확인해야 한다.
             trace: `--trace`(환자별 trace JSON 저장) 전달 여부. **기본 None = 켬** —
                 대시보드 애니메이션이 trace JSON 을 쓰므로 항상 생성한다.
             skip_preflight: 고속 경로의 사전 동치검증 생략(권장하지 않음).
@@ -794,10 +845,51 @@ class Orchestrator:
 
         t2 = time.time()
         elapsed = round(t2 - t1, 3)
-        ok = (proc.returncode == 0)
 
         stdout_text = "".join(_stdout_buf)
         stderr_text = "".join(_stderr_buf)
+
+        # 실제로 어느 코어로 돌았는지 — 런처가 `[fastcore] CORE=...` 로 알려준다.
+        # (G0 드리프트·사전점검 불일치면 런처가 스스로 원본 코어로 폴백한다.)
+        if "[fastcore] CORE=origin" in stdout_text:
+            core_used = "origin"
+        elif "[fastcore] CORE=fast" in stdout_text:
+            core_used = "fast"
+        else:
+            core_used = "fast" if use_fast_core else "origin"
+
+        # ---------- 산출물 검증 ----------
+        # 종료코드 0 만 믿으면 안 된다: 런처/래퍼 층에서 게이트가 걸려 main.py 가 아예
+        # 안 돌아도 rc=0 이 될 수 있고, 반대로 예전 실행이 남긴 결과 파일이 있으면
+        # "성공"으로 오인된다. 그래서 (1) 필수 파일 존재 (2) 이번 실행 중에 갱신됨
+        # 두 가지를 함께 본다.
+        out_dir, required, optional = expected_result_artifacts(
+            self.base_path, config_path, env=env, trace=trace)
+        fresh_cut = t1 - 2.0        # 파일시스템 타임스탬프 해상도 여유
+        missing = [p for p in required if not exists_file(p)]
+        stale = []
+        for p in required:
+            if p in missing:
+                continue
+            try:
+                if os.path.getmtime(p) < fresh_cut:
+                    stale.append(p)
+            except OSError:
+                missing.append(p)
+        artifacts = [p for p in (required + optional) if exists_file(p)]
+
+        ok = (proc.returncode == 0) and not missing and not stale
+        if missing or stale:
+            detail = []
+            if missing:
+                detail.append("없음: " + ", ".join(os.path.basename(p) for p in missing))
+            if stale:
+                detail.append("이번 실행에서 갱신 안 됨(과거 산출물): "
+                              + ", ".join(os.path.basename(p) for p in stale))
+            artifact_error = (f"결과 파일 검증 실패 (출력 디렉터리 {out_dir or '?'}) — "
+                              + " / ".join(detail))
+        else:
+            artifact_error = ""
 
         # Per-run log file
         log_file = os.path.join(self.paths["logs"], f"{coord2}_{ts_short_now()}.txt")
@@ -810,7 +902,10 @@ class Orchestrator:
                 pieces.append("\n")
         if stderr_text.strip():
             pieces.append(f"--- stderr ---\n{stderr_text}\n")
-        pieces.append(f"=== SIM_END {now_kst_iso()} (elapsed: {elapsed}s, rc={proc.returncode}) ===\n\n")
+        if artifact_error:
+            pieces.append(f"--- artifact check ---\n{artifact_error}\n")
+        pieces.append(f"=== SIM_END {now_kst_iso()} (elapsed: {elapsed}s, rc={proc.returncode}, "
+                      f"core={core_used}, ok={ok}) ===\n\n")
         if _run_log_enabled():
             write_text(log_file, "".join(pieces), encoding="utf-8")
 
@@ -951,6 +1046,11 @@ class Orchestrator:
             "stderr": proc.stderr or "",
             "elapsed_sec": elapsed,
             "started_at": sim_started,
-            "sim_core": "fast" if use_fast_core else "origin",
+            "sim_core": core_used,
             "trace": bool(trace),
+            "output_dir": out_dir,
+            "artifacts": artifacts,
+            "missing_artifacts": missing + stale,
+            "artifact_error": artifact_error,
+            "error_tail": _tail_lines(stderr_text) or _tail_lines(stdout_text),
         }

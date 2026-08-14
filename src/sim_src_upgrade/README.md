@@ -34,8 +34,21 @@ python src/sim_src/main.py --config_path "$CFG" --trace
 python src/sim_src_upgrade/drivers/run_sim_fast.py -- --config_path "$CFG" --trace
 ```
 
-실행 순서: **G0 드리프트 검사 → 사전 동치검증(규칙 2 × 에피 3) → flat 모듈 7개 교체 →
-`main.py` 실행**. 사전점검이 실패하면 그 자리에서 멈춘다(`--skip_preflight` 로만 생략).
+실행 순서: **G0 드리프트 검사 → 사전 동치검증(규칙 2 × 에피 3) → flat 모듈 교체 →
+`main.py` 실행**(`--skip_preflight` 로 사전점검 생략).
+
+게이트가 깨졌을 때는 **멈추지 않고 원본 코어로 폴백한다**. G0 드리프트나 사전점검
+불일치는 "사본을 믿을 수 없다"는 뜻이고, 정답의 정의는 언제나 `src/sim_src` 원본이므로
+주입을 포기하고 원본으로 그대로 돌린다 — 결과는 정확하고 시간만 손해다. 어느 코어로
+돌았는지는 stdout 한 줄로 남는다.
+
+```
+[fastcore] CORE=fast      # 고속 코어
+[fastcore] CORE=origin    # 게이트 실패 → 원본 코어 폴백 (직전 [G0]/[preflight] 줄에 이유)
+```
+
+`--strict` 를 주면 예전처럼 중단한다(G0 → exit 2, 사전점검 → exit 3). 사본이 정말 같은지
+확인하는 게 목적인 CI·검증에서만 쓴다. 대시보드는 결과 산출이 목적이라 기본(폴백)이다.
 
 ### 2) Orchestrator / 대시보드에서
 
@@ -70,8 +83,9 @@ MCI_UAV 쪽 대규모 실측(규칙 전수평가 3.7~4.4×, v16 드라이버 wal
 
 ## 원본이 바뀌면
 
-`src/sim_src` 를 수정하면 G0 가 즉시 실패한다. 절차는 **① 사본(`core/`)에 같은 변경을
-반영 → ② `python src/sim_src_upgrade/origin_sync.py --write` → ③ 동치검증 재실행** 이다.
+`src/sim_src` 를 수정하면 G0 가 드리프트를 잡는다. 그때 시뮬은 **원본 코어로 계속
+돌아간다**(고속화만 잠시 꺼진다). 정상화 절차는 **① 사본(`core/`)에 같은 변경을 반영 →
+② `python src/sim_src_upgrade/origin_sync.py --write` → ③ 동치검증 재실행** 이다.
 반영 없이 `--write` 만 하면 드리프트를 덮어버린다.
 
 ```bash

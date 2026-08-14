@@ -18,10 +18,23 @@
 
 안전장치
 --------
-1. **G0 드리프트 검사** — 사본이 파생된 `src/sim_src` 해시가 그대로인지 확인. 원본이
-   바뀌었으면 즉시 중단한다(`origin_sync.py --write` 로만 기준 갱신).
+1. **G0 드리프트 검사** — 사본이 파생된 `src/sim_src` 해시가 그대로인지 확인.
 2. **사전점검** — 실제 실행 전에 같은 config 를 구·신 코어로 소규모(규칙 2 × 에피 3)
-   돌려 지표가 완전히 같은지 확인한다. 다르면 중단(`--skip_preflight` 로만 생략).
+   돌려 지표가 완전히 같은지 확인한다(`--skip_preflight` 로 생략).
+
+게이트가 깨졌을 때의 동작 — **원본 코어 폴백**
+-----------------------------------------------
+G0 드리프트나 사전점검 불일치는 "고속 사본을 믿을 수 없다"는 뜻이지 "시뮬을 돌리면
+안 된다"는 뜻이 아니다. 정답의 정의는 언제나 `src/sim_src` 원본이므로, 게이트가
+깨지면 **고속 코어 주입을 포기하고 원본 코어로 그대로 실행한다** — 결과는 항상 옳고
+시간만 손해다. stdout 에 다음 한 줄을 남겨 어느 코어로 돌았는지 명시한다.
+
+    [fastcore] CORE=fast          # 고속 코어로 실행
+    [fastcore] CORE=origin        # 게이트 실패 → 원본 코어 폴백
+
+`--strict` 를 주면 예전처럼 실행하지 않고 중단한다(G0 → exit 2, 사전점검 → exit 3).
+동치검증·CI 처럼 "사본이 정말 같은지"가 목적일 때만 쓴다. 대시보드는 결과 산출이
+목적이므로 기본(폴백)을 쓴다.
 
 사용
 ----
@@ -100,6 +113,8 @@ def main() -> int:
     p.add_argument("--preflight_rules", type=int, default=2, help="사전점검 규칙 수 (기본 2)")
     p.add_argument("--pin_threads", action="store_true",
                    help="BLAS 스레드를 1로 고정 (기본 off — 평소 main.py 실행과 환경 동일 유지)")
+    p.add_argument("--strict", action="store_true",
+                   help="게이트 실패 시 원본 코어 폴백 대신 중단 (G0=2, 사전점검=3)")
     args, passthrough = p.parse_known_args()
     if passthrough and passthrough[0] == "--":
         passthrough = passthrough[1:]
@@ -111,19 +126,28 @@ def main() -> int:
 
     ensure_paths(rl=False, old_sim=True)
 
+    use_fast = True   # 게이트가 깨지면 원본 코어로 내려간다(결과는 원본이 정답).
+
     # ---------- G0: 원본 드리프트 ----------
     from sim_src_upgrade import origin_sync
-    try:
-        origin_sync.check()
+    drift = origin_sync.drift_modules()
+    if drift:
+        msg = ("G0 드리프트: src/sim_src 가 사본 파생 이후 변경됨 → " + ", ".join(drift) +
+               "\n  사본에 변경을 반영한 뒤 origin_sync.py --write 로 기준을 갱신하라.")
+        if args.strict:
+            print(f"[G0] FAIL — {msg}", file=sys.stderr)
+            return 2
+        print(f"[G0] WARN — {msg}\n"
+              f"[G0] 고속 코어를 쓰지 않고 원본 src/sim_src 로 실행한다 "
+              f"(결과는 원본 기준으로 정확, 시간만 손해).", file=sys.stderr)
+        use_fast = False
+    else:
         print("[G0] PASS — 고속 사본이 현재 src/sim_src 에서 파생된 상태")
-    except Exception as e:
-        print(f"[G0] FAIL — {e}", file=sys.stderr)
-        return 2
 
     config_path = _extract_config_path(passthrough)
 
     # ---------- 사전점검: 구·신 코어 지표 완전일치 ----------
-    if not args.skip_preflight:
+    if use_fast and not args.skip_preflight:
         if not os.path.isfile(config_path):
             print(f"[preflight] config 를 찾을 수 없어 사전점검 생략: {config_path}",
                   file=sys.stderr)
@@ -135,18 +159,29 @@ def main() -> int:
                                             n_rules=args.preflight_rules)
             print(f"[preflight] {time.time() - t0:.1f}s")
             if not res["pass"]:
-                print("[preflight] 지표 불일치 — 고속 실행을 중단한다.", file=sys.stderr)
-                return 3
+                if args.strict:
+                    print("[preflight] 지표 불일치 — 고속 실행을 중단한다.", file=sys.stderr)
+                    return 3
+                print("[preflight] 지표 불일치 — 고속 코어를 버리고 원본 코어로 실행한다.",
+                      file=sys.stderr)
+                use_fast = False
 
-    # ---------- 고속 코어 주입 후 main.py 실행 ----------
-    installed = install_fast_core()
-    print(f"[fastcore] flat 모듈 {len(installed)}개 고속판으로 대체: {', '.join(installed)}")
+    # ---------- 코어 선택 후 main.py 실행 ----------
+    if use_fast:
+        installed = install_fast_core()
+        print(f"[fastcore] flat 모듈 {len(installed)}개 고속판으로 대체: {', '.join(installed)}")
+    else:
+        # 사전점검이 구 코어를 flat 이름으로 sys.modules 에 올려뒀을 수 있다. 지워서
+        # main.py 가 sys.path(=src/sim_src) 에서 원본을 새로 import 하게 한다.
+        for flat in FLAT_MODULES:
+            sys.modules.pop(flat, None)
+    print(f"[fastcore] CORE={'fast' if use_fast else 'origin'}")
 
     main_py = os.path.join(SIM_SRC, "main.py")
     sys.argv = [main_py] + passthrough
     t0 = time.time()
     runpy.run_path(main_py, run_name="__main__")
-    print(f"[fastcore] main.py 완료 ({time.time() - t0:.1f}s)")
+    print(f"[fastcore] main.py 완료 ({time.time() - t0:.1f}s, core={'fast' if use_fast else 'origin'})")
     return 0
 
 
