@@ -426,7 +426,8 @@ def expected_result_artifacts(base_path: str, config_path: str,
         os.path.join(out_dir, f"results_{ind}{sfx}_stat.txt"),
     ]
     # trace JSON 은 trace 가 켜져 있고 궤적이 하나라도 수집됐을 때만 생성된다 → 선택.
-    optional = [os.path.join(out_dir, f"trace_{ind}.json")] if trace else []
+    # (main.py 는 이벤트 한 줄씩 gzip 으로 쓴다 — 대시보드 read_trace_file 이 .json/.json.gz 둘 다 읽는다.)
+    optional = [os.path.join(out_dir, f"trace_{ind}.json.gz")] if trace else []
     return out_dir, required, optional
 
 
@@ -763,7 +764,7 @@ class Orchestrator:
     # ---------- simulation run ----------
     def run_simulation(self, config_path: str, extra_env: Optional[Dict[str,str]] = None,
                        use_fast_core: Optional[bool] = None, trace: Optional[bool] = None,
-                       skip_preflight: bool = False) -> Dict[str,Any]:
+                       skip_preflight: bool = True) -> Dict[str,Any]:
         """시뮬레이션 1회 실행.
 
         Args:
@@ -782,7 +783,8 @@ class Orchestrator:
             `missing_artifacts` 에 담긴다. 호출부는 반드시 `ok` 를 확인해야 한다.
             trace: `--trace`(환자별 trace JSON 저장) 전달 여부. **기본 None = 켬** —
                 대시보드 애니메이션이 trace JSON 을 쓰므로 항상 생성한다.
-            skip_preflight: 고속 경로의 사전 동치검증 생략(권장하지 않음).
+            skip_preflight: 고속 경로의 사전 동치검증 생략. **기본 True** — 동치는 G0 해시 게이트와
+                `verify/sim_equivalence.py`(코어 수정 시 1회) 로 보장하고, 실행마다 0.4s 를 더 쓰지 않는다.
         """
         if trace is None:
             trace = True
@@ -893,9 +895,16 @@ class Orchestrator:
 
         # Per-run log file
         log_file = os.path.join(self.paths["logs"], f"{coord2}_{ts_short_now()}.txt")
+        # trace 가 켜지면 시뮬은 이벤트를 stdout 에 찍지 않고 trace 파일에만 남긴다. 대시보드
+        # (load_log_blocks)가 이 로그에서 이벤트를 찾을 수 있도록 헤더에 trace 파일 경로와 크기를 적는다.
+        trace_tok = ""
+        for _tp in optional:
+            if exists_file(_tp):
+                _rel = os.path.relpath(_tp, self.base_path).replace(os.sep, "/")
+                trace_tok = f", trace_file={_rel}|{os.path.getsize(_tp)}"
         pieces = []
         pieces.append(f"=== SIM_START {sim_started} "
-                      f"(core={'fast' if use_fast_core else 'origin'}, trace={trace}) ===\n")
+                      f"(core={'fast' if use_fast_core else 'origin'}, trace={trace}{trace_tok}) ===\n")
         if stdout_text:
             pieces.append(stdout_text)
             if not stdout_text.endswith("\n"):

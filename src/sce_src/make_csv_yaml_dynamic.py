@@ -16,6 +16,35 @@ from typing import Optional
 
 KST = timezone(timedelta(hours=9))
 
+# 좌표당 생성기 프로세스가 하나씩 뜨므로 Kakao/OSRM 호출은 세션으로 연결을 재사용한다.
+_HTTP = requests.Session()
+
+
+def _read_excel_cached(path: str, **kw) -> pd.DataFrame:
+    """pd.read_excel 을 엑셀 mtime·size 키의 pickle 로 캐시 (좌표당 ≈2s → 0.05s).
+
+    캐시는 엑셀 옆 `<파일>.<옵션>.<mtime>.<size>.pkl` (scenarios/ 는 gitignore). 캐시 읽기·쓰기 실패는
+    무시하고 엑셀을 그대로 읽는다. 엑셀이 바뀌면 키가 달라져 자동으로 새로 읽는다.
+    """
+    cache = None
+    try:
+        st_ = os.stat(path)
+        tag = "_".join(f"{k}={v}" for k, v in sorted(kw.items()) if k != "engine") or "default"
+        cache = f"{path}.{tag}.{st_.st_mtime_ns}.{st_.st_size}.pkl"
+        if os.path.exists(cache):
+            return pd.read_pickle(cache)
+    except Exception:
+        cache = None
+    df = pd.read_excel(path, **kw)
+    if cache:
+        try:
+            df.to_pickle(cache + ".tmp")
+            os.replace(cache + ".tmp", cache)   # 동시 실행 중인 다른 프로세스가 반쯤 쓴 파일을 읽지 않게
+        except Exception:
+            pass
+    return df
+
+
 def ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
 
@@ -233,7 +262,7 @@ class ScenarioGenerator:
         base = (self.osrm_url or "https://router.project-osrm.org").rstrip("/")
         out = (lat, lon, 0.0)
         try:
-            r = requests.get(f"{base}/nearest/v1/driving/{lon},{lat}",
+            r = _HTTP.get(f"{base}/nearest/v1/driving/{lon},{lat}",
                              params={"number": 1}, timeout=10)
             if r.status_code == 200:
                 wps = (r.json().get("waypoints") or [])
@@ -360,7 +389,7 @@ class ScenarioGenerator:
 
         for attempt in range(max_retries):
             try:
-                response = requests.get(url, headers=headers, params=params, timeout=15)
+                response = _HTTP.get(url, headers=headers, params=params, timeout=15)
                 if response.status_code == 200:
                     data = response.json()
 
@@ -495,7 +524,7 @@ class ScenarioGenerator:
         last_err = None
         for attempt in range(max_retries):
             try:
-                response = requests.get(url, headers=headers, params=params, timeout=15)
+                response = _HTTP.get(url, headers=headers, params=params, timeout=15)
                 if response.status_code == 200:
                     data = response.json()
 
@@ -674,7 +703,7 @@ class ScenarioGenerator:
 
         # ---------- (0) 데이터 로드 ----------
         try:
-            df_full = pd.read_excel(self.hospital_data_path, engine='openpyxl')
+            df_full = _read_excel_cached(self.hospital_data_path, engine='openpyxl')
         except Exception as e:
             print(f"❌ 병원 데이터 로드 실패: {e}")
             return
@@ -1126,11 +1155,6 @@ class ScenarioGenerator:
     def make_distance_Hos2Hos(self, save_folder):
         """병원 간 거리 행렬 생성"""
         print(f"  📐 병원간 거리 행렬 생성 중...")
-        try:
-            df_full = pd.read_excel(self.hospital_data_path, engine="openpyxl")
-        except Exception as e:
-            print(f"❌ 병원 데이터 로드 실패: {e}")
-            return
 
         # Euclidean (★ road 소요시간 순서 기준 — hospital_info.csv 의 Index 순서와 일치)
         try:
@@ -1140,7 +1164,8 @@ class ScenarioGenerator:
             coords_road = []
             if {"x좌표", "y좌표"}.issubset(df_road_hos.columns):
                 coords_road = list(zip(df_road_hos["y좌표"], df_road_hos["x좌표"]))
-            else:
+            else:   # hospital_info.csv 에 좌표가 없는 옛 형식일 때만 엑셀을 다시 읽는다
+                df_full = _read_excel_cached(self.hospital_data_path, engine="openpyxl")
                 for name in names_road:
                     row = df_full[df_full["요양기관명"] == name]
                     if not row.empty:
@@ -1175,7 +1200,7 @@ class ScenarioGenerator:
             # header=None keeps duplicate hospital-name columns intact. The rebuilt
             # source matrix can contain same-name hospitals, so row order plus
             # Hospital_Info coordinates are the stable lookup keys.
-            df_matrix_raw = pd.read_excel(
+            df_matrix_raw = _read_excel_cached(
                 excel_path, sheet_name="Distance_Matrix", engine="openpyxl", header=None
             )
             matrix_names = df_matrix_raw.iloc[0, 1:].astype(str).tolist()
@@ -1184,7 +1209,7 @@ class ScenarioGenerator:
                 .apply(pd.to_numeric, errors="coerce")
                 .to_numpy(dtype=float)
             )
-            df_matrix_info = pd.read_excel(excel_path, sheet_name="Hospital_Info", engine="openpyxl")
+            df_matrix_info = _read_excel_cached(excel_path, sheet_name="Hospital_Info", engine="openpyxl")
 
             def coord_key(name, lon, lat):
                 return (str(name), round(float(lon), 6), round(float(lat), 6))

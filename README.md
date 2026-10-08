@@ -47,7 +47,7 @@ flowchart LR
     A["📍 좌표 입력<br/>(위도·경도)"] --> B["🏥 시나리오 생성<br/>make_csv_yaml_dynamic.py"]
     B -->|"Kakao / OSRM"| C[("scenarios/exp_*/(lat,lon)/<br/>hospital · amb_station · uav<br/>patient · 거리행렬 · config.yaml<br/>routes/*.json")]
     C --> D["⚙️ 시뮬레이션<br/>64 정책 × N 반복"]
-    D --> E[("results/exp_*/(lat,lon)/<br/>results_*.txt · _stat.txt<br/>trace_*.json")]
+    D --> E[("results/exp_*/(lat,lon)/<br/>results_*.txt · _stat.txt<br/>trace_*.json.gz")]
     E --> F["📊 Streamlit 대시보드<br/>지도 · 애니메이션 · 통계"]
 
     style B fill:#e8f0ff,stroke:#4a7dff
@@ -63,7 +63,7 @@ flowchart LR
 |---|---|---|
 | 시나리오 생성 | `src/sce_src/make_csv_yaml_dynamic.py` | 병원·구급센터·UAV·환자 CSV, 병원간 거리행렬, `config_(lat,lon).yaml`, 경로 JSON(`routes/`) |
 | 실행 오케스트레이션 | `src/sce_src/orchestrator.py` | 생성·시뮬 subprocess 관리, 요약 CSV, 실행 로그 |
-| 시뮬레이션 | `src/sim_src/main.py` | `results_*.txt`(64룰 × 반복 × 5지표), `_stat.txt`(평균·표준편차·95%CI), `trace_*.json` |
+| 시뮬레이션 | `src/sim_src/main.py` | `results_*.txt`(64룰 × 반복 × 5지표), `_stat.txt`(평균·표준편차·95%CI), `trace_*.json.gz` |
 | 시각화·분석 | `src/vis_src/MCI_Streamlit.py` | 지도·애니메이션·간트차트·ANOVA/CLD/Pareto |
 | 배치 실험 | `experiment_1/batch_runner.py` | 다좌표 자동 실행 + `progress.json` 재개 |
 
@@ -130,9 +130,12 @@ BCa 부트스트랩·Friedman·Kruskal-Wallis, 검정력 분석, LaTeX 내보내
 **일부러 안 건드린 것** — 부동소수 연산 순서, `np.argsort` 의 `kind`, `p_wait[...].pop()` 순서,
 RNG 드로우의 수·순서. 하나라도 바뀌면 궤적이 갈려 비교가 무의미해진다.
 
-> ⚠️ **이벤트 콘솔 출력은 기본 켬.** 대시보드가 `experiment_logs/` 의 이 출력을 파싱해
-> Scenarios 탭·Maps Animation 을 그리기 때문이다. 순수 배치라면 `MCI_TRACE_PRINT=0` 으로
-> 꺼서 더 빠르게 돌릴 수 있고, 출력 여부와 무관하게 결과 파일은 동일하다.
+> ℹ️ **이벤트 로그는 trace 파일 하나로 통합됐다 (2026-10).** `--trace` 로 돌리면(대시보드·배치는 항상)
+> 시뮬은 이벤트를 stdout 에 찍지 않고 `results/<exp>/<coord>/trace_<coord>.json.gz` 에만
+> 이벤트 한 줄씩 gzip 으로 남긴다(실행당 약 60MB → 1MB). 실행 로그 헤더(`=== SIM_START ... trace_file=<경로>|<bytes>`)가
+> 그 파일을 가리키고, 대시보드 Scenarios 탭·Maps Animation·Trace Replay 는 모두 이 파일에서 그린다.
+> 이전 로그(이벤트 튜플이 stdout 에 있는 형식)는 그대로 파싱되므로 옛 결과도 계속 보인다.
+> `--trace` 없이 CLI 로 돌릴 때만 예전처럼 이벤트가 콘솔에 찍힌다. 결과 파일은 어느 쪽이든 바이트 동일하다.
 
 전체 문서 → **[`src/sim_src_upgrade/README.md`](src/sim_src_upgrade/README.md)**
 
@@ -146,7 +149,7 @@ RNG 드로우의 수·순서. 하나라도 바뀌면 궤적이 갈려 비교가 
 |---|---|---|
 | `MCI_FAST_CORE` | `1` | `0` 이면 고속경로를 끄고 원본 `src/sim_src` 로 실행 |
 | `MCI_WRITE_RUN_LOG` | `1` | `0` 이면 `experiment_logs/` 에 실행 로그를 쓰지 않는다 (대시보드 Scenarios·Animation 탭이 이 로그를 읽으므로 기본 켬) |
-| `MCI_TRACE_PRINT` | `1` | `0` 이면 고속 코어가 이벤트·Action 콘솔 출력을 생략한다(더 빠름, 대시보드 애니메이션 불가) |
+| `MCI_TRACE_PRINT` | `1` | `0` 이면 고속 코어가 `--trace` 없는 실행에서도 이벤트·Action 콘솔 출력을 생략한다. trace 가 켜진 실행(대시보드·배치 기본)은 이 값과 무관하게 콘솔 출력 없이 `trace_*.json.gz` 에만 남긴다 |
 | `MCI_OSRM_URL` | 공개 데모 서버 | 자체 OSRM 인스턴스 주소 |
 | `KAKAO_API_KEY` | — | 카카오 모빌리티 키 (CLI 인자 미지정 시 자동 사용) |
 | `MCI_CAP_GATE` | `occ` | 발송 용량 게이트. `psent` = 병원 실시간 정보 없이 현장 지득분만 |
@@ -341,7 +344,7 @@ MCI_ADV/
 │  results/exp_{...}/(lat,lon)/                                                │
 │    ├─ results_(lat,lon).txt       (RAW 데이터)                               │
 │    ├─ results_(lat,lon)_stat.txt  (통계: 평균, 표준편차, 95% CI)              │
-│    └─ trace_(lat,lon).json        (환자별 트레이스, --trace 옵션 시)           │
+│    └─ trace_(lat,lon).json.gz       (환자별 트레이스, --trace 옵션 시)           │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 
@@ -972,7 +975,7 @@ blocks = load_log_blocks(log_path, file_sig(log_path))
 - **환자 요약표**: 구조시각 → 이송수단 → 병원 → 도착시각 → 치료완료
 - **이벤트 테이블**: 전체 시뮬레이션 이벤트 타임라인
 - **Patient Story Animation**: 환자별 상태 변화를 시간축 위에 색상 바로 시각화 (Waiting → Rescued → Transport → Hospital → Completed)
-- **Simulation Trace Replay**: per-patient Gantt chart (`trace_*.json` — Orchestrator 가 **항상 생성**한다. CLI 직접 실행 시에만 `--trace` 필요)
+- **Simulation Trace Replay**: per-patient Gantt chart (`trace_*.json.gz` — Orchestrator 가 **항상 생성**한다. CLI 직접 실행 시에만 `--trace` 필요)
   - 환자별 구조 → 이송 → 병원 도착 → 치료 시작 → 완료까지 타임라인
   - 중증도별 색상 구분 (Red/Yellow/Green/Black)
   - 이벤트 요약 통계 (Rescues, Transports, Arrivals, Diversions, Completed)
@@ -1183,7 +1186,7 @@ python main.py --config_path /path/to/config.yaml
 # 4. 시뮬레이션 + 환자별 트레이스 로깅 (대시보드 경로에서는 항상 켜짐)
 cd src/sim_src
 python main.py --config_path /path/to/config.yaml --trace
-# → results/ 폴더에 trace_*.json 생성 (Scenarios 탭 Trace Replay에서 시각화)
+# → results/ 폴더에 trace_*.json.gz 생성 (Scenarios 탭 Trace Replay에서 시각화)
 ```
 
 #### Streamlit Cloud 배포

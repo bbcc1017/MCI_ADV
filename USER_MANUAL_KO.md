@@ -202,7 +202,7 @@ python src/sim_src/main.py --config_path scenarios/exp_.../config_(lat,lon).yaml
 
 # 2b단계 (선택): 환자별 트레이스 로깅과 함께 실행
 python src/sim_src/main.py --config_path scenarios/exp_.../config_(lat,lon).yaml --trace
-# → results/ 폴더에 trace_*.json 생성 (Scenarios 탭 Trace Replay에서 시각화)
+# → results/ 폴더에 trace_*.json.gz 생성 (Scenarios 탭 Trace Replay에서 시각화)
 ```
 
 ---
@@ -323,7 +323,7 @@ RunManager (main.py)
 
 `python main.py --config_path <config.yaml> --trace`로 실행하면 환자별 이벤트 트레이스를 기록합니다:
 - 기록 이벤트: onset, rescue, transport_start, hospital_arrival, diversion, care_start, care_complete
-- 출력: results 디렉토리에 `trace_*.json` 생성
+- 출력: results 디렉토리에 `trace_*.json.gz` 생성
 - 시각화: Scenarios 탭 → Simulation Trace Replay (Gantt chart)
 
 ### 7.5 전원(Diversion) 규칙
@@ -357,7 +357,7 @@ streamlit run src/vis_src/MCI_Streamlit.py
 - **환자 타임라인**: 구조시각, 이송수단, 병원, 도착시각, 치료완료 시각
 - **이벤트 테이블**: 전체 이벤트 로그 (Rule/Iteration 필터 가능)
 - **Patient Story Animation**: 환자별 상태 변화를 시간축 위에 색상 바로 시각화 (Waiting → Rescued → Transport → Hospital → Completed)
-- **Simulation Trace Replay**: `--trace` 플래그로 실행한 시뮬레이션의 환자별 Gantt chart (trace_*.json 필요)
+- **Simulation Trace Replay**: `--trace` 플래그로 실행한 시뮬레이션의 환자별 Gantt chart (trace_*.json.gz 필요)
   - 환자별 구조 → 이송 → 병원 도착 → 치료 시작 → 완료까지 타임라인
   - 중증도별 색상 구분 (Red/Yellow/Green/Black)
   - 이벤트 요약 통계 (Rescues, Transports, Arrivals, Diversions, Completed)

@@ -20,7 +20,7 @@
 #      · statsmodels 있으면 OLS+Type-II ANOVA, 잔차 정규성(Shapiro)·QQ 스캐터·잔차 히스토그램 제공
 # 5) Data Tables: 편집 대상 셀렉터에 파일명만 노출(경로 숨김), "안전센터와 소방서.csv"는 편집 목록에서 제외
 # -------------------------------------------------------------------------------------------------
-import os, re, json, shutil, subprocess, math, ast, sys
+import os, re, json, gzip, shutil, subprocess, math, ast, sys
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Tuple, Optional, Union
@@ -963,6 +963,87 @@ def build_patient_summary(events: List[Dict]) -> pd.DataFrame:
 
 
 # ------------------------------
+# trace 파일 → 로그 블록 변환
+# ------------------------------
+# 시뮬은 trace 가 켜지면(대시보드 실행은 항상) 이벤트를 stdout 에 찍지 않고 trace_*.json.gz 에만
+# 남긴다. 실행 로그 헤더가 그 파일을 가리키므로, 애니메이션·환자요약은 trace 에서 같은 모양의
+# 블록(parse_log_blocks 출력과 동일한 키)을 만들어 쓴다. 예전 로그(이벤트 튜플 포함)는 그대로 파싱한다.
+
+def read_trace_file(path: str) -> dict:
+    """trace_*.json / trace_*.json.gz 모두 읽는다."""
+    opener = gzip.open if str(path).endswith(".gz") else open
+    with opener(path, "rt", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _trace_vehicle_ev(r: dict, suffix: str, h) -> tuple:
+    amb = r.get("vehicle") == "AMB"
+    vid = r.get("vehicle_id")
+    return (("amb_" if amb else "uav_") + suffix, r.get("patient_id"),
+            vid if amb else None, None if amb else vid, h)
+
+
+def trace_to_blocks(trace: dict) -> List[Dict]:
+    """trace dict("<rule>__iter<N>" → 레코드 목록) → parse_log_blocks 와 같은 블록 목록.
+
+    레코드 ↔ stdout 이벤트 대응: rescue→p_rescue, vehicle_arrival_site→amb/uav_arrival_site,
+    hospital_arrival→amb/uav_arrival_hospital, diversion→(만석 병원 도착) amb/uav_arrival_hospital,
+    care_ready→p_care_ready, care_complete→p_def_care.
+    onset/transport_start/care_start(실제 처치 시작) 는 stdout 에 없던 것이라 뺀다.
+    """
+    blocks = []
+    for key, records in trace.items():
+        rule, _, it = key.rpartition("__iter")
+        events = []
+        for i, r in enumerate(records):
+            evn = r.get("event")
+            if evn == "vehicle_arrival_site":
+                ev, p, a, u, h = _trace_vehicle_ev(r, "arrival_site", None)
+            elif evn == "hospital_arrival":
+                ev, p, a, u, h = _trace_vehicle_ev(r, "arrival_hospital", r.get("hospital_id"))
+            elif evn == "diversion":
+                ev, p, a, u, h = _trace_vehicle_ev(r, "arrival_hospital", r.get("from_hospital"))
+            elif evn == "rescue":
+                ev, p, a, u, h = "p_rescue", r.get("patient_id"), None, None, None
+            elif evn == "care_ready":
+                ev, p, a, u, h = "p_care_ready", r.get("patient_id"), None, None, r.get("hospital_id")
+            elif evn == "care_complete":
+                ev, p, a, u, h = "p_def_care", r.get("patient_id"), None, None, r.get("hospital_id")
+            else:
+                continue
+            events.append({"t": float(r.get("time", 0.0)), "eid": i, "ev": ev, "p": p, "a": a, "u": u, "h": h})
+        blocks.append({"rule": rule, "iter": int(it) if it.isdigit() else None,
+                       "events": events, "actions": []})
+    return blocks
+
+
+_TRACE_FILE_TOKEN_RE = re.compile(r"trace_file=(.+?)\|(\d+)")
+
+
+def trace_for_log(log_path: str) -> Optional[str]:
+    """실행 로그 헤더(`=== SIM_START ... trace_file=<base 상대경로>|<bytes> ===`)가 가리키는 trace 파일.
+
+    파일 크기까지 맞을 때만 돌려준다 — 같은 좌표를 다시 돌려 trace 가 덮인 경우 옛 로그에
+    새 trace 를 붙이지 않기 위해서다. 헤더에 토큰이 없으면(예전 로그) None.
+    """
+    try:
+        with open(log_path, "r", encoding="utf-8-sig", errors="ignore") as fh:
+            first = fh.readline()
+    except OSError:
+        return None
+    m = _TRACE_FILE_TOKEN_RE.search(first)
+    if not m:
+        return None
+    p = m.group(1)
+    if not os.path.isabs(p):   # experiment_logs/<log> 의 두 단계 위 = base_path
+        p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(log_path))), p)
+    try:
+        return p if os.path.getsize(p) == int(m.group(2)) else None
+    except OSError:
+        return None
+
+
+# ------------------------------
 # 로그 / trace / CSV 캐시 진입점
 # ------------------------------
 # 위 파서들은 순수 함수라 그대로 두고, 파일에서 읽어오는 경로만 캐시한다.
@@ -974,8 +1055,13 @@ def load_log_text(log_path: str, sig: Tuple) -> str:
     return _read_text_any(log_path)
 
 
-@st.cache_data(show_spinner=False, max_entries=4)
+# 블록·trace 는 수십 MB 라 cache_data(리런마다 pickle 복사) 대신 cache_resource(참조 공유).
+# 소비자는 sorted()/DataFrame() 으로 복사해 쓰고 제자리 수정은 하지 않는다.
+@st.cache_resource(show_spinner=False, max_entries=4)
 def load_log_blocks(log_path: str, sig: Tuple) -> List[Dict]:
+    trace_path = trace_for_log(log_path)
+    if trace_path:
+        return trace_to_blocks(read_trace_file(trace_path))
     return parse_log_blocks(_read_text_any(log_path))
 
 
@@ -989,10 +1075,9 @@ def load_patient_summary(log_path: str, sig: Tuple, rule: str,
     return build_patient_summary(cand[0]["events"]) if cand else pd.DataFrame()
 
 
-@st.cache_data(show_spinner=False, max_entries=8)
+@st.cache_resource(show_spinner=False, max_entries=8)
 def load_trace_json(trace_path: str, sig: Tuple) -> dict:
-    with open(trace_path, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    return read_trace_file(trace_path)
 
 
 @st.cache_data(show_spinner=False, max_entries=32)
@@ -1914,10 +1999,10 @@ if _view == "Scenarios":
         st.markdown("---")
         st.markdown("### Simulation Trace Replay")
         st.caption("Visualize per-patient event timeline from trace data. "
-                   "Run simulation with `--trace` flag to generate trace_*.json files.")
+                   "Run simulation with `--trace` flag to generate trace_*.json.gz files.")
 
         _trace_dir = Path(bp) / "results" / exp / coord
-        _trace_files = sorted(_trace_dir.glob("trace_*.json")) if _trace_dir.is_dir() else []
+        _trace_files = sorted(_trace_dir.glob("trace_*.json*")) if _trace_dir.is_dir() else []
 
         if not _trace_files:
             st.info("No trace files found. Run simulation with `--trace` flag to enable trace logging.\n\n"

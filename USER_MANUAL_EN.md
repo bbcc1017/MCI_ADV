@@ -202,7 +202,7 @@ python src/sim_src/main.py --config_path scenarios/exp_.../config_(lat,lon).yaml
 
 # Step 2b (optional): Run with per-patient trace logging
 python src/sim_src/main.py --config_path scenarios/exp_.../config_(lat,lon).yaml --trace
-# → Generates trace_*.json in results/ for Trace Replay visualization
+# → Generates trace_*.json.gz in results/ for Trace Replay visualization
 ```
 
 ---
@@ -323,7 +323,7 @@ For each rule (64 total) x each sample (N repetitions):
 
 When run with `python main.py --config_path <config.yaml> --trace`, the simulation records per-patient event traces:
 - Events captured: onset, rescue, transport_start, hospital_arrival, diversion, care_start, care_complete
-- Output: `trace_*.json` in the results directory
+- Output: `trace_*.json.gz` in the results directory
 - Visualization: Scenarios tab → Simulation Trace Replay (Gantt chart)
 
 ### 7.5 Diversion Rule

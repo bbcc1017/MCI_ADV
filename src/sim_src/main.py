@@ -3,11 +3,11 @@ import yaml
 import os
 import sys
 import json
+import gzip
 import random
 import numpy as np
 import time
 from datetime import datetime
-from scipy.stats import t
 
 from ScenarioManager import ScenarioManager
 from RuleManager import RuleManager
@@ -114,11 +114,16 @@ class RunManager():
         np.savetxt(os.path.join(output_path, "results_{0}{1}.txt".format(exp_indicator, _cap_sfx)), output, fmt='%s', delimiter="  ")
         np.savetxt(os.path.join(output_path, "results_{0}{1}_stat.txt".format(exp_indicator, _cap_sfx)), output_stat, fmt='%s', delimiter="  ")
 
-        # Save trace data if enabled
+        # Save trace data if enabled — 이벤트 한 줄씩(grep 가능) + gzip (indent=2 대비 1/20 크기).
         if self.enable_trace and hasattr(self, '_all_traces') and self._all_traces:
-            trace_path = os.path.join(output_path, "trace_{0}.json".format(exp_indicator))
-            with open(trace_path, 'w', encoding='utf-8') as f:
-                json.dump(self._all_traces, f, indent=2, default=str)
+            trace_path = os.path.join(output_path, "trace_{0}.json.gz".format(exp_indicator))
+            with gzip.open(trace_path, 'wt', encoding='utf-8') as f:
+                f.write("{\n")
+                for k_idx, (key, events) in enumerate(self._all_traces.items()):
+                    f.write(json.dumps(key) + ": [\n")
+                    f.write(",\n".join(json.dumps(ev, separators=(",", ":"), default=str) for ev in events))
+                    f.write("\n]" + (",\n" if k_idx < len(self._all_traces) - 1 else "\n"))
+                f.write("}\n")
             print(f"Trace saved to {trace_path}")
 
     def set_random_seed(self, seed):
@@ -189,8 +194,6 @@ class RunManager():
 
                     cumul_reward += reward
                     cumul_r_woG += info.get('r_woG', 0.0)
-                    if (r_idx == 0) & (reward < 0.0):
-                        print('지금')
                     # print(obs['num_amb'],obs['num_uav'])
                     # print("이번 의사결정시점 생존율 합: ", reward, "현재 시각", info['time'])
                 action_logs.append(action_log)
@@ -213,6 +216,8 @@ class RunManager():
         stat_pdr = np.zeros((len(rules), 3), dtype=float)
         stat_rewWOG = np.zeros((len(rules), 3), dtype=float)
         stat_pdrWOG = np.zeros((len(rules), 3), dtype=float)
+        from scipy.stats import t  # 느린 import(≈1s) — 통계 단계에서만 필요
+
         def get_CI(data):
             n_sample = len(data)
             mean = np.mean(data)

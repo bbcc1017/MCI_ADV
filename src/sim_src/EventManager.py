@@ -60,7 +60,10 @@ class EventManager():
                 return log, True
 
             c_event = heapq.heappop(self.event_queue)  # event = (event_time, e_ID, ev_name, entity_idx)
-            print(c_event)
+            # trace 가 켜지면 같은 이벤트가 trace JSON 에 구조화돼 남으므로 stdout 출력은 생략한다
+            # (대시보드는 trace 를 읽는다). trace 없이 CLI 로 돌릴 때만 예전처럼 찍는다.
+            if not self.enable_trace:
+                print(c_event)
 
             time_interval = c_event[0] - self.time
             self.time = c_event[0]
@@ -78,7 +81,8 @@ class EventManager():
         return log, terminated
 
     def proceed_action(self, action):
-        print("Action:", action)
+        if not self.enable_trace:
+            print("Action:", action)
         # action[0]: Red = 0, Yellow = 1, Green = 2
         # action[1]: 0: 현장, 1번 병원 ~ N번 병원; 병원 10개일 때 0은 현장, 1번 병원 ~ 9번 병원
         # action[2]: 0: Amb, 1: UAV
@@ -424,6 +428,7 @@ class EventManager():
         """
         a_idx = entity_idx[0]
         self.status['ambulance']['amb_wait'][0].append(a_idx)
+        self._record_trace("vehicle_arrival_site", vehicle="AMB", vehicle_id=int(a_idx))
 
         hasRY = bool(self.status['patient']['p_wait'][0][0] or self.status['patient']['p_wait'][1][0])
         if hasRY: # 1. Red나 Yellow 환자가 현장에 있으면 decision
@@ -444,6 +449,7 @@ class EventManager():
         """
         u_idx = entity_idx[0]
         self.status['uav']['uav_wait'][0].append(u_idx)
+        self._record_trace("vehicle_arrival_site", vehicle="UAV", vehicle_id=int(u_idx))
 
         hasRY = bool(self.status['patient']['p_wait'][0][0] or self.status['patient']['p_wait'][1][0])
         if hasRY: # 1. Red나 Yellow 환자가 현장에 있으면 decision
@@ -464,6 +470,8 @@ class EventManager():
         """
         p_idx, h_idx = entity_idx
         p_class = self.status['patient']['p_states'][p_idx, 0]
+        # 인계 완료(stdout 의 p_care_ready 와 같은 시점) — 대기열로 가는 환자도 기록한다.
+        self._record_trace("care_ready", patient_id=int(p_idx), hospital_id=int(h_idx), severity=int(p_class))
         n_idle, n_queue = self.status['hospital']['h_states'][h_idx][0:2]
         if n_idle > 0: # 서비스 시작
             h_tier = self.properties['hospital']['hos_tier'][h_idx]
@@ -524,7 +532,7 @@ class EventManager():
             self.status['hospital']['h_states'][h_idx, -1] += 1
             handover_time = self.properties['ambulance']['amb_handover_time']
             self.add_event(handover_time, 'p_care_ready', (p_idx, h_idx))
-            self._record_trace("hospital_arrival", patient_id=int(p_idx), vehicle="AMB",
+            self._record_trace("hospital_arrival", patient_id=int(p_idx), vehicle="AMB", vehicle_id=int(a_idx),
                                hospital_id=int(h_idx), severity=int(p_class), admitted=True)
         else:
             destination = self.diversion_rule(h_idx,
@@ -533,7 +541,7 @@ class EventManager():
                                               mode=0)
             self.status['patient']['p_sent'][h_idx] -= 1
             self.status['patient']['p_sent'][destination-1] += 1
-            self._record_trace("diversion", patient_id=int(p_idx), vehicle="AMB",
+            self._record_trace("diversion", patient_id=int(p_idx), vehicle="AMB", vehicle_id=int(a_idx),
                                from_hospital=int(h_idx), to_hospital=int(destination-1), severity=int(p_class))
 
         transportation_t = self.sample_transportation_time(mode=0, origination=h_idx + 1, destination=destination)
@@ -579,7 +587,7 @@ class EventManager():
             self.status['hospital']['h_states'][h_idx, -1] += 1
             handover_time = self.properties['uav']['uav_handover_time']
             self.add_event(handover_time, 'p_care_ready', (p_idx, h_idx))
-            self._record_trace("hospital_arrival", patient_id=int(p_idx), vehicle="UAV",
+            self._record_trace("hospital_arrival", patient_id=int(p_idx), vehicle="UAV", vehicle_id=int(u_idx),
                                hospital_id=int(h_idx), severity=int(p_class), admitted=True)
         else:
             destination = self.diversion_rule(h_idx,
@@ -588,7 +596,7 @@ class EventManager():
                                               mode=1)
             self.status['patient']['p_sent'][h_idx] -= 1
             self.status['patient']['p_sent'][destination-1] += 1
-            self._record_trace("diversion", patient_id=int(p_idx), vehicle="UAV",
+            self._record_trace("diversion", patient_id=int(p_idx), vehicle="UAV", vehicle_id=int(u_idx),
                                from_hospital=int(h_idx), to_hospital=int(destination-1), severity=int(p_class))
 
         transportation_t = self.sample_transportation_time(mode=1, origination=h_idx + 1, destination=destination)
