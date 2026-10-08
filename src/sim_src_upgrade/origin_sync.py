@@ -22,6 +22,12 @@ import os
 import subprocess
 import sys
 
+# 윈도우 콘솔/파이프 기본 인코딩(cp949)에서 '—' 같은 문자로 print 가 죽지 않게 한다.
+# 대시보드는 `python -X utf8` 로 띄우므로 영향 없고, 직접 CLI 실행(윈도우)만 보호한다.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(errors="backslashreplace")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, os.pardir, os.pardir))
 SIM_SRC = os.path.join(REPO, "src", "sim_src")
@@ -38,11 +44,10 @@ MODULES = (
 
 
 def sha256_file(path: str) -> str:
-    h = hashlib.sha256()
+    """줄바꿈 무관 sha256 — autocrlf 체크아웃(CRLF, 윈도우)과 LF 체크아웃(리눅스 배포)이
+    같은 해시를 내야 G0 가 OS 에 따라 거짓 드리프트를 내지 않는다."""
     with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+        return hashlib.sha256(f.read().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def origin_hashes() -> dict[str, str]:
