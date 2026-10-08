@@ -18,14 +18,21 @@
 
 </div>
 
+<p align="center">
+<img src="docs/img/dashboard_map_animation.gif" alt="Maps · Animation — 구급차·UAV 가 실제 도로 경로를 따라 환자를 나른다" width="920">
+<br><sub>Maps · Animation — 구급차·UAV 가 실제 도로 경로를 따라 환자를 나른다 (시뮬 trace 재생)</sub>
+</p>
+
 <table>
 <tr>
-<td width="50%"><img src="docs/img/dashboard_map_animation.jpg" alt="Maps · Animation — 실제 도로 경로를 따라 움직이는 구급차·UAV"></td>
-<td width="50%"><img src="docs/img/dashboard_trace_replay.jpg" alt="Scenarios · Trace Replay — 환자별 구조→이송→치료 간트차트"></td>
+<td width="33%"><img src="docs/img/dashboard_map_satellite.jpg" alt="Maps · Dark 테마 — Esri 위성 타일 위의 경로"></td>
+<td width="33%"><img src="docs/img/dashboard_trace_replay.jpg" alt="Scenarios · Trace Replay — 환자별 구조→이송→치료 간트차트"></td>
+<td width="33%"><img src="docs/img/dashboard_analytics.jpg" alt="Analytics — ANOVA · CLD · Pareto"></td>
 </tr>
 <tr>
-<td align="center"><sub>Maps · Animation — 실제 도로 경로 위의 구급차·UAV 이동</sub></td>
-<td align="center"><sub>Scenarios · Trace Replay — 환자별 구조→이송→치료 타임라인</sub></td>
+<td align="center"><sub>Maps · Dark 테마 (Esri 위성 타일)</sub></td>
+<td align="center"><sub>Scenarios · Trace Replay 간트차트</sub></td>
+<td align="center"><sub>Analytics · 64 정책 통계 비교</sub></td>
 </tr>
 </table>
 
@@ -174,7 +181,7 @@ cd src/vis_src && streamlit run MCI_Streamlit.py
 
 | 화면 | 하는 일 |
 |---|---|
-| **Maps** | 안전센터→현장, 현장→병원 경로를 혼잡도 색으로 그린다. Animation 모드는 구급차·UAV 마커가 실제 도로 폴리라인을 따라 움직이고, 환자 마커를 누르면 이송수단·병원·대기·치료 시간이 뜬다 |
+| **Maps** | 안전센터→현장, 현장→병원 경로를 혼잡도 색으로 그린다. Light(OpenStreetMap / Esri Gray)와 Dark(Esri 위성) 타일. Animation 모드는 구급차·UAV 마커가 실제 도로 폴리라인을 따라 움직이고, 환자 마커를 누르면 이송수단·병원·대기·치료 시간이 뜬다 |
 | **Scenarios** | 실행 로그와 환자 요약표, 환자별 상태 변화 애니메이션, 전체 이벤트 표, Trace Replay 간트차트 |
 | **Analytics** | RAW / STAT / ANOVA Suite / Pareto / Bootstrap·비모수 / Power / Export |
 | **Data Tables** | 시나리오 CSV를 편집하고 백업을 남긴 뒤 수정값으로 재실행 |

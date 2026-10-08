@@ -1572,9 +1572,9 @@ with st.sidebar:
                 import folium
                 from streamlit_folium import st_folium
 
-                # 사이드바가 딥네이비이므로 미니맵도 어두운 타일로 맞춘다.
-                # (본문 Maps 탭 지도는 그대로 Light/Dark 선택을 따른다.)
-                chosen_tile = "CartoDB dark_matter"
+                # CARTO 타일은 2026-08 부터 키 없는 요청에 "API KEY REQUIRED" 워터마크를 찍고
+                # 래스터 베이스맵 자체를 접는 중이라 쓰지 않는다. 키가 필요 없는 OSM 으로 둔다.
+                chosen_tile = "OpenStreetMap"
 
                 m = folium.Map(location=(lat, lon), zoom_start=12, control_scale=True, tiles=chosen_tile)
                 folium.CircleMarker(
@@ -2187,10 +2187,11 @@ if _view == "Maps":
             "Map Theme", ["Light", "Dark"],
             default="Light", key="theme_seg_maps_bottom",
         ) or "Light"
+        # 키 없는 타일만 쓴다 (CARTO 는 2026-08 부터 키 없으면 워터마크). Esri 타일은 attribution 포함 무료.
         if theme == "Light":
-            tile_name = st.selectbox("Light Tile", ["OpenStreetMap","CartoDB Positron"], index=0, key="light_tile_select")
+            tile_name = st.selectbox("Light Tile", ["OpenStreetMap", "Esri.WorldGrayCanvas"], index=0, key="light_tile_select")
         else:
-            tile_name = "CartoDB Dark_Matter"
+            tile_name = "Esri.WorldImagery"
 
     if not (bp and exp and coord):
         st.info("Select base_path / Experiment / Coord from the sidebar.")

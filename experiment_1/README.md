@@ -323,7 +323,7 @@ python experiment_1/visualize_coords.py
 
 - **결과 지도 (Leaflet.js)**
   - Reward / Time / PDR 3개 지표를 상단 버튼으로 전환
-  - **지도 타일 전환**: OpenStreetMap / CartoDB 두 가지 타일 선택 가능
+  - **지도 타일 전환**: OpenStreetMap / Esri Gray 두 가지 타일 선택 가능
   - RdYlGn 컬러맵: Reward는 높을수록 초록, Time·PDR은 낮을수록 초록
   - P5~P95 백분위수 클리핑: 극단값에 의한 색상 포화 방지
   - 이상치 강조: 상위·하위 N개 좌표를 별도 색상(파랑/보라)으로 표시

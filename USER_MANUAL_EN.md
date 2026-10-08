@@ -515,7 +515,7 @@ python experiment_1/visualize_coords.py \
 ```
 
 Outputs (saved in `scenarios/{experiment_id}/`):
-- `coords_map.html`: Interactive result map (Reward/Time/PDR toggle, OpenStreetMap/CartoDB tile switch)
+- `coords_map.html`: Interactive result map (Reward/Time/PDR toggle, OpenStreetMap/Esri Gray tile switch)
 - `coords_map_hist.pdf/png`: Histogram distributions of key metrics
 - `coords_map_rule_heatmap.pdf/png`: 64-rule performance heatmap (3 metrics × 4 panels, GnBu monotone colormap, reversed for lower-is-better metrics)
 - `coords_map_rule_effects.pdf/png`: Factor main effects chart with ANOVA η² effect size (★ Best level marker, teal monotone bars)

@@ -515,7 +515,7 @@ python experiment_1/visualize_coords.py \
 ```
 
 출력물 (`scenarios/{experiment_id}/` 폴더에 저장):
-- `coords_map.html`: 인터랙티브 결과 지도 (Reward/Time/PDR 전환, OpenStreetMap/CartoDB 타일 전환)
+- `coords_map.html`: 인터랙티브 결과 지도 (Reward/Time/PDR 전환, OpenStreetMap/Esri Gray 타일 전환)
 - `coords_map_hist.pdf/png`: 주요 지표 분포 히스토그램
 - `coords_map_rule_heatmap.pdf/png`: 64개 규칙 성능 히트맵 (3지표 × 4패널, GnBu 단조톤 컬러맵, 낮을수록 좋은 지표는 색상 반전)
 - `coords_map_rule_effects.pdf/png`: 요인별 주효과 그래프 (ANOVA η² effect size, ★ Best level 표시, teal 단조톤 바)

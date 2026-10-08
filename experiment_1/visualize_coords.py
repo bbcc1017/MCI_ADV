@@ -1024,7 +1024,7 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
   <hr style="margin:8px 0 6px 0;border:none;border-top:1px solid #ccc;">
   <b>Map Tile</b>
   <button class="mci-btn active" id="btn-tile-osm"    onclick="mciTile('osm')">OpenStreetMap</button>
-  <button class="mci-btn"        id="btn-tile-carto"   onclick="mciTile('carto')">CartoDB</button>
+  <button class="mci-btn"        id="btn-tile-esri"    onclick="mciTile('esri')">Esri Gray</button>
 </div>
 
 <div id="mci-colorbar">
@@ -1066,12 +1066,14 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
   var currentTileLayer = null;
   var tileUrls = {{
     'osm':   'https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',
-    'carto':  'https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png'
+    'esri':  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{{z}}/{{y}}/{{x}}'
   }};
+  // CARTO 타일은 2026-08 부터 키 없는 요청에 워터마크를 찍어 키 불필요한 Esri Gray 로 바꿨다.
   var tileAttrs = {{
     'osm':   '&copy; OpenStreetMap contributors',
-    'carto': '&copy; OpenStreetMap contributors &copy; CARTO'
+    'esri':  'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
   }};
+  var tileMaxNative = {{ 'osm': 19, 'esri': 16 }};
 
   function getMap() {{
     return window["{map_var}"];
@@ -1151,9 +1153,10 @@ def build_map(data: dict, out_path: Path, ranges: dict, clip_pct: float, outlier
     }}
     currentTileLayer = L.tileLayer(tileUrls[tileKey], {{
       attribution: tileAttrs[tileKey],
-      maxZoom: 19
+      maxZoom: 19,
+      maxNativeZoom: tileMaxNative[tileKey]
     }}).addTo(mapObj);
-    ['osm','carto'].forEach(function(k) {{
+    ['osm','esri'].forEach(function(k) {{
       document.getElementById('btn-tile-' + k).className =
         'mci-btn' + (k === tileKey ? ' active' : '');
     }});
