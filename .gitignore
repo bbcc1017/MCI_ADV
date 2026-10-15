@@ -263,6 +263,7 @@ $RECYCLE.BIN/
 scenarios/*
 !scenarios/안전센터와 소방서.csv
 !scenarios/*.xlsx
+!scenarios/*_변경기록.json
 experiment_logs/
 results/
 reports/
