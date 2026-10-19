@@ -635,7 +635,8 @@ export MCI_OSRM_URL=http://localhost:5000
 **호출되는 OSRM 엔드포인트**:
 | 엔드포인트 | 용도 |
 |------------|------|
-| `/route/v1/driving/{lon1},{lat1};{lon2},{lat2}` | 병원/소방서까지의 도로 distance + duration + GeoJSON 폴리라인 |
+| `/table/v1/driving/{coordinates}` | 최대 40구간씩 도로 distance(m) + duration(s) 조회. 생성 CSV는 기존 km·분 단위를 유지 |
+| `/route/v1/driving/{lon1},{lat1};{lon2},{lat2}` | 지도를 볼 때 GeoJSON 경로선 조회·1시간 캐시. table 미지원·누락 구간은 기존 route로 계산 |
 
 자체 호스팅 OSRM은 호출 한도가 없고(서버 자원 한계 내), `--daily-limit` 설정은 무의미하지만 호환을 위해 그대로 유지된다.
 

@@ -30,7 +30,6 @@ import numpy as np
 import streamlit as st
 import altair as alt
 import folium
-from streamlit_folium import st_folium
 from openpyxl import load_workbook  # dependency ensure
 import yaml
 
@@ -68,6 +67,8 @@ _VIS_DIR = str(Path(__file__).resolve().parent)
 if _VIS_DIR not in sys.path:
     sys.path.insert(0, _VIS_DIR)
 from _theme import inject_theme, page_header, kpi_row, PALETTE
+from _map_controls import create_map
+from _route_geometry import osrm_payload, index_hospital_routes, prefetch_osrm_geometry
 
 # (선택) 통계 패키지
 try:
@@ -497,8 +498,8 @@ def get_routes_dirs(base_path: str, exp_id: str, coord: str) -> Dict[str, Path]:
     }
 
 
-@st.cache_data(ttl=300)
-def load_json_files(folder: Path, limit: Optional[int]=None) -> List[dict]:
+@st.cache_data(show_spinner=False, max_entries=32)
+def load_json_files(folder: Path, limit: Optional[int]=None, sig: Tuple=()) -> List[dict]:
     if not folder.is_dir():
         return []
     files = sorted(folder.glob("*.json"))
@@ -535,8 +536,8 @@ def write_csv_smart(df: pd.DataFrame, path: str):
 
 # 병원 엑셀: 우선순위 1) base_path/엑셀 결합 데이터.xlsx  2) base_path/scenarios/엑셀 결합 데이터.xlsx
 
-@st.cache_data(ttl=600)
-def read_excel_hospital(base_path: str) -> Optional[pd.DataFrame]:
+@st.cache_data(show_spinner=False, max_entries=4)
+def read_excel_hospital(base_path: str, sig: Tuple=()) -> Optional[pd.DataFrame]:
     cands = [
         Path(base_path) / "엑셀 결합 데이터.xlsx",
         Path(base_path) / "scenarios" / "엑셀 결합 데이터.xlsx",
@@ -660,7 +661,7 @@ def _load_scenario_csvs(bp: str, exp: str, coord: str, sig: Tuple = ()):
     base = Path(bp) / "scenarios" / exp / coord
     _KR_HOSP = {"종별코드":"Grade Code","요양기관명":"Hospital Name","수술실수":"ORs","병상수":"Beds","헬기장 여부":"Helipad"}
     _KR_AMB  = {"안전센터/소방서이름":"Fire Station","보유대수":"Fleet Size"}
-    _HCOLS   = ["Index","ORs","Beds","Grade Code","Hospital Name","Helipad"]
+    _HCOLS   = ["Index","ORs","Beds","Grade Code","Hospital Name","Helipad","x좌표","y좌표"]
 
     def _read(p, enc=None):
         if not p.is_file(): return pd.DataFrame()
@@ -1311,7 +1312,7 @@ def draw_route_from_json(m: folium.Map, route_obj: dict, highlight: bool=False):
 
     elif api_provider == "osrm":
         # OSRM: GeoJSON LineString geometry, no congestion info → 단일 색 폴리라인
-        payload = (route_obj.get("payload") or {}).get("osrm_response", {})
+        payload = osrm_payload(route_obj)
         routes = payload.get("routes", [])
         if not routes:
             return
@@ -1405,7 +1406,7 @@ def extract_polyline(route_obj: dict) -> List[Tuple[float, float]]:
                     if i + 1 < len(vx):
                         latlngs.append((vx[i + 1], vx[i]))
     elif api_provider == "osrm":
-        payload = (route_obj.get("payload") or {}).get("osrm_response", {})
+        payload = osrm_payload(route_obj)
         routes = payload.get("routes", [])
         if routes:
             coords = routes[0].get("geometry", {}).get("coordinates", [])
@@ -1516,29 +1517,20 @@ st.set_page_config(
 
 
 with st.sidebar:
-    st.header("Settings")
+    st.header("Scenario")
 
-    base_input = st.text_input(
-        "base_path",
-        st.session_state.base_path,
-        placeholder="e.g. C:\\Users\\USER\\MCI",
-        disabled=IS_CLOUD,
-    )
-
-    if IS_CLOUD:
-        st.caption(f"Cloud mode: base_path is fixed to `{CLOUD_BASE_PATH}`.")
-
-    # 로컬에서만 버튼 동작
-    if (not IS_CLOUD) and st.button("Set base_path"):
-        st.session_state.base_path = norm(base_input)
-        if base_ok(norm(base_input)):
-            st.success("base_path set! Select a scenario or create a new one in the Generate tab.")
+    if not IS_CLOUD:
+        with st.expander("Project folder"):
+            base_input = st.text_input("base_path", st.session_state.base_path)
+            if st.button("Set base_path"):
+                st.session_state.base_path = norm(base_input)
+                if base_ok(norm(base_input)):
+                    st.success("Project folder updated.")
     if st.session_state.base_path and not base_ok(st.session_state.base_path):
         st.warning("Invalid base_path. (scenarios folder required)")
     # (removed guidance text for cleaner UI)
     if base_ok(st.session_state.base_path):
         exps = list_experiments_any(st.session_state.base_path)
-        st.caption("Select existing scenario (optional)")
 
         # Ensure stored value is still valid; reset if not
         if st.session_state.selected_exp not in exps:
@@ -1563,14 +1555,14 @@ with st.sidebar:
         )
 
         # 1) 미니맵 (좌표 선택시)
-        if st.session_state.selected_coord:
+        if st.session_state.selected_coord and (st.session_state.get("main_view") or "Maps") != "Maps":
             lat, lon = coord_center(st.session_state.selected_coord)
             st.caption("Current Coordinate")
 
             # ── folium 기반 렌더(표출 로직 동일: 한 점만) ────────────────
             try:
                 import folium
-                from streamlit_folium import st_folium
+                import streamlit.components.v1 as components
 
                 # CARTO 타일은 2026-08 부터 키 없는 요청에 "API KEY REQUIRED" 워터마크를 찍고
                 # 래스터 베이스맵 자체를 접는 중이라 쓰지 않는다. 키가 필요 없는 OSM 으로 둔다.
@@ -1582,25 +1574,7 @@ with st.sidebar:
                     color=PALETTE["sidebar_accent"],
                     fill=True, fill_opacity=0.8, tooltip=f"{lat:.6f}, {lon:.6f}"
                 ).add_to(m)
-                # ★ 라이센스 표출 크기 최소화! (저작권 위반?)
-                from folium import Element
-                m.get_root().html.add_child(Element("""
-                <style>
-                .leaflet-control-attribution {
-                font-size: 1px !important;
-                opacity: .55 !important;
-                background: rgba(255,255,255,.6) !important;
-                padding: 2px 6px !important;
-                border-radius: 1px !important;
-                }
-                .leaflet-control-attribution a { color: inherit !important; text-decoration: none !important; }
-                /* (선택) 아래 대신 위로 올리고 싶으면 활성화 */
-                .leaflet-bottom.leaflet-right { bottom: auto !important; top: 6px !important; right: 8px !important; }
-                </style>
-                """))
-                # returned_objects=[] 가 없으면 미니맵을 팬/줌 할 때마다 컴포넌트가
-                # 값을 돌려주고, 그 값이 세션을 바꿔 스크립트 전체가 다시 실행된다.
-                st_folium(m, width='stretch', height=260, returned_objects=[])
+                components.html(m.get_root().render(), height=200, scrolling=False)
 
             except Exception:
                 # (폴백) streamlit 기본 지도 (타일 커스텀 불가)
@@ -1616,8 +1590,8 @@ inject_theme()
 _hdr_exp = st.session_state.get("selected_exp") or "\u2014"
 _hdr_coord = st.session_state.get("selected_coord") or "\u2014"
 page_header(
-    "MCI Disaster Simulation Dashboard",
-    fields={"EXP": _hdr_exp, "COORD": _hdr_coord},
+    "MCI Dispatch Console",
+    fields={"Experiment": _hdr_exp, "Location": _hdr_coord},
 )
 
 # ── 뷰 전환 ────────────────────────────────────────────────────
@@ -1632,6 +1606,7 @@ _view = st.segmented_control(
     "View", VIEWS, key="main_view",
     format_func=lambda v: f"{VIEW_ICONS[v]} {v}",
     label_visibility="collapsed",
+    width="stretch",
 ) or VIEWS[0]
 
 # 현재 보고 있는 화면을 URL 에 남긴다(딥링크/새로고침 복원용).
@@ -2122,20 +2097,24 @@ if _view == "Scenarios":
 # Maps 탭 (복수선택 + UAV 출동/이송 토글 + 범례 강화)
 # ------------------------------
 if _view == "Maps":
-    st.subheader("Map Visualization")
     bp   = st.session_state.base_path
     exp  = st.session_state.selected_exp
     coord= st.session_state.selected_coord
+
+    if not (bp and exp and coord):
+        st.info("Choose an experiment and location in the sidebar to explore routes.")
+        st.page_link("pages/Generate.py", label="Create a scenario", icon=":material/add_location_alt:")
+        st.stop()
 
     # segmented_control 은 선택 해제가 가능하므로(None) 기본값을 되살려 준다.
     _map_mode = st.segmented_control(
         "Mode", ["Static Map", "Animation"],
         default="Static Map", key="map_mode_seg",
+        label_visibility="collapsed",
     ) or "Static Map"
 
-    # ── 지도는 '최상단' 컨테이너에 그렸다가, 옵션을 아래에 배치 ─────────────
+    # 지도 타일은 Leaflet 안에서 전환하므로 Streamlit 재실행이 필요 없다.
     map_holder = st.container()
-    st.divider()
 
     # 좌표/기본값
     lat, lon = coord_center(coord)
@@ -2148,15 +2127,17 @@ if _view == "Maps":
     yaml_path = find_yaml_in_coord(bp, exp, coord)
 
     # JSON 경로(전체 로드; 지도 시각화용 - 시뮬레이션 반복수와 무관)
-    c2s_all = load_json_files(rdirs["center2site"])  # Center→Site
-    h2s_all = load_json_files(rdirs["hos2site"])     # Site→Hospitals
+    c2s_all = load_json_files(rdirs["center2site"], sig=dir_sig(rdirs["center2site"], "*.json"))
+    h2s_all = load_json_files(rdirs["hos2site"], sig=dir_sig(rdirs["hos2site"], "*.json"))
 
     # 병원/센터 메타
-    hosp_xl   = read_excel_hospital(bp)   # 엑셀(요양기관명, 종별코드, x/y좌표, 전화/주소 등)
+    hosp_xl = read_excel_hospital(bp, dir_sig(Path(bp), "*.xlsx") + dir_sig(Path(bp) / "scenarios", "*.xlsx"))
 
     # road/euc CSV (표/거리 참조용) — cached (top-level function)
     hinfo_df, center_df, ambinfo_df, dist_road_df, hinfo_euc_df, dist_euc_df = _load_scenario_csvs(
-        bp, exp, coord, dir_sig(Path(bp) / "scenarios" / exp / coord, "*.csv"))
+        bp, exp, coord, dir_sig(Path(bp) / "scenarios" / exp / coord, "*.csv")
+        + dir_sig(Path(bp) / "scenarios" / exp / coord, "*.yaml")
+        + dir_sig(Path(bp) / "scenarios", "*.csv"))
     dist_road_map = dict(zip(dist_road_df["Index"], dist_road_df["distance"])) if not dist_road_df.empty else {}
     dur_road_map = dict(zip(dist_road_df["Index"], dist_road_df["duration"])) if not dist_road_df.empty and "duration" in dist_road_df.columns else {}
     dist_euc_map  = dict(zip(dist_euc_df["Index"], dist_euc_df["distance"])) if not dist_euc_df.empty else {}
@@ -2180,22 +2161,6 @@ if _view == "Maps":
         if c == 1:  return "Tertiary Hospital"
         if c == 11: return "General Hospital"
         return "Hospital"
-
-    # ── 지도 테마(지도 바로 위) ─────────────────────────────────────────────
-    with st.container(horizontal=True, gap="medium", vertical_alignment="bottom"):
-        theme = st.segmented_control(
-            "Map Theme", ["Light", "Dark"],
-            default="Light", key="theme_seg_maps_bottom",
-        ) or "Light"
-        # 키 없는 타일만 쓴다 (CARTO 는 2026-08 부터 키 없으면 워터마크). Esri 타일은 attribution 포함 무료.
-        if theme == "Light":
-            tile_name = st.selectbox("Light Tile", ["OpenStreetMap", "Esri.WorldGrayCanvas"], index=0, key="light_tile_select")
-        else:
-            tile_name = "Esri.WorldImagery"
-
-    if not (bp and exp and coord):
-        st.info("Select base_path / Experiment / Coord from the sidebar.")
-        st.stop()
 
     # ─────────────────────────────────────────────────────────────────────
     # ① AMB 경로 (C→S 표 / S→H 표)
@@ -2519,7 +2484,16 @@ if _view == "Maps":
     # ─────────────────────────────────────────────────────────────────────
     # ③ 지도 생성 및 출력(최상단 map_holder에 표출)
     # ─────────────────────────────────────────────────────────────────────
-    m = folium.Map(location=center, zoom_start=12, control_scale=True, tiles=tile_name)
+    m = create_map(center)
+
+    if _map_mode == "Animation":
+        prefetch_osrm_geometry(c2s_all + h2s_all)
+    else:
+        selected_centers = set(c2s_df.loc[c2s_df["Index"].isin(st.session_state.amb_c2s_sel_idx), "Fire Station"])
+        selected_hospitals = set(s2h_df.loc[s2h_df["Index"].isin(st.session_state.amb_s2h_sel_idx), "Hospital"])
+        prefetch_osrm_geometry(
+            [r for r in c2s_all if r.get("meta", {}).get("name") in selected_centers]
+            + [r for r in h2s_all if r.get("meta", {}).get("name") in selected_hospitals])
 
     # 사고지점 마커
     site_popup = f"Incident Site<br>lat,lon={lat:.6f},{lon:.6f}"
@@ -2610,13 +2584,14 @@ if _view == "Maps":
             pass
 
     # ✔ hospital_info_road 순서/선택 + distance_Hos2Site_road 거리 표출
+    h2s_by_hospital = index_hospital_routes(hinfo_df.to_dict("records"), h2s_all)
     for _, row in s2h_df.iterrows():
         i = int(row["Index"])
         if i not in st.session_state.amb_s2h_sel_idx:
             continue
         name = str(row["Hospital"]).strip()
         euc_idx = int(row.get("euc_idx", i))
-        obj = h2s_idx_map.get(euc_idx) or h2s_map.get(name)
+        obj = h2s_by_hospital.get(i) or h2s_idx_map.get(euc_idx) or h2s_map.get(name)
         if obj is None:
             continue
 
@@ -2734,9 +2709,9 @@ if _view == "Maps":
 
     # ─ 범례/속도 ─
     amb_speed, uav_speed = get_speed_from_yaml(find_yaml_in_coord(bp, exp, coord))
+    has_traffic = any(obj.get("meta", {}).get("api_provider") == "kakao" for obj in c2s_all + h2s_all)
     legend_html = [
-        '<div style="position: fixed; bottom: 18px; left: 12px; z-index: 9999; background: rgba(255,255,255,0.96); color: #222; padding: 10px 12px; border-radius: 10px; font-size: 12px; line-height: 1.35; box-shadow: 0 2px 8px rgba(0,0,0,.25); border: 1px solid #ccc;">',
-        '<b>Legend (Kakao Traffic)</b><br>',
+        '<details class="mci-legend"><summary>경로 범례</summary>',
         f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[0]};margin:2px 6px 2px 0;"></span>Unknown(0)<br>',
         f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[1]};margin:2px 6px 2px 0;"></span>Congested(1)<br>',
         f'<span style="display:inline-block;width:26px;height:0;border-top:5px solid {CONG_COLORS[2]};margin:2px 6px 2px 0;"></span>Slow(2)<br>',
@@ -2746,35 +2721,28 @@ if _view == "Maps":
         f'<span style="display:inline-block;width:26px;height:0;border-top:3px dashed {UAV_OUT_COLOR};margin:6px 6px 2px 0;"></span>UAV Dispatch(Hosp→Site)<br>',
         f'<span style="display:inline-block;width:26px;height:0;border-top:3px dashed {UAV_BACK_COLOR};margin:2px 6px 0 0;"></span>UAV Transport(Site→Hosp)<br>',
     ]
+    if not has_traffic:
+        legend_html[1:7] = [f'<span style="display:inline-block;width:26px;border-top:4px solid {CONG_COLORS[0]};margin-right:6px;"></span>AMB road route (OSRM)<br>']
     if amb_speed or uav_speed:
         sp = []
         if amb_speed: sp.append(f"🚑 AMB≈{amb_speed} km/h")
         if uav_speed: sp.append(f"🛩️ UAV≈{uav_speed} km/h")
         legend_html.append(" · ".join(sp) + '<br>')
     legend_html.append('<span style="opacity:.7; color:#555;">* Click marker popup for route details</span>')
-    legend_html.append('</div>')
+    legend_html.append('</details>')
     m.get_root().html.add_child(folium.Element("".join(legend_html)))
 
-    # 저작권 표기 축소(옵션)
-    from folium import Element
-    m.get_root().html.add_child(Element("""
-    <style>
-    .leaflet-control-attribution {
-      font-size: 1px !important;
-      opacity: .55 !important;
-      background: rgba(255,255,255,.6) !important;
-      padding: 2px 6px !important;
-      border-radius: 1px !important;
-    }
-    .leaflet-control-attribution a { color: inherit !important; text-decoration: none !important; }
-    .leaflet-bottom.leaflet-right { bottom: auto !important; top: 6px !important; right: 8px !important; }
-    </style>
-    """))
+    # 선택한 자원이 처음부터 보이도록 현재 표시 경로의 범위에 맞춘다.
+    m.fit_bounds(m.get_bounds(), padding=(36, 36), max_zoom=13)
 
     # 지도는 '최상단' 컨테이너에 출력
     with map_holder:
         if _map_mode == "Static Map":
-            st_folium(m, width=None, height=690, key="main_map", returned_objects=[])
+            station_count = ambinfo_df["Fire Station"].nunique() if "Fire Station" in ambinfo_df else 0
+            st.caption(f"{len(hinfo_df)} hospitals · {station_count} stations · {patient_cnt or 0} patients")
+            # 읽기 전용 지도는 컴포넌트의 Python 왕복 없이 Leaflet HTML을 바로 표시한다.
+            import streamlit.components.v1 as components
+            components.html(m.get_root().render(), height=640, scrolling=False)
         else:
             # ─────────────────────────────────────────────────────────────
             # Animation Mode — Folium map + Leaflet JS animation overlay
@@ -2828,17 +2796,18 @@ if _view == "Maps":
                                 for _, _hr in hinfo_df.iterrows():
                                     _hi = int(_hr["Index"])
                                     _hn = str(_hr.get("Hospital Name", "")).strip()
-                                    if _hn in xl_coord:
+                                    _hospital_meta = h2s_by_hospital.get(_hi, {}).get("meta", {}).get("hospital")
+                                    if isinstance(_hospital_meta, (list, tuple)) and len(_hospital_meta) == 2:
+                                        _hosp_coords[_hi] = (float(_hospital_meta[1]), float(_hospital_meta[0]), _hn)
+                                    elif _hn in xl_coord:
                                         _hosp_coords[_hi] = (*xl_coord[_hn], _hn)
 
                             _amb2station = {}
                             _station_info = {}
-                            _amb_cursor = 0
                             if not ambinfo_df.empty:
                                 for _, _sr in ambinfo_df.iterrows():
                                     _si = int(_sr["Index"])
                                     _sn = str(_sr.get("Fire Station", "")).strip()
-                                    _fleet = int(_sr.get("Fleet Size", 1)) if "Fleet Size" in _sr.index and pd.notna(_sr.get("Fleet Size")) else 1
                                     for _robj in c2s_all:
                                         _rm = _robj.get("meta", {})
                                         if str(_rm.get("name", "")).strip() == _sn:
@@ -2846,9 +2815,8 @@ if _view == "Maps":
                                             if isinstance(_sc, (list, tuple)) and len(_sc) == 2:
                                                 _station_info[_si] = (float(_sc[1]), float(_sc[0]), _sn)
                                             break
-                                    for _fi in range(_fleet):
-                                        _amb2station[_amb_cursor] = _si
-                                        _amb_cursor += 1
+                                    # _load_scenario_csvs에서 이미 보유대수만큼 전개된 차량 행이다.
+                                    _amb2station[_si] = _si
 
                             _uav_base = {}
                             for _ui, (_uy, _ux, _un, _uc) in enumerate(uav_dispatch_latlons):
@@ -2865,16 +2833,18 @@ if _view == "Maps":
 
                             _s2h_poly = {}
                             _h2s_poly = {}
-                            for _robj in h2s_all:
-                                _rm = _robj.get("meta", {})
+                            for _ri, _robj in h2s_by_hospital.items():
                                 try:
-                                    _ri = int(_rm.get("source_index"))
                                     _pl = extract_polyline(_robj)
                                     if _pl:
                                         _s2h_poly[_ri] = _pl
                                         _h2s_poly[_ri] = list(reversed(_pl))
                                 except (TypeError, ValueError):
                                     pass
+
+                            if any(r.get("_geometry_failed") for r in c2s_all + h2s_all):
+                                st.warning("도로 경로선을 받지 못해 애니메이션을 멈췄습니다. 잠시 후 다시 실행해 주세요.")
+                                st.stop()
 
                             # ── Parse log events ──
                             _amb_site_t = {}
@@ -3072,17 +3042,20 @@ if _view == "Maps":
                                 _map_var = m.get_name()
 
                                 # Inject Leaflet JS animation into the Folium map HTML
-                                # Control bar is placed BELOW the map (outside) to avoid legend overlap
+                                # 재생 컨트롤은 지도와 분리해 범례와 겹치지 않게 한다.
                                 _anim_js = f"""
 <style>
 .anim-icon{{background:none!important;border:none!important;}}
 #anim-ctrl-bar{{
-  background:rgba(255,255,255,0.97);padding:10px 20px;border-radius:8px;
-  box-shadow:0 2px 8px rgba(0,0,0,.2);display:flex;align-items:center;
-  gap:12px;font-family:sans-serif;margin:8px auto 0;width:fit-content;
+  box-sizing:border-box;background:#fff;padding:8px 10px;height:52px;
+  display:flex;align-items:center;gap:8px;font-family:sans-serif;
+  margin:0 auto;width:100%;border-bottom:1px solid #d4dfe7;
 }}
+#{_map_var}{{height:calc(100% - 52px)!important;}}
+#acb-slider{{flex:1;min-width:45px;width:auto!important;}}
+#acb-time{{min-width:85px!important;font-size:12px!important;white-space:nowrap;}}
 #anim-ctrl-bar button{{
-  padding:5px 14px;cursor:pointer;font-size:14px;border:1px solid #bbb;
+  padding:5px 8px;cursor:pointer;font-size:13px;border:1px solid #bbb;
   border-radius:5px;background:#fff;transition:background .15s;
 }}
 #anim-ctrl-bar button:hover{{background:#f0f0f0;}}
@@ -4877,7 +4850,7 @@ if _view == "Data Tables":
                         st.exception(e)
 
         st.markdown("#### Hospital Master (Excel, read-only)")
-        hdf = read_excel_hospital(bp)
+        hdf = read_excel_hospital(bp, dir_sig(Path(bp), "*.xlsx") + dir_sig(Path(bp) / "scenarios", "*.xlsx"))
         if hdf is not None and not hdf.empty:
             st.dataframe(hdf.head(200), width='stretch', height=280)
         else:

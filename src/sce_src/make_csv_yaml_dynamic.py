@@ -600,6 +600,92 @@ class ScenarioGenerator:
             f"OSRM 호출 실패 ({max_retries}회 재시도 후에도 실패): last_err={last_err}"
         )
 
+    def _osrm_table(self, coords, sources, destinations):
+        """방향을 유지한 거리(m)·시간(s) 행렬과 원본 응답을 반환한다."""
+        base = self.osrm_url.rstrip("/")
+        locations = ";".join(f"{lon},{lat}" for lat, lon in coords)
+        for attempt in range(2):
+            response = _HTTP.get(
+                f"{base}/table/v1/driving/{locations}",
+                params={"sources": ";".join(map(str, sources)),
+                        "destinations": ";".join(map(str, destinations)),
+                        "annotations": "distance,duration"}, timeout=15)
+            self.api_call_count += 1
+            if response.status_code == 429 and attempt == 0:
+                time.sleep(1)
+                continue
+            response.raise_for_status()
+            data = response.json()
+            if data.get("code") != "Ok":
+                raise ValueError(f"OSRM table: {data.get('code')}")
+            for key in ("distances", "durations"):
+                matrix = data.get(key)
+                if (not isinstance(matrix, list) or len(matrix) != len(sources)
+                        or any(not isinstance(row, list) or len(row) != len(destinations) for row in matrix)):
+                    raise ValueError(f"OSRM table: invalid {key} shape")
+                if any(value is not None and (not isinstance(value, (int, float))
+                       or not np.isfinite(value) or value < 0) for row in matrix for value in row):
+                    raise ValueError(f"OSRM table: invalid {key} value")
+            return data
+
+    def get_road_distance_batch(self, starts, ends, *, save_json_dir, route_type,
+                                names, start_label, goal_label):
+        """OSRM은 table로 묶고, Kakao와 table 미지원 구간은 기존 route를 쓴다."""
+        if not (len(starts) == len(ends) == len(names)):
+            raise ValueError("구간 좌표와 이름의 개수가 다릅니다.")
+        results = []
+        for offset in range(0, len(starts), 40):
+            batch_starts = starts[offset:offset + 40]
+            batch_ends = ends[offset:offset + 40]
+            # shortcut: 구간 40개씩 묶어 100좌표 안에 둔다, 서버 한도가 더 작으면 묶음 크기를 낮춘다.
+            coords = list(dict.fromkeys(tuple(c) for c in batch_starts + batch_ends))
+            coord_idx = {c: i for i, c in enumerate(coords)}
+            sources = list(dict.fromkeys(coord_idx[tuple(c)] for c in batch_starts))
+            destinations = list(dict.fromkeys(coord_idx[tuple(c)] for c in batch_ends))
+            table = None
+            if self.road_provider == "osrm":
+                try:
+                    table = self._osrm_table(coords, sources, destinations)
+                except (requests.RequestException, ValueError) as exc:
+                    print(f"  ⚠️ OSRM table 사용 불가, 기존 route로 재시도: {exc}")
+            if table is not None:
+                table_path = os.path.join(os.path.dirname(save_json_dir), "tables", f"{route_type}_{offset:03d}.json")
+                ensure_dir(os.path.dirname(table_path))
+                with open(table_path, "w", encoding="utf-8") as f:
+                    json.dump(table, f, ensure_ascii=False)
+            for j, (start, end) in enumerate(zip(batch_starts, batch_ends), offset):
+                kwargs = dict(save_json_dir=save_json_dir, route_type=route_type,
+                              source_index=j, name=names[j], start_label=start_label, goal_label=goal_label)
+                dist = duration = None
+                if table is not None:
+                    row = sources.index(coord_idx[tuple(start)])
+                    col = destinations.index(coord_idx[tuple(end)])
+                    dist, duration = table["distances"][row][col], table["durations"][row][col]
+                if (dist is None or duration is None
+                        or not np.isfinite([dist, duration]).all() or min(dist, duration) < 0):
+                    results.append(self.get_road_distance(start, end, **kwargs))
+                    time.sleep(0.05)
+                    continue
+                distance_km, duration_min = float(dist) / 1000, float(duration) / 60
+                meta = {"api_provider": "osrm", "service": "table", "osrm_url": self.osrm_url,
+                        "route_type": route_type, "source_index": j, "name": names[j],
+                        start_label: [float(start[1]), float(start[0])],
+                        goal_label: [float(end[1]), float(end[0])],
+                        "start_label": start_label, "goal_label": goal_label,
+                        "departure_time": "static", "priority": "shortest_time",
+                        "saved_at": datetime.now(KST).isoformat(),
+                        "distance_km": round(distance_km, 3), "duration_min": round(duration_min, 2),
+                        "duration_sec": int(round(duration)), "toll_fare": 0, "taxi_fare": 0,
+                        "direction_note": f"{start_label}->{goal_label}"}
+                ensure_dir(save_json_dir)
+                path = os.path.join(save_json_dir, f"{j:03d}_{slugify(names[j])}.json")
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump({"meta": meta, "payload": {"osrm_table": {
+                        "response_file": os.path.relpath(table_path, save_json_dir),
+                        "row": row, "column": col}}}, f, ensure_ascii=False, indent=2)
+                results.append((distance_km, duration_min))
+        return results
+
     def make_amb_info(self, latitude, longitude, incident_size, amb_count, save_folder):
         """구급차 정보 생성 — 카운트 방식 amb_station_info.csv (Phase 1).
 
@@ -647,18 +733,12 @@ class ScenarioGenerator:
         # 도로 거리/시간 (고유 센터당 1회 — Kakao 절감)
         routes_dir = os.path.join(save_folder, "routes", "center2site")
         ensure_dir(routes_dir)
-        road_distances, road_durations = [], []
-        for j, (_, row) in enumerate(df_candidates.iterrows()):
-            coord = (row["y좌표"], row["x좌표"])  # (lat, lon)
-            dist_km, duration_min = self.get_road_distance(
-                start=coord, end=(latitude, longitude),  # center → site
-                save_json_dir=routes_dir, route_type="center2site",
-                source_index=j, name=row.get("기관명", f"center_{j}"),
-                start_label="center", goal_label="site"
-            )
-            road_distances.append(dist_km)
-            road_durations.append(duration_min)
-            time.sleep(0.05)
+        legs = self.get_road_distance_batch(
+            list(zip(df_candidates["y좌표"], df_candidates["x좌표"])),
+            [(latitude, longitude)] * len(df_candidates),
+            save_json_dir=routes_dir, route_type="center2site",
+            names=df_candidates["기관명"].tolist(), start_label="center", goal_label="site")
+        road_distances, road_durations = zip(*legs)
 
         df_candidates["road_distance"] = road_distances
         df_candidates["road_duration"] = road_durations
@@ -1012,19 +1092,11 @@ class ScenarioGenerator:
         # ---------- ROAD 거리/시간 계산 (선정 병원만, site → hospital) ----------
         routes_dir_hos = os.path.join(save_folder, "routes", "hos2site")
         ensure_dir(routes_dir_hos)
-        road_distances = []
-        road_durations = []
-        for j, (_, row) in enumerate(df_euc.iterrows()):
-            end = (row["y좌표"], row["x좌표"])
-            road_km, duration_min = self.get_road_distance(
-                start=(latitude, longitude), end=end,  # site → hospital
-                save_json_dir=routes_dir_hos, route_type="hos2site",
-                source_index=j, name=row.get("요양기관명", f"hospital_{j}"),
-                start_label="site", goal_label="hospital"
-            )
-            road_distances.append(road_km)
-            road_durations.append(duration_min)
-            time.sleep(0.05)
+        legs = self.get_road_distance_batch(
+            [(latitude, longitude)] * len(df_euc), list(zip(df_euc["y좌표"], df_euc["x좌표"])),
+            save_json_dir=routes_dir_hos, route_type="hos2site",
+            names=df_euc["요양기관명"].tolist(), start_label="site", goal_label="hospital")
+        road_distances, road_durations = zip(*legs)
 
         df_euc = df_euc.copy()
         df_euc["road_distance"] = road_distances

@@ -79,7 +79,7 @@ chartCategoricalColors = [
 chartSequentialColors = [
   "#EAF2FB", "#CFE0F6", "#AFCCEF", "#8AB5E7",
   "#639BDD", "#3E80D0", "#2266BE", "#0B4E9E",
-  "#073A78",
+  "#073A78", "#052D5D",
 ]
 
 # ── 사이드바만 딥네이비: 상황실 느낌은 여기서 낸다 ────────────────

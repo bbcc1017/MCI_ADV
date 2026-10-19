@@ -24,12 +24,12 @@
 
 <table>
 <tr>
-<td width="33%"><img src="docs/img/dashboard_map_satellite.jpg" alt="Maps · Dark (Esri 위성 타일)"></td>
+<td width="33%"><img src="docs/img/dashboard_map_satellite.jpg" alt="Maps · Esri 위성 타일"></td>
 <td width="33%"><img src="docs/img/dashboard_trace_replay.jpg" alt="Scenarios · Trace Replay"></td>
 <td width="33%"><img src="docs/img/dashboard_analytics.jpg" alt="Analytics · Pareto Dominance"></td>
 </tr>
 <tr>
-<td align="center"><sub>Maps · Dark 테마 (Esri 위성 타일)</sub></td>
+<td align="center"><sub>Maps · 위성지도 (Esri)</sub></td>
 <td align="center"><sub>Scenarios · 환자별 Trace Replay</sub></td>
 <td align="center"><sub>Analytics · Pareto Dominance (3D)</sub></td>
 </tr>
@@ -127,6 +127,7 @@ flowchart LR
 종합 ≥ 1, 헬기장 ≥ UAV 대수, 헬기장∩상급 ≥ 1, 헬기장∩종합 ≥ 1)을 적용합니다.
 
 - 구간별 원본 API 응답을 `routes/`에 보존하며, 지도 애니메이션은 이 폴리라인을 따릅니다.
+- OSRM 거리·시간은 최대 40구간씩 `/table`로 조회합니다. 원본 응답은 `routes/tables/`, 구간 JSON은 해당 셀의 위치를 보존합니다. 도로 경로선은 지도 표시 시 `/route`로 가져와 1시간 캐시하며, table 미지원·누락 구간은 기존 route로 재시도합니다. Kakao 호출 방식은 동일합니다.
 - 도로 스냅에 실패한 좌표는 OSRM `/nearest`로 보정 후 재시도하고, 보정 내역을 `route_adjustments.json`에 기록합니다.
 
 ### 구급차 + UAV 이산사건 시뮬레이션
@@ -191,7 +192,7 @@ cd src/vis_src && streamlit run MCI_Streamlit.py
 
 | 화면 | 기능 |
 |---|---|
-| **Maps** | 안전센터→현장, 현장→병원 경로를 혼잡도 색상으로 표시. Light(OpenStreetMap / Esri Gray)·Dark(Esri 위성) 타일. Animation 모드에서는 구급차·UAV 마커가 실제 도로 폴리라인을 따라 이동하며, 환자 마커 클릭 시 이송 수단·병원·대기·치료 시간 표시 |
+| **Maps** | 지도 오른쪽 위의 도로지도(OpenStreetMap)·회색지도(Esri Gray) 버튼, 확대·축소 바로 아래 위성지도 전환 버튼. 타일 전환은 페이지 재실행 없이 동작. 선택한 경로 범위 자동 맞춤·접을 수 있는 범례. Animation 모드에서 구급차·UAV 이동 및 환자별 이송·치료 정보 표시 |
 | **Scenarios** | 실행 로그, 환자 요약표, 환자별 상태 변화 애니메이션, 전체 이벤트 표, Trace Replay 간트차트 |
 | **Analytics** | RAW / STAT / ANOVA Suite / Pareto Dominance / Bootstrap·비모수 / Power Analysis / Export |
 | **Data Tables** | 시나리오 CSV 편집(자동 백업) 후 수정값으로 재실행 |
@@ -511,7 +512,8 @@ ratio의 합은 1입니다. 구조 시간은 베타분포(alpha, beta), 처치 �
 |---|---|---|
 | 역지오코딩 | `https://dapi.kakao.com/v2/local/geo/coord2address.json` | `orchestrator.reverse_geocode_kakao` |
 | 도로 거리·시간 | `https://apis-navi.kakaomobility.com/v1/future/directions` (`priority=TIME`, `departure_time` 선택) | `make_csv_yaml_dynamic.get_road_distance_kakao` |
-| OSRM 경로 | `{MCI_OSRM_URL}/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=full&geometries=geojson` | 〃 (`is_use_time=False`) |
+| OSRM 거리·시간 | `{MCI_OSRM_URL}/table/v1/driving/{coordinates}?sources=...&destinations=...&annotations=distance,duration` | 시나리오 생성 (`is_use_time=False`) |
+| OSRM 경로선 | `{MCI_OSRM_URL}/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=full&geometries=geojson` | 지도 표시 시 캐시 조회, table 불가 시 기존 route 폴백 |
 
 오류 처리: 401은 키 확인 후 중단, 429는 2초 대기 후 최대 3회 재시도, 타임아웃(15초)은 직선거리(Haversine)로 대체합니다.
 한 생성 프로세스 안에서는 `requests.Session`으로 연결을 재사용합니다.

@@ -1,0 +1,92 @@
+{
+  "checked_at": "2026-10-19 Asia/Seoul",
+  "source": "C:\\Users\\User\\MCI_UAV\\scenarios",
+  "backup": "C:\\Users\\User\\MCI_ADV\\tmp\\dashboard_upgrade_20261019\\resource_backup",
+  "files": [
+    {
+      "file": "안전센터와 소방서.csv",
+      "rows": 997,
+      "changed_cells": {
+        "주소": 106,
+        "y좌표": 121,
+        "x좌표": 121
+      },
+      "before_sha256": "8e16c714fb2957aaa802a2499522eddac3009730d12d49dbf0a54ac0e3255dea",
+      "source_sha256": "38a1a2be9b3d9e08dc8afcb0cafcfa455c743951569d6e933e4c6713b48d4dbf",
+      "copied_sha256": "38a1a2be9b3d9e08dc8afcb0cafcfa455c743951569d6e933e4c6713b48d4dbf",
+      "git_blob_sha256": "1210ac885d5c0b19c7276bc43d48f6f2eed210737c602d532d3fba72adcfd4e8"
+    },
+    {
+      "file": "엑셀 결합 데이터.xlsx",
+      "rows": 548,
+      "changed_cells": {
+        "요양기관명": 7,
+        "주소": 3,
+        "x좌표": 8,
+        "y좌표": 8
+      },
+      "before_sha256": "cce41c15753c028a98415e07c0ce776a2d084731d286d31704673507d46386f7",
+      "source_sha256": "1d1228c27f60bcad7bfd5ef2462bf7f2f03e53bd18efc19a91d6409149c67133",
+      "copied_sha256": "1d1228c27f60bcad7bfd5ef2462bf7f2f03e53bd18efc19a91d6409149c67133",
+      "git_blob_sha256": "1d1228c27f60bcad7bfd5ef2462bf7f2f03e53bd18efc19a91d6409149c67133"
+    },
+    {
+      "file": "DISTANCE_MATRIX_FINAL.xlsx",
+      "rows": 548,
+      "changed_cells": {
+        "요양기관명": 7,
+        "주소": 3,
+        "x좌표": 8,
+        "y좌표": 8,
+        "헬기장 여부": 1
+      },
+      "before_sha256": "12375e71eed0a47aa6b5cb83e5930f7cafaed2214162dff579841a27c4a50c8b",
+      "source_sha256": "370b60296516d606c35068a688fd6f95565c74a46ed50563486ff303f1182025",
+      "copied_sha256": "370b60296516d606c35068a688fd6f95565c74a46ed50563486ff303f1182025",
+      "git_blob_sha256": "370b60296516d606c35068a688fd6f95565c74a46ed50563486ff303f1182025"
+    }
+  ],
+  "preserved_formula_cells": 548,
+  "note": "최신 원격 자료 보정 커밋을 fast-forward로 보존. 세 자원 파일은 현재 MCI_UAV 로컬 원본과 바이트 일치. CSV Git blob은 CRLF 정규화로 해시가 다를 수 있음. 기존 생성 시나리오와 결과는 보존.",
+  "initial_sync_files": [
+    {
+      "file": "안전센터와 소방서.csv",
+      "rows": 997,
+      "changed_cells": {
+        "주소": 102,
+        "y좌표": 117,
+        "x좌표": 117
+      },
+      "before_sha256": "8e16c714fb2957aaa802a2499522eddac3009730d12d49dbf0a54ac0e3255dea",
+      "source_sha256": "0e1d5ca59f7819f7d3ac2619de36bb80df1203552510ea94be344a13fb049be8",
+      "copied_sha256": "0e1d5ca59f7819f7d3ac2619de36bb80df1203552510ea94be344a13fb049be8"
+    },
+    {
+      "file": "엑셀 결합 데이터.xlsx",
+      "rows": 548,
+      "changed_cells": {
+        "요양기관명": 7,
+        "주소": 3,
+        "x좌표": 8,
+        "y좌표": 8
+      },
+      "before_sha256": "cce41c15753c028a98415e07c0ce776a2d084731d286d31704673507d46386f7",
+      "source_sha256": "1d1228c27f60bcad7bfd5ef2462bf7f2f03e53bd18efc19a91d6409149c67133",
+      "copied_sha256": "1d1228c27f60bcad7bfd5ef2462bf7f2f03e53bd18efc19a91d6409149c67133"
+    },
+    {
+      "file": "DISTANCE_MATRIX_FINAL.xlsx",
+      "rows": 548,
+      "changed_cells": {
+        "요양기관명": 7,
+        "x좌표": 4,
+        "y좌표": 4,
+        "헬기장 여부": 1
+      },
+      "before_sha256": "12375e71eed0a47aa6b5cb83e5930f7cafaed2214162dff579841a27c4a50c8b",
+      "source_sha256": "c2a966c0921a4fce447d681afc1de890292f126bb734b51156df76e37a1489d0",
+      "copied_sha256": "c2a966c0921a4fce447d681afc1de890292f126bb734b51156df76e37a1489d0"
+    }
+  ],
+  "integration_base_commit": "8103d74c381dc62bea71042e7e49820c4cb90126"
+}

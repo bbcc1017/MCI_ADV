@@ -296,7 +296,7 @@ h2::before, h3::before {{
 
 /* ══ 6. console eyebrow / status strip (page_header) ═════════════ */
 .dc-sub {{
-  font-family: var(--dc-mono);
+  font-family: var(--dc-sans);
   font-size: .78rem;
   color: var(--dc-muted);
   font-variant-numeric: tabular-nums;
@@ -310,8 +310,6 @@ h2::before, h3::before {{
 .dc-sub .dc-k {{
   font-family: var(--dc-sans);
   font-size: .7rem;
-  letter-spacing: .09em;
-  text-transform: uppercase;
   color: var(--dc-muted);
   margin-right: .3rem;
 }}
@@ -348,6 +346,32 @@ iframe[title="streamlit_folium.st_folium"],
 ::-webkit-scrollbar-track {{ background: transparent; }}
 ::-webkit-scrollbar-thumb {{ background: var(--dc-rule-hi); border-radius: 6px; }}
 ::-webkit-scrollbar-thumb:hover {{ background: var(--dc-muted); }}
+
+/* 지도와 결과가 주인공인 작업 영역: 불필요한 좌우 여백을 줄인다. */
+[data-testid="stMainBlockContainer"] {{
+  max-width: 1800px;
+  padding-left: clamp(1rem, 3vw, 2.5rem) !important;
+  padding-right: clamp(1rem, 3vw, 2.5rem) !important;
+}}
+.st-key-main_view {{
+  padding: .35rem 0 .65rem;
+  margin-bottom: .3rem;
+  border-bottom: 1px solid var(--dc-rule);
+}}
+.st-key-main_view button {{ min-height: 2.6rem; font-weight: 500; }}
+.st-key-main_view [role="radiogroup"] {{ flex-wrap: nowrap; overflow-x: auto; }}
+.dc-sub {{ margin-bottom: .4rem; overflow-wrap: anywhere; }}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{ padding-top: 1rem; }}
+[data-testid="stMain"] [data-testid="stExpander"] {{ background: var(--dc-panel); }}
+button:focus-visible {{ outline: 2px solid var(--dc-accent); outline-offset: 2px; }}
+@media (max-width: 1100px) {{
+  .st-key-main_view button {{ min-width: 0; padding-left: .4rem; padding-right: .4rem; }}
+  .st-key-main_view button [data-testid="stMarkdownContainer"] p {{ font-size: .8rem; }}
+  .st-key-main_view span:has(> [data-testid="stIconMaterial"]) {{ display: none; }}
+}}
+@media (max-width: 700px) {{
+  .dc-sub {{ gap: .25rem .6rem; }}
+}}
 
 @media (prefers-reduced-motion: reduce) {{
   * {{ transition: none !important; animation: none !important; }}

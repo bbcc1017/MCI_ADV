@@ -635,7 +635,8 @@ export MCI_OSRM_URL=http://localhost:5000
 **OSRM endpoints used**:
 | Endpoint | Purpose |
 |----------|---------|
-| `/route/v1/driving/{lon1},{lat1};{lon2},{lat2}` | Road distance + duration + GeoJSON polyline for hospitals/fire stations |
+| `/table/v1/driving/{coordinates}` | Distance (m) + duration (s), batched in up to 40 legs. Generated CSVs retain km and minutes |
+| `/route/v1/driving/{lon1},{lat1};{lon2},{lat2}` | GeoJSON geometry fetched when viewing a map and cached for one hour; existing route calculation used when table is unsupported or a cell is missing |
 
 A self-hosted OSRM instance has no external rate limit (only server resource limits). The `--daily-limit` flag remains for compatibility but is meaningless in OSRM mode.
 

@@ -1,0 +1,1946 @@
+[
+  {
+    "row": 10,
+    "physical_row": 12,
+    "기관명": "서부소방서_대구-내당-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "대구광역시 서구 서대구로3길 16",
+        "after": "대구광역시 서구 평리로 260"
+      },
+      "y좌표": {
+        "before": "35.8594298",
+        "after": "35.86248"
+      },
+      "x좌표": {
+        "before": "128.5552638",
+        "after": "128.5518725"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.daegu.go.kr/119/index.do?menu_id=00001487",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1294779849"
+    ]
+  },
+  {
+    "row": 21,
+    "physical_row": 23,
+    "기관명": "동부소방서_대구-신천-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "대구 동구 효신로 13",
+        "after": "대구광역시 동구 효신로 13"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.daegu.go.kr/119/index.do?menu_id=00001479",
+      "http://place.map.kakao.com/2014382418"
+    ]
+  },
+  {
+    "row": 22,
+    "physical_row": 24,
+    "기관명": "광산소방서_광주-평동-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "광주광역시 광산구 월전동 1251",
+        "after": "전남광주통합특별시 광산구 월전로 59(월전동)"
+      },
+      "y좌표": {
+        "before": "35.1242989",
+        "after": "35.1243151"
+      },
+      "x좌표": {
+        "before": "126.773418",
+        "after": "126.7739659"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gwangju.go.kr/fire/contentsView.do?pageId=fire180",
+      "http://place.map.kakao.com/193366420"
+    ]
+  },
+  {
+    "row": 26,
+    "physical_row": 28,
+    "기관명": "광산소방서_광주-월곡-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "전남광주통합특별시 광산구 우산로85번길 12-5",
+        "after": "전남광주통합특별시 광산구 우산로 85번길 12-5(우산동)"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gwangju.go.kr/fire/contentsView.do?pageId=fire180",
+      "http://place.map.kakao.com/8045727"
+    ]
+  },
+  {
+    "row": 32,
+    "physical_row": 34,
+    "기관명": "대전-가양-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "대전 동구 계족로 300",
+        "after": "대전광역시 동구 계족로 300"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.daejeon.go.kr/dj119/CmmContentsHtmlView.do?menuSeq=4439",
+      "http://place.map.kakao.com/1369987797"
+    ]
+  },
+  {
+    "row": 34,
+    "physical_row": 36,
+    "기관명": "대전-산내-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "대전 동구 산내로 1208",
+        "after": "대전광역시 동구 산내로 1208"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.daejeon.go.kr/dj119/CmmContentsHtmlView.do?menuSeq=4439",
+      "http://place.map.kakao.com/25800895"
+    ]
+  },
+  {
+    "row": 35,
+    "physical_row": 37,
+    "기관명": "대전-부사-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "대전 중구 대종로 324",
+        "after": "대전광역시 중구 대종로 324"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.daejeon.go.kr/dj119/CmmContentsHtmlView.do?menuSeq=4439",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/17572925"
+    ]
+  },
+  {
+    "row": 36,
+    "physical_row": 38,
+    "기관명": "대전-원동-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "대전 동구 대전천동로 508",
+        "after": "대전광역시 동구 대전천동로 508"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.daejeon.go.kr/dj119/CmmContentsHtmlView.do?menuSeq=4439",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1369984710"
+    ]
+  },
+  {
+    "row": 59,
+    "physical_row": 61,
+    "기관명": "동부소방서_광주-용산-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "전남광주통합특별시 동구 남문로 535",
+        "after": "전남광주통합특별시 동구 남문로 535(용산동)"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gwangju.go.kr/fire/contentsView.do?pageId=fire164",
+      "http://place.map.kakao.com/2012415603"
+    ]
+  },
+  {
+    "row": 67,
+    "physical_row": 69,
+    "기관명": "영종소방서-공항-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "인천광역시 중구 공항서로512번길 464(운서동)",
+        "after": "인천광역시 영종구 제2터미널대로 268"
+      },
+      "y좌표": {
+        "before": "37.4858663",
+        "after": "37.4868652"
+      },
+      "x좌표": {
+        "before": "126.4145851",
+        "after": "126.4155086"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.incheon.go.kr/119yeongjong/119yeongjong050100",
+      "https://ebook.incheon.go.kr/e-book/access/ecatalogt.jsp?Dir=747&callmode=normal&catimage=&eclang=ko&start=48&um=s",
+      "http://place.map.kakao.com/1368094931"
+    ]
+  },
+  {
+    "row": 71,
+    "physical_row": 73,
+    "기관명": "남부소방서_인천-숭의-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "인천광역시 남구 석정로 51 (숭의동)",
+        "after": "인천광역시 미추홀구 석정로49번길 30"
+      },
+      "y좌표": {
+        "before": "37.4661051",
+        "after": "37.4649855"
+      },
+      "x좌표": {
+        "before": "126.643178",
+        "after": "126.6424876"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.incheon.go.kr/119michuhol/119michuhol050700",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1369785785"
+    ]
+  },
+  {
+    "row": 86,
+    "physical_row": 88,
+    "기관명": "부천소방서-오정-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 부천시 오정구 신흥로 499",
+        "after": "경기도 부천시 오정구 신흥로 499"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://share.gg.go.kr/facilityListO/view?eshare=1&facilityId=F0002&instiCode=6412235",
+      "http://place.map.kakao.com/1406770259"
+    ]
+  },
+  {
+    "row": 95,
+    "physical_row": 97,
+    "기관명": "성남소방서-상대원-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기도 성남시 중원구 둔촌대로 457번길 8 (상대원동)",
+        "after": "경기도 성남시 중원구 둔촌대로 469"
+      },
+      "y좌표": {
+        "before": "37.4324179",
+        "after": "37.4321473"
+      },
+      "x좌표": {
+        "before": "127.168675",
+        "after": "127.168993"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.seongnam.go.kr/contents/down/History/HistoryOfSeongnamCity_4.pdf",
+      "http://place.map.kakao.com/1404341818"
+    ]
+  },
+  {
+    "row": 99,
+    "physical_row": 101,
+    "기관명": "성남소방서-고등-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "37.423394",
+        "after": "37.4233945"
+      },
+      "x좌표": {
+        "before": "127.105155",
+        "after": "127.1015503"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gg.go.kr/uploads/CONTENTS/budget/2020/02/%EA%B3%84%EC%86%8D%EB%B9%84.pdf",
+      "http://place.map.kakao.com/1404543668"
+    ]
+  },
+  {
+    "row": 102,
+    "physical_row": 104,
+    "기관명": "수원소방서-이의-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 수원시 영통구 도청로18번길 33",
+        "after": "경기도 수원시 영통구 도청로18번길 33"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000030103/BBS_202504221114516660.pdf",
+      "http://place.map.kakao.com/19001077"
+    ]
+  },
+  {
+    "row": 110,
+    "physical_row": 112,
+    "기관명": "세종소방서-어진-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "세종특별자치시 어진동 610",
+        "after": "세종특별자치시 절재로 301(어진동)"
+      },
+      "y좌표": {
+        "before": "36.5041461",
+        "after": "36.5061929"
+      },
+      "x좌표": {
+        "before": "127.2717542",
+        "after": "127.2735922"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1381015099"
+    ]
+  },
+  {
+    "row": 124,
+    "physical_row": 126,
+    "기관명": "남부소방서_울산-남부(울산)_공단-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "울산 남구 사평로 161",
+        "after": "울산광역시 남구 사평로 161"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://fire.ulsan.go.kr/page/nambu/119Center_6.do",
+      "http://place.map.kakao.com/1380907676"
+    ]
+  },
+  {
+    "row": 135,
+    "physical_row": 137,
+    "기관명": "중부소방서_울산-성남-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "울산광역시 중구 만남의거리 14",
+        "after": "울산광역시 중구 젊음의거리 6"
+      },
+      "y좌표": {
+        "before": "35.554175",
+        "after": "35.5532038"
+      },
+      "x좌표": {
+        "before": "129.32015",
+        "after": "129.3167443"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1378810350"
+    ]
+  },
+  {
+    "row": 145,
+    "physical_row": 147,
+    "기관명": "대전-덕암-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "대전광역시 대덕구 신탄진로 681번길 10",
+        "after": "대전광역시 대덕구 신탄진로 661"
+      },
+      "y좌표": {
+        "before": "36.4391257",
+        "after": "36.4372802"
+      },
+      "x좌표": {
+        "before": "127.4260783",
+        "after": "127.4256445"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.daejeon.go.kr/drh/board/boardNormalView.do?boardId=normal_0189&menuSeq=&ntatcSeq=1252246080&pageIndex=1",
+      "http://place.map.kakao.com/1370050813"
+    ]
+  },
+  {
+    "row": 150,
+    "physical_row": 152,
+    "기관명": "대전-태평-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "대전광역시 중구 태평로 91",
+        "after": "대전광역시 중구 동서대로 1235"
+      },
+      "y좌표": {
+        "before": "36.3249014",
+        "after": "36.3266436"
+      },
+      "x좌표": {
+        "before": "127.3942065",
+        "after": "127.3968566"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.daejeon.go.kr/dj119/CmmContentsHtmlView.do?menuSeq=4444",
+      "http://place.map.kakao.com/1406178425"
+    ]
+  },
+  {
+    "row": 153,
+    "physical_row": 155,
+    "기관명": "화성소방서-목동-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 화성시 동탄구 동탄신리천로 359",
+        "after": "경기도 화성시 동탄신리천로 359"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.goe.go.kr/resource/goe/na/bbs_2530/2026/02/561b05a6-d5f0-47a0-88f0-d21d390cd65c.pdf",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202212280326392150.pdf",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202201040737463470.pdf",
+      "https://www.gg.go.kr/bbs/boardView.do?bIdx=37330986&bcIdx=601&bsIdx=469&menuId=1547&page=9",
+      "https://www.gg.go.kr/bbs/boardView.do?bIdx=37331004&bcIdx=601&bsIdx=469&menuId=1547&page=2",
+      "http://place.map.kakao.com/1393000337"
+    ]
+  },
+  {
+    "row": 155,
+    "physical_row": 157,
+    "기관명": "화성소방서-봉담-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 화성시 효행구 봉담읍 동화새터길 135",
+        "after": "경기도 화성시 봉담읍 동화새터길 135"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202212280326392150.pdf",
+      "http://place.map.kakao.com/1392963192"
+    ]
+  },
+  {
+    "row": 156,
+    "physical_row": 158,
+    "기관명": "화성소방서-남양-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 화성시 만세구 남양읍 주석로 29",
+        "after": "경기도 화성시 주석로 29"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1392920838"
+    ]
+  },
+  {
+    "row": 168,
+    "physical_row": 170,
+    "기관명": "광명소방서-광명-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기도 광명시 사성로 12 (광명동)",
+        "after": "경기도 광명시 광이로 67"
+      },
+      "y좌표": {
+        "before": "37.4854303",
+        "after": "37.484368"
+      },
+      "x좌표": {
+        "before": "126.8585601",
+        "after": "126.8598558"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.yna.co.kr/amp/view/AKR20250811123300061",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1376519247"
+    ]
+  },
+  {
+    "row": 171,
+    "physical_row": 173,
+    "기관명": "송탄소방서-고덕-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기도 평택시 고덕면 고덕로 335",
+        "after": "경기도 평택시 고덕율포1로46(고덕동)"
+      },
+      "y좌표": {
+        "before": "37.0459414",
+        "after": "37.0452676"
+      },
+      "x좌표": {
+        "before": "127.0212283",
+        "after": "127.026709"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/8756475"
+    ]
+  },
+  {
+    "row": 227,
+    "physical_row": 229,
+    "기관명": "의정부소방서-금오-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 의정부시 금오로23번길 22-40",
+        "after": "경기도 의정부시 금오로23번길 22-40"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202212280326392150.pdf",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202501060524265581.pdf",
+      "https://www.goe.go.kr/resource/goe/na/bbs_2530/2026/02/561b05a6-d5f0-47a0-88f0-d21d390cd65c.pdf",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202201040737463470.pdf",
+      "http://place.map.kakao.com/1402790915"
+    ]
+  },
+  {
+    "row": 237,
+    "physical_row": 239,
+    "기관명": "고양소방서-삼송-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 고양시 덕양구 오금로 14",
+        "after": "경기도 고양시 덕양구 오금로 14"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.goe.go.kr/resource/goe/na/bbs_2530/2026/02/561b05a6-d5f0-47a0-88f0-d21d390cd65c.pdf",
+      "https://www.goyang.go.kr/dong/user/bbs/BD_selectBbsList.do?q_bbsCode=1072&q_clCode=7",
+      "http://place.map.kakao.com/1376776570"
+    ]
+  },
+  {
+    "row": 262,
+    "physical_row": 264,
+    "기관명": "광주소방서-곤지암-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 광주시 곤지암읍 광여로 160",
+        "after": "경기도 광주시 곤지암읍 광여로 160"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202212280326392150.pdf",
+      "http://place.map.kakao.com/1376420286"
+    ]
+  },
+  {
+    "row": 279,
+    "physical_row": 281,
+    "기관명": "홍천소방서-서석-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "강원도 홍천군 서석면 구룡령로 2512",
+        "after": "강원특별자치도 홍천군 서석면 풍암길2길 9"
+      },
+      "y좌표": {
+        "before": "37.7128905",
+        "after": "37.7144768"
+      },
+      "x좌표": {
+        "before": "128.1841197",
+        "after": "128.1877581"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://yw119.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_firestation/fire_hc",
+      "https://js119.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_char",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization",
+      "http://place.map.kakao.com/1377051791"
+    ]
+  },
+  {
+    "row": 280,
+    "physical_row": 282,
+    "기관명": "홍천소방서-양덕원-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "강원도 홍천군 남면 시동로 38",
+        "after": "강원특별자치도 홍천군 남면 시동로 46"
+      },
+      "y좌표": {
+        "before": "37.6122562",
+        "after": "37.6115145"
+      },
+      "x좌표": {
+        "before": "127.7704377",
+        "after": "127.7703768"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://yw119.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_firestation/fire_hc",
+      "https://wj119.gwd.go.kr/fire/greetings/greetings_oranization",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization",
+      "http://place.map.kakao.com/1377079359"
+    ]
+  },
+  {
+    "row": 301,
+    "physical_row": 303,
+    "기관명": "강릉소방서-경포-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "강원도 강릉시 해안로 502",
+        "after": "강원특별자치도 강릉시 안현로 377"
+      },
+      "y좌표": {
+        "before": "37.8050228",
+        "after": "37.8071097"
+      },
+      "x좌표": {
+        "before": "128.9052478",
+        "after": "128.900246"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://fire.gwd.go.kr/gn119/partici/partici_photo?articleSeq=11128670",
+      "https://inje119.gwd.go.kr/gn119/partici/partici_photo?articleSeq=11128670",
+      "http://place.map.kakao.com/1378434220"
+    ]
+  },
+  {
+    "row": 305,
+    "physical_row": 307,
+    "기관명": "원주소방서-현장대응과(명륜)-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "강원도 원주시 남원로 487",
+        "after": "강원특별자치도 원주시 남원로 467"
+      },
+      "y좌표": {
+        "before": "37.328358",
+        "after": "37.3270206"
+      },
+      "x좌표": {
+        "before": "127.944363",
+        "after": "127.9427724"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://inje119.gwd.go.kr/wj119/partici/partici_news?articleSeq=11091281",
+      "https://yy119.gwd.go.kr/wj119/partici/partici_news?articleSeq=11091281",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization",
+      "http://place.map.kakao.com/1377909352"
+    ]
+  },
+  {
+    "row": 310,
+    "physical_row": 312,
+    "기관명": "춘천소방서-소양-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "강원도 춘천시 금강로 15",
+        "after": "강원특별자치도 춘천시 가연길16번길 16"
+      },
+      "y좌표": {
+        "before": "37.882111",
+        "after": "37.8791034"
+      },
+      "x좌표": {
+        "before": "127.7244645",
+        "after": "127.7229148"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.chuncheon.go.kr/village/soyang-dong/institution/public/",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1377458059"
+    ]
+  },
+  {
+    "row": 316,
+    "physical_row": 318,
+    "기관명": "가평소방서-설악-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 가평군 설악면 한서로 7",
+        "after": "경기도 가평군 설악면 한서로 7"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202501060524265581.pdf",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202212280326392150.pdf",
+      "https://www.goe.go.kr/resource/goe/na/bbs_2530/2026/02/561b05a6-d5f0-47a0-88f0-d21d390cd65c.pdf",
+      "https://www.goe.go.kr/resource/old/BBSMSTR_000000000170/BBS_202201040737463470.pdf",
+      "http://place.map.kakao.com/1376850356"
+    ]
+  },
+  {
+    "row": 339,
+    "physical_row": 341,
+    "기관명": "천안동남소방서-독립-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충남 천안시 동남구 목천읍 독립기념관로 1",
+        "after": "충청남도 천안시 동남구 목천읍 독립기념관로 1"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1405140398"
+    ]
+  },
+  {
+    "row": 340,
+    "physical_row": 342,
+    "기관명": "천안동남소방서-청당-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충남 천안시 동남구 청수14로 91",
+        "after": "충청남도 천안시 동남구 청수14로 91"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1405090986"
+    ]
+  },
+  {
+    "row": 357,
+    "physical_row": 359,
+    "기관명": "보은소방서-구병산-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충북 보은군 마로면 관기 송현로 78",
+        "after": "충청북도  보은군 마로면 관기송현로 48"
+      },
+      "y좌표": {
+        "before": "36.4355732",
+        "after": "36.4366484"
+      },
+      "x좌표": {
+        "before": "127.8174267",
+        "after": "127.8144768"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1386384457"
+    ]
+  },
+  {
+    "row": 378,
+    "physical_row": 380,
+    "기관명": "동부소방서_충북-사천-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충북 청주시 청원구 밀레니엄1로 63",
+        "after": "충청북도 청주시 청원구 밀레니엄1로 63"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1385319037"
+    ]
+  },
+  {
+    "row": 380,
+    "physical_row": 382,
+    "기관명": "양양소방서-강현-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "38.1477855",
+        "after": "38.147832"
+      },
+      "x좌표": {
+        "before": "128.597561",
+        "after": "128.597673"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_firestation/fire_yy",
+      "https://yy119.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_char",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization",
+      "http://place.map.kakao.com/1378195049"
+    ]
+  },
+  {
+    "row": 381,
+    "physical_row": 383,
+    "기관명": "양양소방서-하조대-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "37.9950666",
+        "after": "37.995153"
+      },
+      "x좌표": {
+        "before": "128.7379548",
+        "after": "128.737983"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_firestation/fire_yy",
+      "https://wj119.gwd.go.kr/fire/greetings/greetings_oranization",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization",
+      "https://state.gwd.go.kr/upload/report/kw_nws_data/kw_mgr_4905_20210401.pdf",
+      "http://place.map.kakao.com/1378081773"
+    ]
+  },
+  {
+    "row": 386,
+    "physical_row": 388,
+    "기관명": "인제소방서-기린-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "강원도 인제군 기린면 내린천로 4100",
+        "after": "강원특별자치도 인제군 기린면 대내로 34-14"
+      },
+      "y좌표": {
+        "before": "37.9616761",
+        "after": "37.9648156"
+      },
+      "x좌표": {
+        "before": "128.3206439",
+        "after": "128.318444"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_firestation/fire_inje",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization",
+      "https://inje119.gwd.go.kr/fire/greetings/greetings_oranization",
+      "https://state.gwd.go.kr/page/gwprovin/download/CCTV_20171231_20180416.pdf",
+      "http://place.map.kakao.com/1377667851"
+    ]
+  },
+  {
+    "row": 387,
+    "physical_row": 389,
+    "기관명": "인제소방서-원통-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "강원도 인제군 북면 원통로 276",
+        "after": "강원특별자치도 인제군 북면 원통로 301"
+      },
+      "y좌표": {
+        "before": "38.126176",
+        "after": "38.1278741"
+      },
+      "x좌표": {
+        "before": "128.2135799",
+        "after": "128.2156981"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://fire.gwd.go.kr/fire/greetings/greetings_oranization",
+      "https://inje119.gwd.go.kr/fire/greetings/greetings_oranization",
+      "http://place.map.kakao.com/1377652444"
+    ]
+  },
+  {
+    "row": 391,
+    "physical_row": 393,
+    "기관명": "철원소방서-동송-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "강원도 철원군 동송읍 금학로 251길 17",
+        "after": "강원특별자치도 철원군 동송읍 금학로251번길 17"
+      },
+      "y좌표": {
+        "before": "38.2107647",
+        "after": "38.2097781"
+      },
+      "x좌표": {
+        "before": "127.2161308",
+        "after": "127.2144968"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://state.gwd.go.kr/upload/report/kw_nws_data/kw_mgr_4825_20190920.pdf",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1377488071"
+    ]
+  },
+  {
+    "row": 395,
+    "physical_row": 397,
+    "기관명": "정선소방서-고한-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "37.1949013",
+        "after": "37.1949346"
+      },
+      "x좌표": {
+        "before": "128.869425",
+        "after": "128.869897"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://gfsa.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_firestation/fire_js",
+      "https://www.kostat.go.kr/boardDownload.es?bid=12000&list_no=431479&seq=1",
+      "https://js119.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_char",
+      "https://gfsa.gwd.go.kr/fire/greetings/greetings_oranization/greetings_oranization_char",
+      "http://place.map.kakao.com/1377622539"
+    ]
+  },
+  {
+    "row": 444,
+    "physical_row": 446,
+    "기관명": "서산소방서-해미-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충남 서산시 해미면  성지3길 33",
+        "after": "충청남도 서산시 해미면 성지3길 29"
+      },
+      "y좌표": {
+        "before": "36.7100555",
+        "after": "36.709812"
+      },
+      "x좌표": {
+        "before": "126.5426",
+        "after": "126.5427909"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1363583885"
+    ]
+  },
+  {
+    "row": 445,
+    "physical_row": 447,
+    "기관명": "서산소방서-서산_동부-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충남 서산시 학동3로53(동문동)",
+        "after": "충청남도 서산시 학동3로 52"
+      },
+      "y좌표": {
+        "before": "36.789833",
+        "after": "36.7899073"
+      },
+      "x좌표": {
+        "before": "126.45905",
+        "after": "126.4596104"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.seosan.go.kr/emd/contents.do?key=2034",
+      "http://place.map.kakao.com/1363663977"
+    ]
+  },
+  {
+    "row": 452,
+    "physical_row": 454,
+    "기관명": "아산소방서-모종-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충남 아산시 모종로 77",
+        "after": "충청남도 아산시 모종로 77"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1405274880"
+    ]
+  },
+  {
+    "row": 454,
+    "physical_row": 456,
+    "기관명": "보령소방서-오천-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충남 보령시 오천면 충청수영로 701",
+        "after": "충청남도 보령시 오천면 충청수영로 701"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1363862530"
+    ]
+  },
+  {
+    "row": 457,
+    "physical_row": 459,
+    "기관명": "보령소방서-명천-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충남 보령시 성주산로 63",
+        "after": "충청남도 보령시 성주산로 63"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1363953842"
+    ]
+  },
+  {
+    "row": 459,
+    "physical_row": 461,
+    "기관명": "공주소방서-동학사-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충남 공주시 반포면 동학사1로 110",
+        "after": "충청남도 공주시 반포면 동학사1로 62"
+      },
+      "y좌표": {
+        "before": "36.3637401",
+        "after": "36.3667214"
+      },
+      "x좌표": {
+        "before": "127.2539972",
+        "after": "127.256935"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://min24.energy.or.kr/nzeb/BC/BC03/BC03_06_001.do?page=110",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1364491323"
+    ]
+  },
+  {
+    "row": 485,
+    "physical_row": 487,
+    "기관명": "무진장소방서-진안-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "전북 진안군 진안읍 진무로 1179",
+        "after": "전북특별자치도 진안군 진안읍 쇠징계로 9"
+      },
+      "y좌표": {
+        "before": "35.7964195",
+        "after": "35.798901"
+      },
+      "x좌표": {
+        "before": "127.4347185",
+        "after": "127.4355016"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1365118592"
+    ]
+  },
+  {
+    "row": 494,
+    "physical_row": 496,
+    "기관명": "김제소방서-만경-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "전북 김제시 만경읍 만경공단1길 7",
+        "after": "전북특별자치도 김제시 만경읍 두릉길 49"
+      },
+      "y좌표": {
+        "before": "35.8576647",
+        "after": "35.8537557"
+      },
+      "x좌표": {
+        "before": "126.8168582",
+        "after": "126.8193511"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.jeonbuk.go.kr/upload_data/board_data/BBS_0000017/173519419435430.pdf",
+      "http://place.map.kakao.com/1366176601"
+    ]
+  },
+  {
+    "row": 534,
+    "physical_row": 536,
+    "기관명": "경주소방서- 감포 -119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경북 경주시 감포읍 동해안로 2153",
+        "after": "경상북도 경주시 감포읍 동해안로 2153"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R26BK01345606&bidPbancOrd=000&fileSeq=2&fileType=&prcmBsneSeCd=03",
+      "http://place.map.kakao.com/1374124685"
+    ]
+  },
+  {
+    "row": 537,
+    "physical_row": 539,
+    "기관명": "경주소방서- 용황 -119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경상북도 경주시 공단로 25",
+        "after": "경상북도 경주시 공단로 6"
+      },
+      "y좌표": {
+        "before": "35.8753987",
+        "after": "35.8760474"
+      },
+      "x좌표": {
+        "before": "129.2171",
+        "after": "129.2150956"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://min24.energy.or.kr/nzeb/BC/BC03/BC03_06_001.do?page=52",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1374068806"
+    ]
+  },
+  {
+    "row": 562,
+    "physical_row": 564,
+    "기관명": "진도소방서-진도-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "전남 진도군 진도읍 진도대로 6945",
+        "after": "전남광주통합특별시 진도군 진도읍 진도대로 6935"
+      },
+      "y좌표": {
+        "before": "34.4730186",
+        "after": "34.4723937"
+      },
+      "x좌표": {
+        "before": "126.2472667",
+        "after": "126.2466932"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://jngjsobang.go.kr/jindo/center/center_zone/center_zone20/",
+      "https://jngjsobang.go.kr/jindo/center/group/group_team/",
+      "http://place.map.kakao.com/1366513808"
+    ]
+  },
+  {
+    "row": 564,
+    "physical_row": 566,
+    "기관명": "완도소방서-완도-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "전남광주통합특별시 완도군 완도읍 농공단지길 7",
+        "after": "전남광주통합특별시 완도군 농공단지길 7"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1366753655"
+    ]
+  },
+  {
+    "row": 571,
+    "physical_row": 573,
+    "기관명": "화순소방서-동복-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "전남 화순군 동복면 칠정1길 14",
+        "after": "전남광주통합특별시 화순군 동복면 천변길 7"
+      },
+      "y좌표": {
+        "before": "35.0713857",
+        "after": "35.0700416"
+      },
+      "x좌표": {
+        "before": "127.1290623",
+        "after": "127.1273759"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1366412515"
+    ]
+  },
+  {
+    "row": 611,
+    "physical_row": 613,
+    "기관명": "경산소방서- 하양 -119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경북 경산시 하양읍 서사리 406",
+        "after": "경상북도 경산시 하양읍 대곡로 142"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/893015977"
+    ]
+  },
+  {
+    "row": 624,
+    "physical_row": 626,
+    "기관명": "상주소방서- 만산 -119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "36.43404",
+        "after": "36.433774"
+      },
+      "x좌표": {
+        "before": "128.15164",
+        "after": "128.1517007"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gb.go.kr/Main/page.do?BD_CODE=bbs_bodo&B_LEVEL=0&B_NUM=366635501&B_STEP=366635500&Start=340&V_NUM=7944&bdName=&cmd=2&dept_code=&dept_name=&key=4&mnu_uid=6792&p1=0&p2=0&tbbscode1=bbs_bodo&word=",
+      "http://place.map.kakao.com/1373449883"
+    ]
+  },
+  {
+    "row": 629,
+    "physical_row": 631,
+    "기관명": "영주소방서- 봉화 -119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경북 봉화군 봉화읍 내성천3길 152",
+        "after": "경상북도 봉화군 봉화읍 내성천3길 152"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gb.go.kr/Main/open_contents/section/finace/page.do?CTRT_ACCT_BOOK_MNG_NO=202200116616&cmd=2&mnu_uid=14897",
+      "http://place.map.kakao.com/1373506298"
+    ]
+  },
+  {
+    "row": 643,
+    "physical_row": 645,
+    "기관명": "구미소방서- 구미_공단 -119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "36.110565",
+        "after": "36.1099516"
+      },
+      "x좌표": {
+        "before": "128.376463",
+        "after": "128.3761948"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gb.go.kr/Main/page.do?BD_CODE=bbs_bodo&B_LEVEL=0&B_NUM=392674401&B_STEP=392674400&Start=0&V_NUM=8537&bdName=&cmd=2&dept_code=&dept_name=&key=4&mnu_uid=6792&p1=0&p2=0&tbbscode1=bbs_bodo&word=",
+      "http://place.map.kakao.com/1373947396"
+    ]
+  },
+  {
+    "row": 647,
+    "physical_row": 649,
+    "기관명": "안동소방서- 청송 -119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경북 청송군 청송읍 굿바들길 19",
+        "after": "경상북도 청송군 청송읍 굿바들길 19"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R26BK01345606&bidPbancOrd=000&fileSeq=2&fileType=&prcmBsneSeCd=03",
+      "http://place.map.kakao.com/1372507804"
+    ]
+  },
+  {
+    "row": 657,
+    "physical_row": 659,
+    "기관명": "함양소방서-함양-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경남 함양군 함양읍 고운로 161-41",
+        "after": "경상남도 함양군 고운로 161-41"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gnfire.go.kr/hamyang/cm/cntnts/cntntsView.do?cntntsId=178&mi=1103",
+      "https://www.gnfire.go.kr/hamyang/cm/cntnts/cntntsView.do?mi=1102",
+      "https://www.gnfire.go.kr/hamyang/cm/cntnts/cntntsView.do?cntntsId=194&mi=1130",
+      "https://www.gnfire.go.kr/hamyang/cm/cntnts/cntntsView.do?cntntsId=191&mi=1127",
+      "https://www.gnfire.go.kr/hamyang/jo/jobshare/selectOfficeList.do?mi=1497&officeCd1=1057000000000&officeCd2=1057007000000",
+      "https://www.gnfire.go.kr/hamyang/jo/jobshare/selectOfficeList.do?mi=1341&officeCd1=1057000000000&officeCd2=1057001000000",
+      "https://www.gnfire.go.kr/hamyang/jo/jobshare/selectJobShareView.do?mi=1497",
+      "http://place.map.kakao.com/1391452410"
+    ]
+  },
+  {
+    "row": 691,
+    "physical_row": 693,
+    "기관명": "김해서부소방서-주촌-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경남 김해시 주촌면 서부로 1784",
+        "after": "경상남도 김해시 주촌면 주선로 29"
+      },
+      "y좌표": {
+        "before": "35.2350849",
+        "after": "35.2349858"
+      },
+      "x좌표": {
+        "before": "128.844682",
+        "after": "128.8454224"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gnfire.go.kr/gimhaewest/cm/cntnts/cntntsView.do?cntntsId=219&mi=653",
+      "http://place.map.kakao.com/1371373745"
+    ]
+  },
+  {
+    "row": 693,
+    "physical_row": 695,
+    "기관명": "김해서부소방서-진례-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경남 김해시 진례면 서부로 730",
+        "after": "경상남도 김해시 진례면 서부로 730"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gnfire.go.kr/gimhaewest/cm/cntnts/cntntsView.do?cntntsId=220&mi=654",
+      "https://www.gnfire.go.kr/gimhaewest/cm/cntnts/cntntsView.do?cntntsId=217&mi=651",
+      "https://www.gnfire.go.kr/gimhaewest/cm/cntnts/cntntsView.do?cntntsId=231&mi=677",
+      "https://www.gnfire.go.kr/gimhaewest/main.do",
+      "https://www.gnfire.go.kr/gimhaewest/cm/cntnts/cntntsView.do?cntntsId=221&mi=655",
+      "http://place.map.kakao.com/1371361661"
+    ]
+  },
+  {
+    "row": 699,
+    "physical_row": 701,
+    "기관명": "김해동부소방서-동상-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경남 김해시 구지로 179",
+        "after": "경상남도 김해시 구지로 179"
+      },
+      "y좌표": {
+        "before": "35.2388501",
+        "after": "35.2388069"
+      },
+      "x좌표": {
+        "before": "128.8828569",
+        "after": "128.8828559"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.gnfire.go.kr/gimhaeeast/cm/cntnts/cntntsView.do?cntntsId=199&mi=614",
+      "http://place.map.kakao.com/7840987"
+    ]
+  },
+  {
+    "row": 705,
+    "physical_row": 707,
+    "기관명": "사천소방서-동금-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경남 사천시 남일로 29",
+        "after": "경상남도 사천시 동금로 51"
+      },
+      "y좌표": {
+        "before": "34.9331486",
+        "after": "34.9305983"
+      },
+      "x좌표": {
+        "before": "128.0797505",
+        "after": "128.0808052"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.gnfire.go.kr/sacheon/cm/cntnts/cntntsView.do?cntntsId=623&mi=570",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1392492102"
+    ]
+  },
+  {
+    "row": 706,
+    "physical_row": 708,
+    "기관명": "통영소방서-도남-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경남 통영시 도남로257",
+        "after": "경상남도 통영시 도남로 185"
+      },
+      "y좌표": {
+        "before": "34.8283404",
+        "after": "34.8295914"
+      },
+      "x좌표": {
+        "before": "128.4322518",
+        "after": "128.424315"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/498643782"
+    ]
+  },
+  {
+    "row": 726,
+    "physical_row": 728,
+    "기관명": "천안서북소방서-두정-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "충청남도 천안시 서북구 1공단2길 16 두정119안전센터",
+        "after": "충청남도 천안시 서북구 1공단2길 13"
+      },
+      "y좌표": {
+        "before": "36.8276526",
+        "after": "36.8278354"
+      },
+      "x좌표": {
+        "before": "127.1465752",
+        "after": "127.1462673"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1405038388"
+    ]
+  },
+  {
+    "row": 731,
+    "physical_row": 733,
+    "기관명": "진해소방서(본부)-웅동-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경남 창원시 진해구 대장로 44-10",
+        "after": "경상남도 창원시 진해구 대장로 44-10"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/278947429"
+    ]
+  },
+  {
+    "row": 739,
+    "physical_row": 741,
+    "기관명": "마산소방서-무학-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "창원시 마산회원구 회원동 652-1",
+        "after": "경상남도 창원시 마산회원구 무학로 564"
+      },
+      "y좌표": {
+        "before": "35.21815",
+        "after": "35.2177997"
+      },
+      "x좌표": {
+        "before": "128.561158",
+        "after": "128.5611861"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1948830535"
+    ]
+  },
+  {
+    "row": 741,
+    "physical_row": 743,
+    "기관명": "창원소방서-북면-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경남 창원시 의창구 북면 감계로110번길 54-36",
+        "after": "경상남도 창원시 의창구 북면 감계로110번길 54-36"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1375499452"
+    ]
+  },
+  {
+    "row": 749,
+    "physical_row": 751,
+    "기관명": "창원소방서-중동-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "35.258885",
+        "after": "35.2585855"
+      },
+      "x좌표": {
+        "before": "128.631054",
+        "after": "128.6309667"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.changwon.go.kr/cwportal/10310/10429/10432.web?amode=view&gcode=1011&idx=758740",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1375570668"
+    ]
+  },
+  {
+    "row": 771,
+    "physical_row": 773,
+    "기관명": "제주소방서-오라-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "33.4959596",
+        "after": "33.4950582"
+      },
+      "x좌표": {
+        "before": "126.514675",
+        "after": "126.5187901"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://bangjae.jeju.go.kr/files/map4/jejusi_034.pdf",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1364822296"
+    ]
+  },
+  {
+    "row": 790,
+    "physical_row": 792,
+    "기관명": "은평소방서-수색-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "서울특별시 은평구 수색로 294 (수색동)",
+        "after": "서울특별시 은평구 수색로 320 (수색동)"
+      },
+      "y좌표": {
+        "before": "37.584079",
+        "after": "37.5852614"
+      },
+      "x좌표": {
+        "before": "126.8921551",
+        "after": "126.8898928"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://data.ep.go.kr/openinf/sheetview.jsp?infId=OA-19013",
+      "http://place.map.kakao.com/1381409091"
+    ]
+  },
+  {
+    "row": 801,
+    "physical_row": 803,
+    "기관명": "도봉소방서-도봉-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "서울 도봉구 도봉산길 40",
+        "after": "서울특별시 도봉구 도봉산길 40 (도봉동)"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1382641417"
+    ]
+  },
+  {
+    "row": 814,
+    "physical_row": 816,
+    "기관명": "중랑소방서-면목-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "37.572847",
+        "after": "37.572816"
+      },
+      "x좌표": {
+        "before": "127.0807591",
+        "after": "127.0798737"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://ecatalog.jungnang.go.kr/src/viewer/download.php?host=main&no=1&site=20220725_151418",
+      "https://uri.seoul.go.kr/resources/morenCMS/site/web-eng/file/%EC%84%9C%EC%9A%B8%EC%8B%9C%20%EA%B3%A0%EC%8B%9C%20%EC%A0%9C2011-418%ED%98%B8.pdf",
+      "https://ecatalog.jungnang.go.kr/src/viewer/download.php?host=main&no=1&site=20160721_091041",
+      "http://place.map.kakao.com/1381146141"
+    ]
+  },
+  {
+    "row": 842,
+    "physical_row": 844,
+    "기관명": "종로소방서-세종로-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "서울 종로구 율곡로 78",
+        "after": "서울특별시 종로구 율곡로 78(운니동)"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1381318703"
+    ]
+  },
+  {
+    "row": 858,
+    "physical_row": 860,
+    "기관명": "송파소방서-가락-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "37.4961026",
+        "after": "37.4946034"
+      },
+      "x좌표": {
+        "before": "127.1110027",
+        "after": "127.1064832"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.songpa.go.kr/child/detailInfo.do?cpn=19&key=3642&resrceCd=LV0126-1057880&sc1=LV0126",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1617587313"
+    ]
+  },
+  {
+    "row": 859,
+    "physical_row": 861,
+    "기관명": "송파소방서-운동장-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "37.5151707",
+        "after": "37.5161926"
+      },
+      "x좌표": {
+        "before": "127.0740482",
+        "after": "127.0759312"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://stadium.seoul.go.kr/about/phone-guide",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1381734070"
+    ]
+  },
+  {
+    "row": 887,
+    "physical_row": 889,
+    "기관명": "서초소방서-우면-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "서울특별시 서초구 남부순환로340길 49 (서초동)",
+        "after": "서울특별시 서초구 남부순환로340길 29"
+      },
+      "y좌표": {
+        "before": "37.4795644",
+        "after": "37.4800166"
+      },
+      "x좌표": {
+        "before": "127.0218874",
+        "after": "127.0238895"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R26BK01322222&bidPbancOrd=000&fileSeq=1&fileType=&prcmBsneSeCd=03",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1382050155"
+    ]
+  },
+  {
+    "row": 910,
+    "physical_row": 912,
+    "기관명": "기장소방서-장안-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "부산 기장군 장안읍 길천3길 11",
+        "after": "부산광역시 기장군 장안읍 길천3길 11"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://119.busan.go.kr/gijang/119gijintro01",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1405955849"
+    ]
+  },
+  {
+    "row": 920,
+    "physical_row": 922,
+    "기관명": "남부소방서_부산-망미-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "부산 수영구 연수로 330",
+        "after": "부산광역시 수영구 연수로 330(망미동)"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R25BK01206764&bidPbancOrd=000&fileSeq=2&fileType=&prcmBsneSeCd=03",
+      "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R26BK01467859&bidPbancOrd=000&fileSeq=3&fileType=&prcmBsneSeCd=03",
+      "http://place.map.kakao.com/1384072617"
+    ]
+  },
+  {
+    "row": 944,
+    "physical_row": 946,
+    "기관명": "북부소방서_부산-구포-119 안전센터",
+    "changes": {
+      "y좌표": {
+        "before": "35.2106544",
+        "after": "35.2110586"
+      },
+      "x좌표": {
+        "before": "129.0087257",
+        "after": "129.0083671"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R26BK01467859&bidPbancOrd=000&fileSeq=3&fileType=&prcmBsneSeCd=03",
+      "http://place.map.kakao.com/8677247"
+    ]
+  },
+  {
+    "row": 946,
+    "physical_row": 948,
+    "기관명": "북부소방서_부산-삼락-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "부산광역시 사상구 삼덕로 17(삼락동)",
+        "after": "부산광역시 사상구 낙동대로 1422(삼락동)"
+      },
+      "y좌표": {
+        "before": "35.174463",
+        "after": "35.1869036"
+      },
+      "x좌표": {
+        "before": "128.978749",
+        "after": "128.9784404"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://119.busan.go.kr/sasang/119bbintro01",
+      "https://www.busan.go.kr/nbnews/1675262?curPage=202&srchBeginDt=2025-10-15&srchEndDt=2026-10-15&srchKey=&srchText=",
+      "https://www.busan.go.kr/nbnews/1675262?curPage=240&srchBeginDt=2025-02-18&srchEndDt=2026-02-18&srchKey=&srchText=",
+      "https://www.busan.go.kr/nbnews/1675262?curPage=271&srchBeginDt=2025-03-25&srchEndDt=2026-03-25&srchKey=&srchText=",
+      "https://www.g2b.go.kr/pn/pnp/pnpe/UntyAtchFile/downloadFile.do?bidPbancNo=R26BK01467859&bidPbancOrd=000&fileSeq=3&fileType=&prcmBsneSeCd=03",
+      "http://place.map.kakao.com/1384270382"
+    ]
+  },
+  {
+    "row": 948,
+    "physical_row": 950,
+    "기관명": "동래소방서-양정-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "부산광역시 부산진구 연제로9번길 42(양정동)",
+        "after": "부산광역시 부산진구 연수로 50"
+      },
+      "y좌표": {
+        "before": "35.1753992",
+        "after": "35.1747964"
+      },
+      "x좌표": {
+        "before": "129.0759106",
+        "after": "129.0766983"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://119.busan.go.kr/dongnae/119dnintro04",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/9242359"
+    ]
+  },
+  {
+    "row": 965,
+    "physical_row": 967,
+    "기관명": "서부소방서_인천-가좌-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "인천광역시 서구 가좌동 540-1",
+        "after": "인천광역시 서해구 백범로678번길 17"
+      },
+      "y좌표": {
+        "before": "37.4795785",
+        "after": "37.4822804"
+      },
+      "x좌표": {
+        "before": "126.6800947",
+        "after": "126.6825967"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://ebook.incheon.go.kr/e-book/access/ecatalogt.jsp?Dir=747&callmode=normal&catimage=&eclang=ko&start=46&um=s",
+      "http://place.map.kakao.com/1369450952"
+    ]
+  },
+  {
+    "row": 973,
+    "physical_row": 975,
+    "기관명": "남동소방서_인천-간석-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "인천 남동구 경인로 621",
+        "after": "인천광역시 남동구 경인로 621"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.incheon.go.kr/119namdong/119namdong050400",
+      "https://ebook.incheon.go.kr/e-book/access/ecatalogt.jsp?Dir=747&callmode=normal&catimage=&eclang=ko&start=46&um=s",
+      "https://www.incheon.go.kr/119namdong/119namdong030000",
+      "http://place.map.kakao.com/1380239805"
+    ]
+  },
+  {
+    "row": 974,
+    "physical_row": 976,
+    "기관명": "남동소방서_인천-만수-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "인천 남동구 백범로 207",
+        "after": "인천광역시 남동구 백범로 207"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "https://www.incheon.go.kr/119namdong/119namdong050300",
+      "https://ebook.incheon.go.kr/e-book/access/ecatalogt.jsp?Dir=747&callmode=normal&catimage=&eclang=ko&start=46&um=s",
+      "https://www.incheon.go.kr/119namdong/119namdong030000",
+      "http://place.map.kakao.com/1380189151"
+    ]
+  },
+  {
+    "row": 977,
+    "physical_row": 979,
+    "기관명": "중부소방서_인천-만석-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "인천광역시 동구 제물량로 396",
+        "after": "인천광역시 제물포구 제물량로 349"
+      },
+      "y좌표": {
+        "before": "37.4833866",
+        "after": "37.4815848"
+      },
+      "x좌표": {
+        "before": "126.6257931",
+        "after": "126.6211191"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.incheon.go.kr/119jungbu/119jungbu050500",
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1380063621"
+    ]
+  },
+  {
+    "row": 996,
+    "physical_row": 998,
+    "기관명": "군포소방서-송정-119 안전센터",
+    "changes": {
+      "주소": {
+        "before": "경기 군포시 송부로74번길 4",
+        "after": "경기도 군포시 송부로74번길 4"
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 필드를 원격 기존 보정에 병합",
+    "sources": [
+      "https://www.data.go.kr/data/15065056/fileData.do",
+      "http://place.map.kakao.com/1379003092"
+    ]
+  }
+]
