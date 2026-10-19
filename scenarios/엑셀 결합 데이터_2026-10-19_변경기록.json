@@ -1,0 +1,174 @@
+[
+  {
+    "row": 63,
+    "physical_row": 65,
+    "기관명": "강원특별자치도삼척의료원",
+    "changes": {
+      "주소": {
+        "before": "강원특별자치도 삼척시 오십천로 418-0, 삼척의료원",
+        "after": "강원특별자치도 삼척시 오십천로 473"
+      },
+      "x좌표": {
+        "before": 129.1638017,
+        "after": 129.1705069
+      },
+      "y좌표": {
+        "before": 37.4403018,
+        "after": 37.4400406
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 셀을 원격 기존 보정에 병합; 고유 병원명·eff 수식·계산 캐시 보존",
+    "sources": [
+      "https://state.gwd.go.kr/egf/bp/common/front/261124/download",
+      "http://place.map.kakao.com/479829902"
+    ]
+  },
+  {
+    "row": 218,
+    "physical_row": 220,
+    "기관명": "의료법인 대우의료재단대우병원",
+    "changes": {
+      "주소": {
+        "before": "경상남도 거제시 두모길 16-16, (두모동)",
+        "after": "경상남도 거제시 두모길 16"
+      },
+      "x좌표": {
+        "before": 128.7216517,
+        "after": 128.7221455
+      },
+      "y좌표": {
+        "before": 34.8712995,
+        "after": 34.8719559
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 셀을 원격 기존 보정에 병합; 고유 병원명·eff 수식·계산 캐시 보존",
+    "sources": [
+      "https://www.tu.ac.kr/nursing/sub04_04.do?article.offset=0&articleLimit=10&articleNo=426626&mode=view",
+      "http://place.map.kakao.com/10131422"
+    ]
+  },
+  {
+    "row": 242,
+    "physical_row": 244,
+    "기관명": "의료법인 온그룹의료재단 온병원",
+    "changes": {
+      "x좌표": {
+        "before": 129.0504284,
+        "after": 129.0500997
+      },
+      "y좌표": {
+        "before": 35.1574359,
+        "after": 35.1578852
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 셀을 원격 기존 보정에 병합; 고유 병원명·eff 수식·계산 캐시 보존",
+    "sources": [
+      "https://www.hira.or.kr/ra/hosp/hospInfoAjax.do?isNewWindow=Y&isPopupYn=Y&ykiho=JDQ4MTAxMiM1MSMkMSMkMCMkODkkMzgxMzUxIzExIyQxIyQzIyQ4MiQyNjEwMDIjNjEjJDEjJDgjJDgz",
+      "http://place.map.kakao.com/11825205"
+    ]
+  },
+  {
+    "row": 385,
+    "physical_row": 387,
+    "기관명": "(의)서일의료재단기장병원",
+    "changes": {
+      "주소": {
+        "before": "부산광역시 기장군 기장읍 대청로72번길 6-6, 6",
+        "after": "부산광역시 기장군 기장읍 대청로72번길 6"
+      },
+      "x좌표": {
+        "before": 129.2169211,
+        "after": 129.2164907
+      },
+      "y좌표": {
+        "before": 35.2357991,
+        "after": 35.2360312
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 셀을 원격 기존 보정에 병합; 고유 병원명·eff 수식·계산 캐시 보존",
+    "sources": [
+      "https://farmerhealth.kr/content/sub02_1",
+      "http://place.map.kakao.com/8046835"
+    ]
+  },
+  {
+    "row": 532,
+    "physical_row": 534,
+    "기관명": "하나병원",
+    "changes": {
+      "x좌표": {
+        "before": 128.0864806,
+        "after": 128.0864811
+      },
+      "y좌표": {
+        "before": 35.0822158,
+        "after": 35.0822157
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 셀을 원격 기존 보정에 병합; 고유 병원명·eff 수식·계산 캐시 보존",
+    "sources": [
+      "https://www.hira.or.kr/ra/hosp/hospInfoAjax.do?ykiho=JDQ4MTYyMiM4MSMkMSMkNCMkOTkkMzgxMzUxIzMxIyQxIyQzIyQxMyQyNjE4MzIjODEjJDEjJDYjJDgz",
+      "http://place.map.kakao.com/1763336559"
+    ]
+  },
+  {
+    "row": 535,
+    "physical_row": 537,
+    "기관명": "한솔병원",
+    "changes": {
+      "x좌표": {
+        "before": 128.4668345,
+        "after": 128.4668362
+      },
+      "y좌표": {
+        "before": 35.856943,
+        "after": 35.8569413
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 셀을 원격 기존 보정에 병합; 고유 병원명·eff 수식·계산 캐시 보존",
+    "sources": [
+      "https://www.hira.or.kr/ra/hosp/hospInfoAjax.do?ykiho=JDQ4MTYyMiM4MSMkMSMkMCMkOTkkMzgxMzUxIzExIyQxIyQ3IyQ4OSQyNjEwMDIjNjEjJDEjJDQjJDgz",
+      "http://place.map.kakao.com/912101996"
+    ]
+  },
+  {
+    "row": 541,
+    "physical_row": 543,
+    "기관명": "현대병원_경주시",
+    "changes": {
+      "x좌표": {
+        "before": 129.2064771,
+        "after": 129.2064576
+      },
+      "y좌표": {
+        "before": 35.8450997,
+        "after": 35.8451006
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 셀을 원격 기존 보정에 병합; 고유 병원명·eff 수식·계산 캐시 보존",
+    "sources": [
+      "https://www.gyeongju.go.kr/health/page.do?gubun=0&mnu_uid=3072&pageNo=68&srchKwd=",
+      "http://place.map.kakao.com/11203493"
+    ]
+  },
+  {
+    "row": 542,
+    "physical_row": 544,
+    "기관명": "현대병원_아산시",
+    "changes": {
+      "x좌표": {
+        "before": 126.998274,
+        "after": 126.9982627
+      },
+      "y좌표": {
+        "before": 36.7823517,
+        "after": 36.7823462
+      }
+    },
+    "reason": "2026-10-19 기관별 검수의 위치 셀을 원격 기존 보정에 병합; 고유 병원명·eff 수식·계산 캐시 보존",
+    "sources": [
+      "https://www.hira.or.kr/ra/hosp/hospInfoAjax.do?ykiho=JDQ4MTYyMiM2MSMkMSMkMiMkOTkkMzgxMzUxIzExIyQxIyQzIyQxMyQyNjE4MzIjNTEjJDEjJDIjJDgz",
+      "http://place.map.kakao.com/10594344"
+    ]
+  }
+]
