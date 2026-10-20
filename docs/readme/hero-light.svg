@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="448" viewBox="0 0 1280 448" role="img" aria-labelledby="title desc">
+  <title id="title">MCI_ADV · Mass casualty transport simulation</title>
+  <desc id="desc">Ambulance and UAV transport policy simulation by SDO Lab. 64 policy combinations, 548 hospitals, and 997 fire and safety facilities in the 2026-10-19 resource snapshot. The route network is schematic.</desc>
+  <defs>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M 44 0 H 0 V 44" fill="none" stroke="#A7C3D5" stroke-width="0.7" opacity="0.28"/>
+    </pattern>
+    <linearGradient id="wash" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F2F7FC" stop-opacity="1"/>
+      <stop offset="1" stop-color="#F2F7FC" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="clip"><rect x="1" y="1" width="1278" height="446" rx="24"/></clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect width="1280" height="448" fill="#F2F7FC"/>
+    <rect x="580" width="700" height="336" fill="url(#grid)"/>
+    <rect x="570" width="180" height="336" fill="url(#wash)"/>
+    <path d="M699 336 C786 274 736 210 841 194 S1066 97 1280 139" fill="none" stroke="#A7C3D5" stroke-width="22" opacity="0.15"/>
+    <path d="M732 0 C818 84 901 62 964 127 S1115 327 1280 327" fill="none" stroke="#A7C3D5" stroke-width="13" opacity="0.13"/>
+    <rect x="52" y="42" width="29" height="4" rx="2" fill="#087E82"/>
+    <rect x="86" y="42" width="15" height="4" rx="2" fill="#AA5614"/>
+    <g font-family="'Segoe UI', Arial, sans-serif">
+      <text x="114" y="49" font-size="12" font-weight="600" letter-spacing="2.5" fill="#526C7D">SDO LAB / RESEARCH SOFTWARE</text>
+      <text x="51" y="153" font-size="78" font-weight="750" letter-spacing="-3.5" fill="#102B3D">MCI_ADV</text>
+      <text x="55" y="196" font-size="24" font-weight="500" letter-spacing="-0.5" fill="#102B3D">Mass casualty transport simulation</text>
+      <text x="55" y="229" font-size="16" fill="#526C7D">Ambulance + UAV / discrete-event simulation</text>
+      <g transform="translate(54 265)">
+        <rect width="160" height="33" rx="16.5" fill="#E0EEF5" stroke="#087E82" stroke-opacity="0.6"/>
+        <circle cx="18" cy="16.5" r="4" fill="#087E82"/>
+        <text x="31" y="21" font-size="11" font-weight="700" letter-spacing="1.4" fill="#087E82">GROUND / AMB</text>
+      </g>
+      <g transform="translate(228 265)">
+        <rect width="132" height="33" rx="16.5" fill="#E0EEF5" stroke="#AA5614" stroke-opacity="0.6"/>
+        <circle cx="18" cy="16.5" r="4" fill="#AA5614"/>
+        <text x="31" y="21" font-size="11" font-weight="700" letter-spacing="1.4" fill="#AA5614">AIR / UAV</text>
+      </g>
+    </g>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M766 224 H829 V186 H947 V104 H1018" stroke="#087E82" stroke-width="3"/>
+      <path d="M766 224 H881 V263 H1035" stroke="#087E82" stroke-width="3"/>
+      <path d="M766 224 H829 V186 H1100 V206 H1179" stroke="#087E82" stroke-width="3" opacity="0.68"/>
+      <path d="M766 224 L1018 104 M766 224 L1179 206 M766 224 L1035 263" stroke="#AA5614" stroke-width="2" stroke-dasharray="5 9" opacity="0.9"/>
+      <circle cx="766" cy="224" r="28" stroke="#D64141" stroke-width="1" opacity="0.3"/>
+      <circle cx="766" cy="224" r="38" stroke="#D64141" stroke-width="1" opacity="0.14"/>
+    </g>
+    <g fill="#E0EEF5" stroke="#087E82" stroke-width="1.4">
+      <circle cx="1018" cy="104" r="20"/>
+      <circle cx="1035" cy="263" r="20"/>
+      <circle cx="1179" cy="206" r="20"/>
+    </g>
+    <g fill="none" stroke="#087E82" stroke-width="3.4" stroke-linecap="round">
+      <path d="M1018 96 V112 M1010 104 H1026"/>
+      <path d="M1035 255 V271 M1027 263 H1043"/>
+      <path d="M1179 198 V214 M1171 206 H1187"/>
+    </g>
+    <circle cx="766" cy="224" r="15" fill="#D64141"/>
+    <path d="M766 216 V227 M766 232 V233" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+    <g transform="translate(888 150)" stroke="#AA5614" fill="#F2F7FC" stroke-width="1.8">
+      <path d="M-11 -9 L11 9 M-11 9 L11 -9"/>
+      <circle cx="-13" cy="-10" r="5.5"/><circle cx="13" cy="-10" r="5.5"/>
+      <circle cx="-13" cy="10" r="5.5"/><circle cx="13" cy="10" r="5.5"/>
+      <rect x="-4" y="-5" width="8" height="10" rx="2" fill="#AA5614"/>
+    </g>
+    <g transform="translate(915 263)">
+      <rect x="-21" y="-10" width="30" height="18" rx="3" fill="#087E82"/>
+      <path d="M9 -5 H16 L22 2 V8 H9 Z" fill="#087E82"/>
+      <path d="M-6 -7 V3 M-11 -2 H-1" stroke="#F2F7FC" stroke-width="2.5"/>
+      <circle cx="-12" cy="10" r="4" fill="#F2F7FC" stroke="#087E82" stroke-width="2"/>
+      <circle cx="13" cy="10" r="4" fill="#F2F7FC" stroke="#087E82" stroke-width="2"/>
+    </g>
+    <g font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="600" letter-spacing="1.8" fill="#526C7D">
+      <text x="1018" y="68" text-anchor="middle">HOSPITAL</text>
+      <text x="1179" y="172" text-anchor="middle">HOSPITAL</text>
+      <text x="766" y="284" text-anchor="middle">INCIDENT</text>
+      <text x="921" y="140" fill="#AA5614">UAV</text>
+      <text x="1118" y="313" text-anchor="middle" font-size="9" letter-spacing="1.4">SCHEMATIC / NOT TO SCALE</text>
+    </g>
+    <rect y="336" width="1280" height="112" fill="#E6F0F7"/>
+    <path d="M0 336 H1280 M426 361 V423 M853 361 V423" fill="none" stroke="#B9CFDE" stroke-width="1"/>
+    <g font-family="'Segoe UI', Arial, sans-serif">
+      <text x="54" y="405" font-size="43" font-weight="700" letter-spacing="-1" fill="#087E82">64</text>
+      <text x="127" y="390" font-size="11" font-weight="700" letter-spacing="1.5" fill="#102B3D">POLICY COMBINATIONS</text>
+      <text x="127" y="411" font-size="12" fill="#526C7D">2 × 2 × 4 × 4</text>
+      <text x="469" y="405" font-size="43" font-weight="700" letter-spacing="-1" fill="#102B3D">548</text>
+      <text x="570" y="390" font-size="11" font-weight="700" letter-spacing="1.5" fill="#102B3D">HOSPITALS</text>
+      <text x="570" y="411" font-size="12" fill="#526C7D">Resource master</text>
+      <text x="895" y="405" font-size="43" font-weight="700" letter-spacing="-1" fill="#AA5614">997</text>
+      <text x="998" y="390" font-size="11" font-weight="700" letter-spacing="1.3" fill="#102B3D">FIRE &amp; SAFETY BASES</text>
+      <text x="998" y="411" font-size="12" fill="#526C7D">Resource master</text>
+    </g>
+  </g>
+  <rect x="0.5" y="0.5" width="1279" height="447" rx="24" fill="none" stroke="#B9CFDE"/>
+</svg>
